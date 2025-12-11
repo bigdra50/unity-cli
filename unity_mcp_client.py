@@ -38,18 +38,106 @@ import json
 import struct
 import subprocess
 import sys
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 
 
-def detect_port() -> int:
+CONFIG_FILE_NAME = ".unity-mcp.toml"
+
+
+@dataclass
+class UnityMCPConfig:
+    """Configuration for Unity MCP Client"""
+    port: int = 6400
+    host: str = "localhost"
+    timeout: float = 5.0
+    connection_timeout: float = 30.0
+    retry: int = 3
+    log_types: List[str] = field(default_factory=lambda: ["error", "warning"])
+    log_count: int = 20
+
+    @classmethod
+    def load(cls, config_path: Optional[Path] = None) -> "UnityMCPConfig":
+        """
+        Load configuration from TOML file.
+
+        Search order:
+        1. Explicit config_path if provided
+        2. .unity-mcp.toml in current directory
+        3. .unity-mcp.toml in Unity project root (parent of Assets/)
+        4. Default values + EditorPrefs port detection
+        """
+        config = cls()
+
+        # Find config file
+        if config_path and config_path.exists():
+            toml_path = config_path
+        else:
+            toml_path = cls._find_config_file()
+
+        # Load from TOML if found
+        if toml_path:
+            try:
+                with open(toml_path, "rb") as f:
+                    data = tomllib.load(f)
+                config = cls._from_dict(data)
+            except (tomllib.TOMLDecodeError, OSError):
+                pass  # Fall back to defaults
+
+        # If port not set in config, try EditorPrefs
+        if config.port == 6400:
+            detected = _detect_port_from_editor_prefs()
+            if detected:
+                config.port = detected
+
+        return config
+
+    @classmethod
+    def _find_config_file(cls) -> Optional[Path]:
+        """Find config file in current directory or Unity project root"""
+        cwd = Path.cwd()
+
+        # Check current directory
+        config_in_cwd = cwd / CONFIG_FILE_NAME
+        if config_in_cwd.exists():
+            return config_in_cwd
+
+        # Check if we're in a Unity project (has Assets/ directory)
+        # and look for config in project root
+        for parent in [cwd] + list(cwd.parents):
+            if (parent / "Assets").is_dir() and (parent / "ProjectSettings").is_dir():
+                config_in_project = parent / CONFIG_FILE_NAME
+                if config_in_project.exists():
+                    return config_in_project
+                break  # Found Unity project but no config
+
+        return None
+
+    @classmethod
+    def _from_dict(cls, data: Dict[str, Any]) -> "UnityMCPConfig":
+        """Create config from dictionary (TOML data)"""
+        return cls(
+            port=data.get("port", 6400),
+            host=data.get("host", "localhost"),
+            timeout=float(data.get("timeout", 5.0)),
+            connection_timeout=float(data.get("connection_timeout", 30.0)),
+            retry=data.get("retry", 3),
+            log_types=data.get("log_types", ["error", "warning"]),
+            log_count=data.get("log_count", 20),
+        )
+
+
+def _detect_port_from_editor_prefs() -> Optional[int]:
     """
     Detect Unity MCP port from EditorPrefs (macOS only).
 
     Returns the port from Unity EditorPrefs if available,
-    otherwise falls back to the default port 6400.
+    otherwise returns None.
     """
     if sys.platform != 'darwin':
-        return 6400
+        return None
 
     try:
         result = subprocess.run(
@@ -63,7 +151,20 @@ def detect_port() -> int:
     except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
         pass
 
-    return 6400
+    return None
+
+
+def detect_port() -> int:
+    """
+    Detect Unity MCP port.
+
+    Search order:
+    1. .unity-mcp.toml in current directory or Unity project root
+    2. EditorPrefs (macOS only)
+    3. Default port 6400
+    """
+    config = UnityMCPConfig.load()
+    return config.port
 
 
 class UnityMCPError(Exception):
@@ -123,9 +224,20 @@ class UnityMCPConnection:
                     "  1. Unity Editor is open\n"
                     "  2. MCP For Unity bridge is running (Window > MCP For Unity)"
                 )
+            except (socket.timeout, TimeoutError):
+                raise UnityMCPError(
+                    f"Connection timed out to {self.host}:{self.port} (timeout: {self.timeout}s).\n"
+                    "Please ensure Unity Editor is responsive."
+                )
 
             # Read WELCOME
-            welcome = sock.recv(1024).decode('utf-8')
+            try:
+                welcome = sock.recv(1024).decode('utf-8')
+            except (socket.timeout, TimeoutError):
+                raise UnityMCPError(
+                    f"Handshake timed out (timeout: {self.timeout}s).\n"
+                    "Unity Editor may be busy or unresponsive."
+                )
             if 'WELCOME UNITY-MCP' not in welcome:
                 raise UnityMCPError(f"Invalid handshake: {welcome}")
 
@@ -140,7 +252,14 @@ class UnityMCPConnection:
             self._write_frame(sock, payload)
 
             # Read framed response
-            response_text = self._read_frame(sock)
+            try:
+                response_text = self._read_frame(sock)
+            except (socket.timeout, TimeoutError):
+                raise UnityMCPError(
+                    f"Response timed out for '{tool_name}' (timeout: {self.timeout}s).\n"
+                    "The operation may still be running in Unity.\n"
+                    "Try increasing --connection-timeout for long operations."
+                )
             response = json.loads(response_text)
 
             # Check status (support both old 'status' and new 'success' fields)
@@ -169,9 +288,20 @@ class UnityMCPConnection:
                     "  1. Unity Editor is open\n"
                     "  2. MCP For Unity bridge is running (Window > MCP For Unity)"
                 )
+            except (socket.timeout, TimeoutError):
+                raise UnityMCPError(
+                    f"Connection timed out to {self.host}:{self.port} (timeout: {self.timeout}s).\n"
+                    "Please ensure Unity Editor is responsive."
+                )
 
             # Read WELCOME
-            welcome = sock.recv(1024).decode('utf-8')
+            try:
+                welcome = sock.recv(1024).decode('utf-8')
+            except (socket.timeout, TimeoutError):
+                raise UnityMCPError(
+                    f"Handshake timed out (timeout: {self.timeout}s).\n"
+                    "Unity Editor may be busy or unresponsive."
+                )
             if 'WELCOME UNITY-MCP' not in welcome:
                 raise UnityMCPError(f"Invalid handshake: {welcome}")
 
@@ -186,7 +316,13 @@ class UnityMCPConnection:
             self._write_frame(sock, payload)
 
             # Read framed response
-            response_text = self._read_frame(sock)
+            try:
+                response_text = self._read_frame(sock)
+            except (socket.timeout, TimeoutError):
+                raise UnityMCPError(
+                    f"Response timed out for resource '{resource_name}' (timeout: {self.timeout}s).\n"
+                    "Unity Editor may be busy or unresponsive."
+                )
             response = json.loads(response_text)
 
             # Check status (support both old 'status' and new 'success' fields)
@@ -537,6 +673,9 @@ def main():
     import sys
     import argparse
 
+    # Load config first to use as defaults
+    config = UnityMCPConfig.load()
+
     parser = argparse.ArgumentParser(
         description="Unity MCP Client CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -551,39 +690,77 @@ Available commands:
   find <name>             Find GameObject by name
   tests <mode>            Run tests (edit|play)
   verify                  Verify build (refresh → clear → compile wait → console)
+  config                  Show current configuration
 
 Examples:
   %(prog)s state
   %(prog)s refresh
   %(prog)s console --types error --count 50
-  %(prog)s verify --timeout 120 --retry 5
-  %(prog)s verify --types error warning log
+  %(prog)s verify --timeout 120 --connection-timeout 60
+  %(prog)s verify --types error warning log --retry 5
   %(prog)s find "Main Camera"
   %(prog)s tests edit
+  %(prog)s config
+
+Configuration:
+  Settings can be stored in .unity-mcp.toml in the current directory
+  or Unity project root. Example:
+
+    # .unity-mcp.toml
+    port = 6401
+    host = "localhost"
+    timeout = 5.0
+    connection_timeout = 30.0
+    retry = 3
+    log_types = ["error", "warning"]
+    log_count = 20
         """
     )
     parser.add_argument("command", help="Command to execute (see available commands below)")
     parser.add_argument("args", nargs="*", help="Command arguments")
     parser.add_argument("--port", type=int, default=None,
-                        help="Server port (auto-detected on macOS if not specified)")
-    parser.add_argument("--host", default="localhost", help="Server host")
-    parser.add_argument("--count", type=int, default=20, help="Number of console logs to retrieve (default: 20)")
-    parser.add_argument("--types", nargs="+", default=["error", "warning"],
-                        help="Log types to retrieve (default: error warning). Options: error, warning, log")
-    parser.add_argument("--timeout", type=int, default=60,
-                        help="Maximum wait time for compilation in seconds (default: 60, verify only)")
-    parser.add_argument("--retry", type=int, default=3,
-                        help="Maximum connection retry attempts (default: 3, verify only)")
+                        help=f"Server port (default: {config.port}, from config/EditorPrefs)")
+    parser.add_argument("--host", default=None,
+                        help=f"Server host (default: {config.host})")
+    parser.add_argument("--count", type=int, default=None,
+                        help=f"Number of console logs to retrieve (default: {config.log_count})")
+    parser.add_argument("--types", nargs="+", default=None,
+                        help=f"Log types to retrieve (default: {' '.join(config.log_types)}). Options: error, warning, log")
+    parser.add_argument("--timeout", type=int, default=None,
+                        help=f"Maximum wait time for compilation in seconds (default: {int(config.timeout)}, verify only)")
+    parser.add_argument("--connection-timeout", type=float, default=None,
+                        help=f"TCP connection timeout in seconds (default: {config.connection_timeout}, verify only)")
+    parser.add_argument("--retry", type=int, default=None,
+                        help=f"Maximum connection retry attempts (default: {config.retry}, verify only)")
 
     args = parser.parse_args()
 
-    # Auto-detect port if not specified
-    port = args.port if args.port is not None else detect_port()
-    client = UnityMCPClient(host=args.host, port=port)
+    # Apply config defaults where CLI args not specified
+    port = args.port if args.port is not None else config.port
+    host = args.host if args.host is not None else config.host
+    timeout = args.timeout if args.timeout is not None else int(config.timeout)
+    connection_timeout = args.connection_timeout if args.connection_timeout is not None else config.connection_timeout
+    retry = args.retry if args.retry is not None else config.retry
+    log_types = args.types if args.types is not None else config.log_types
+    log_count = args.count if args.count is not None else config.log_count
+
+    client = UnityMCPClient(host=host, port=port, timeout=config.timeout)
 
     try:
-        if args.command == "console":
-            result = client.read_console(types=args.types, count=args.count)
+        if args.command == "config":
+            config_file = UnityMCPConfig._find_config_file()
+            print("=== Unity MCP Configuration ===")
+            print(f"Config file: {config_file or 'Not found (using defaults)'}")
+            print(f"Port: {port}")
+            print(f"Host: {host}")
+            print(f"Timeout: {config.timeout}s")
+            print(f"Connection timeout: {connection_timeout}s")
+            print(f"Retry: {retry}")
+            print(f"Log types: {', '.join(log_types)}")
+            print(f"Log count: {log_count}")
+
+        elif args.command == "console":
+            result = client.read_console(types=log_types, count=log_count)
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
         elif args.command == "clear":
@@ -619,14 +796,21 @@ Examples:
         elif args.command == "verify":
             import time
 
+            # Create a separate client with longer timeout for verify operations
+            verify_client = UnityMCPClient(
+                host=host,
+                port=port,
+                timeout=connection_timeout
+            )
+
             # Step 1: Refresh assets
             print("=== Refreshing Assets ===")
-            client.execute_menu_item("Assets/Refresh")
+            verify_client.execute_menu_item("Assets/Refresh")
             print("✓ Asset refresh triggered")
 
             # Step 2: Clear console (to capture only new errors)
             print("\n=== Clearing Console ===")
-            client.clear_console()
+            verify_client.clear_console()
             print("✓ Console cleared")
 
             # Step 3: Wait for compilation using isCompiling state
@@ -635,12 +819,12 @@ Examples:
             elapsed = 0.0
             connection_failures = 0
 
-            while elapsed < args.timeout:
+            while elapsed < timeout:
                 time.sleep(poll_interval)
                 elapsed += poll_interval
 
                 try:
-                    state = client.editor.get_state()
+                    state = verify_client.editor.get_state()
                     is_compiling = state.get('data', {}).get('isCompiling', False)
 
                     if not is_compiling:
@@ -652,31 +836,31 @@ Examples:
 
                 except UnityMCPError as e:
                     connection_failures += 1
-                    if connection_failures <= args.retry:
-                        print(f"  Connection lost, retrying ({connection_failures}/{args.retry})...", end='\r')
+                    if connection_failures <= retry:
+                        print(f"  Connection lost, retrying ({connection_failures}/{retry})...", end='\r')
                         continue
-                    print(f"\n⚠ Connection failed after {args.retry} retries")
+                    print(f"\n⚠ Connection failed after {retry} retries")
                     sys.exit(1)
             else:
-                print(f"\n⚠ Timeout after {args.timeout}s")
+                print(f"\n⚠ Timeout after {timeout}s")
                 sys.exit(1)
 
             # Step 4: Check console logs
             print("\n=== Console Logs ===")
-            logs = client.read_console(types=args.types, count=args.count)
+            logs = verify_client.read_console(types=log_types, count=log_count)
 
             if logs['data']:
-                print(f"Found {len(logs['data'])} log entries (types: {', '.join(args.types)}, max: {args.count}):\n")
+                print(f"Found {len(logs['data'])} log entries (types: {', '.join(log_types)}, max: {log_count}):\n")
                 for log in logs['data']:
                     print(f"[{log['type']}] {log['message']}")
                     if log.get('file'):
                         print(f"  at {log['file']}:{log.get('line', '?')}")
             else:
-                print(f"✓ No logs found (searched types: {', '.join(args.types)})")
+                print(f"✓ No logs found (searched types: {', '.join(log_types)})")
 
         else:
             print(f"Unknown command: {args.command}")
-            print("Available: console, clear, play, stop, state, refresh, find, tests, verify")
+            print("Available: config, console, clear, play, stop, state, refresh, find, tests, verify")
             sys.exit(1)
 
     except UnityMCPError as e:

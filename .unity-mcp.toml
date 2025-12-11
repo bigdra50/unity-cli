@@ -1,0 +1,17 @@
+# Unity MCP Client Configuration
+# This file configures the unity-mcp CLI tool.
+
+# Connection settings
+port = 6401
+host = "localhost"
+
+# Timeout settings (in seconds)
+timeout = 10.0              # Default TCP timeout for most operations
+connection_timeout = 60.0   # TCP timeout for verify command (longer for heavy ops)
+
+# Retry settings
+retry = 5                   # Connection retry attempts for verify command
+
+# Console log settings
+log_types = ["error", "warning"]
+log_count = 50
