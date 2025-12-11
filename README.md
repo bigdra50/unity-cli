@@ -15,7 +15,7 @@ Unity Editor を外部から制御するCLIツール。
 
 ## 制限事項
 
-- TCP（レガシー）トランスポートのみ対応 - WebSocketトランスポートは未対応（次バージョンで実装予定）
+- TCP（Stdio Bridge）トランスポートのみ対応
 
 ## インストール
 
@@ -59,22 +59,47 @@ unity-mcp find "Main Camera"
 unity-mcp tests edit
 unity-mcp tests play
 
-# ビルド検証（リフレッシュ→コンパイル待機→コンソール確認）
+# ビルド検証（リフレッシュ→クリア→コンパイル待機→コンソール確認）
 unity-mcp verify
+unity-mcp verify --timeout 120 --retry 5
 ```
 
 ## オプション
 
-| オプション | 説明                              | デフォルト    |
-| ---------- | --------------------------------- | ------------- |
-| `--port`   | MCPサーバーポート                 | 6400          |
-| `--host`   | MCPサーバーホスト                 | localhost     |
-| `--count`  | 取得するログ件数                  | 20            |
-| `--types`  | ログタイプ（error, warning, log） | error warning |
+### 共通オプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--port` | MCPサーバーポート（macOSでは自動検出） | 6400 |
+| `--host` | MCPサーバーホスト | localhost |
+| `--count` | 取得するログ件数 | 20 |
+| `--types` | ログタイプ（error, warning, log） | error warning |
+
+### verify専用オプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--timeout` | コンパイル待機の最大秒数 | 60 |
+| `--retry` | 接続失敗時のリトライ回数 | 3 |
 
 ```bash
 # 例: ポート6401でエラーのみ50件取得
 unity-mcp console --port 6401 --types error --count 50
+
+# 例: 大規模プロジェクト向けverify（タイムアウト120秒、リトライ5回）
+unity-mcp verify --timeout 120 --retry 5
+```
+
+## ポート自動検出（macOS）
+
+macOSでは `--port` を省略すると、Unity EditorPrefsからポートを自動検出します。
+
+```bash
+# 自動検出されたポートを使用
+unity-mcp state
+
+# 手動指定も可能（自動検出より優先）
+unity-mcp --port 6401 state
 ```
 
 ## トラブルシューティング
