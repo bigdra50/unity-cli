@@ -36,7 +36,34 @@ Usage:
 import socket
 import json
 import struct
+import subprocess
+import sys
 from typing import Dict, List, Optional, Any, Union
+
+
+def detect_port() -> int:
+    """
+    Detect Unity MCP port from EditorPrefs (macOS only).
+
+    Returns the port from Unity EditorPrefs if available,
+    otherwise falls back to the default port 6400.
+    """
+    if sys.platform != 'darwin':
+        return 6400
+
+    try:
+        result = subprocess.run(
+            ["defaults", "read", "com.unity3d.UnityEditor5.x", "MCPForUnity.UnitySocketPort"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return int(result.stdout.strip())
+    except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
+        pass
+
+    return 6400
 
 
 class UnityMCPError(Exception):
@@ -523,12 +550,13 @@ Available commands:
   refresh                 Refresh assets
   find <name>             Find GameObject by name
   tests <mode>            Run tests (edit|play)
-  verify                  Verify build (refresh → wait → console)
+  verify                  Verify build (refresh → clear → compile wait → console)
 
 Examples:
   %(prog)s state
   %(prog)s refresh
   %(prog)s console --types error --count 50
+  %(prog)s verify --timeout 120 --retry 5
   %(prog)s verify --types error warning log
   %(prog)s find "Main Camera"
   %(prog)s tests edit
@@ -536,15 +564,22 @@ Examples:
     )
     parser.add_argument("command", help="Command to execute (see available commands below)")
     parser.add_argument("args", nargs="*", help="Command arguments")
-    parser.add_argument("--port", type=int, default=6400, help="Server port")
+    parser.add_argument("--port", type=int, default=None,
+                        help="Server port (auto-detected on macOS if not specified)")
     parser.add_argument("--host", default="localhost", help="Server host")
     parser.add_argument("--count", type=int, default=20, help="Number of console logs to retrieve (default: 20)")
     parser.add_argument("--types", nargs="+", default=["error", "warning"],
                         help="Log types to retrieve (default: error warning). Options: error, warning, log")
+    parser.add_argument("--timeout", type=int, default=60,
+                        help="Maximum wait time for compilation in seconds (default: 60, verify only)")
+    parser.add_argument("--retry", type=int, default=3,
+                        help="Maximum connection retry attempts (default: 3, verify only)")
 
     args = parser.parse_args()
 
-    client = UnityMCPClient(host=args.host, port=args.port)
+    # Auto-detect port if not specified
+    port = args.port if args.port is not None else detect_port()
+    client = UnityMCPClient(host=args.host, port=port)
 
     try:
         if args.command == "console":
@@ -584,34 +619,51 @@ Examples:
         elif args.command == "verify":
             import time
 
-            # Step 1: refresh コマンド相当
+            # Step 1: Refresh assets
             print("=== Refreshing Assets ===")
             client.execute_menu_item("Assets/Refresh")
             print("✓ Asset refresh triggered")
 
-            # Step 2: コンパイル完了をポーリングで待機
-            print("\n=== Waiting for Compilation ===")
-            max_retries = 30
-            retry_interval = 1.0  # seconds
+            # Step 2: Clear console (to capture only new errors)
+            print("\n=== Clearing Console ===")
+            client.clear_console()
+            print("✓ Console cleared")
 
-            for attempt in range(max_retries):
-                time.sleep(retry_interval)
+            # Step 3: Wait for compilation using isCompiling state
+            print("\n=== Waiting for Compilation ===")
+            poll_interval = 1.0
+            elapsed = 0.0
+            connection_failures = 0
+
+            while elapsed < args.timeout:
+                time.sleep(poll_interval)
+                elapsed += poll_interval
+
                 try:
-                    # consoleが取得できれば準備完了
-                    logs = client.read_console(types=args.types, count=args.count)
-                    print(f"✓ Editor ready (waited {(attempt + 1) * retry_interval:.1f}s)")
-                    break
+                    state = client.editor.get_state()
+                    is_compiling = state.get('data', {}).get('isCompiling', False)
+
+                    if not is_compiling:
+                        print(f"\n✓ Compilation complete ({elapsed:.1f}s)")
+                        break
+
+                    print(f"  Compiling... ({elapsed:.1f}s)", end='\r')
+                    connection_failures = 0  # Reset on successful connection
+
                 except UnityMCPError as e:
-                    if "0 bytes" in str(e) or "Connection" in str(e):
-                        print(f"  Waiting for editor... ({(attempt + 1) * retry_interval:.1f}s)", end='\r')
+                    connection_failures += 1
+                    if connection_failures <= args.retry:
+                        print(f"  Connection lost, retrying ({connection_failures}/{args.retry})...", end='\r')
                         continue
-                    raise
+                    print(f"\n⚠ Connection failed after {args.retry} retries")
+                    sys.exit(1)
             else:
-                print(f"\n⚠ Timeout after {max_retries * retry_interval}s")
+                print(f"\n⚠ Timeout after {args.timeout}s")
                 sys.exit(1)
 
-            # Step 3: console コマンド相当
+            # Step 4: Check console logs
             print("\n=== Console Logs ===")
+            logs = client.read_console(types=args.types, count=args.count)
 
             if logs['data']:
                 print(f"Found {len(logs['data'])} log entries (types: {', '.join(args.types)}, max: {args.count}):\n")
