@@ -4,9 +4,23 @@ Unity Editor を外部から制御するCLIツール。
 
 ## 概要
 
-[CoplayDev/unity-mcp](https://github.com/CoplayDev/unity-mcp) サーバーと通信し、Unity Editorを操作します。
+[CoplayDev/unity-mcp](https://github.com/CoplayDev/unity-mcp) パッケージのTCPブリッジと直接通信し、Unity Editorを操作します。
 
-> Note: Unity Editor側で [unity-mcp](https://github.com/CoplayDev/unity-mcp) パッケージがインストールされ、MCPブリッジが起動している必要があります。
+MCPサーバー経由ではなく直接通信する理由:
+- MCPツールを大量に読み込むと、コーディングエージェントのコンテキストウィンドウを常に圧迫する
+- このCLIツールならBashツール経由で必要な時だけ呼び出せる
+
+```
+通常のMCPフロー:
+  Claude → MCP Server → Unity TCP Bridge → Unity Editor
+         (ツール定義がコンテキストを常に消費)
+
+このツール:
+  Claude → Bash → unity-mcp-client → Unity TCP Bridge → Unity Editor
+                (必要な時だけ呼び出し)
+```
+
+> Note: Unity Editor側で [unity-mcp](https://github.com/CoplayDev/unity-mcp) パッケージがインストールされ、TCPブリッジが起動している必要があります（Window > MCP For Unity）。
 
 ## 動作要件
 
@@ -15,7 +29,8 @@ Unity Editor を外部から制御するCLIツール。
 
 ## 制限事項
 
-- TCP（Stdio Bridge）トランスポートのみ対応
+- TCPブリッジ（Stdio Bridge）への直接接続のみ対応
+- MCPプロトコル（stdio/SSE）は使用しません
 
 ## インストール
 
