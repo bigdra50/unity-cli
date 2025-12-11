@@ -10,7 +10,7 @@ Unity Editor を外部から制御するCLIツール。
 
 ## 動作要件
 
-- Python 3.8+
+- Python 3.11+
 - [CoplayDev/unity-mcp](https://github.com/CoplayDev/unity-mcp) >= 8.1.0
 
 ## 制限事項
@@ -38,6 +38,9 @@ uv tool install .
 # ヘルプ表示
 unity-mcp --help
 
+# 現在の設定を確認
+unity-mcp config
+
 # エディタ状態確認
 unity-mcp state
 
@@ -61,8 +64,39 @@ unity-mcp tests play
 
 # ビルド検証（リフレッシュ→クリア→コンパイル待機→コンソール確認）
 unity-mcp verify
-unity-mcp verify --timeout 120 --retry 5
+unity-mcp verify --timeout 120 --connection-timeout 60
 ```
+
+## 設定ファイル
+
+`.unity-mcp.toml` をカレントディレクトリまたはUnityプロジェクトルートに配置することで、デフォルト値を設定できます。
+
+```toml
+# .unity-mcp.toml
+
+# 接続設定
+port = 6401
+host = "localhost"
+
+# タイムアウト設定（秒）
+timeout = 5.0              # 通常操作のTCPタイムアウト
+connection_timeout = 30.0  # verifyコマンド用（重い処理向け）
+
+# リトライ設定
+retry = 3                  # verifyコマンドの接続リトライ回数
+
+# コンソールログ設定
+log_types = ["error", "warning"]
+log_count = 20
+```
+
+### 設定の優先順位
+
+1. CLIオプション（`--port`, `--timeout` など）
+2. `.unity-mcp.toml`（カレントディレクトリ）
+3. `.unity-mcp.toml`（Unityプロジェクトルート）
+4. EditorPrefs（macOSのみ、ポート自動検出）
+5. デフォルト値
 
 ## オプション
 
@@ -70,7 +104,7 @@ unity-mcp verify --timeout 120 --retry 5
 
 | オプション | 説明 | デフォルト |
 |-----------|------|-----------|
-| `--port` | MCPサーバーポート（macOSでは自動検出） | 6400 |
+| `--port` | MCPサーバーポート | 設定ファイル or 6400 |
 | `--host` | MCPサーバーホスト | localhost |
 | `--count` | 取得するログ件数 | 20 |
 | `--types` | ログタイプ（error, warning, log） | error warning |
@@ -80,25 +114,30 @@ unity-mcp verify --timeout 120 --retry 5
 | オプション | 説明 | デフォルト |
 |-----------|------|-----------|
 | `--timeout` | コンパイル待機の最大秒数 | 60 |
+| `--connection-timeout` | TCP接続タイムアウト（秒） | 30.0 |
 | `--retry` | 接続失敗時のリトライ回数 | 3 |
 
 ```bash
 # 例: ポート6401でエラーのみ50件取得
 unity-mcp console --port 6401 --types error --count 50
 
-# 例: 大規模プロジェクト向けverify（タイムアウト120秒、リトライ5回）
-unity-mcp verify --timeout 120 --retry 5
+# 例: 大規模プロジェクト向けverify（タイムアウト120秒、接続タイムアウト60秒）
+unity-mcp verify --timeout 120 --connection-timeout 60
 ```
 
-## ポート自動検出（macOS）
+## ポート自動検出
 
-macOSでは `--port` を省略すると、Unity EditorPrefsからポートを自動検出します。
+ポートは以下の順序で検出されます：
+
+1. `.unity-mcp.toml` の `port` 設定
+2. macOS: Unity EditorPrefsから自動検出
+3. デフォルト: 6400
 
 ```bash
 # 自動検出されたポートを使用
 unity-mcp state
 
-# 手動指定も可能（自動検出より優先）
+# 手動指定（自動検出より優先）
 unity-mcp --port 6401 state
 ```
 
@@ -107,6 +146,9 @@ unity-mcp --port 6401 state
 ```bash
 # Unity MCPサーバーが起動しているか確認
 lsof -i :6400
+
+# 現在の設定を確認
+unity-mcp config
 ```
 
 ## ライセンス
