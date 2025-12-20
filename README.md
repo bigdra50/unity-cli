@@ -85,6 +85,17 @@ unity-mcp scene load --name MainScene
 unity-mcp scene load --path Assets/Scenes/Level1.unity
 unity-mcp scene save
 unity-mcp scene create --name NewScene --path Assets/Scenes
+
+# GameObject操作
+unity-mcp gameobject find "Main Camera"
+unity-mcp gameobject create --name "MyCube" --primitive Cube --position 0,1,0
+unity-mcp gameobject modify --name "MyCube" --position 5,0,0 --rotation 0,45,0
+unity-mcp gameobject delete --name "MyCube"
+
+# マテリアル操作
+unity-mcp material info --path Assets/Materials/Default.mat
+unity-mcp material create --path Assets/Materials/New.mat --shader Standard
+unity-mcp material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 ```
 
 ## 設定ファイル
@@ -155,6 +166,27 @@ log_count = 20
 | `--name` | シーン名（create/load） | - |
 | `--path` | シーンパス（create/load/save） | - |
 | `--build-index` | ビルドインデックス（load） | - |
+
+### gameobject専用オプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--name` | オブジェクト名 | - |
+| `--primitive` | プリミティブ (Cube, Sphere, Capsule, Cylinder, Plane, Quad) | - |
+| `--position` | 位置 (x,y,z) | - |
+| `--rotation` | 回転 (x,y,z) | - |
+| `--scale` | スケール (x,y,z) | - |
+| `--parent` | 親オブジェクト名 | - |
+
+### material専用オプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--path` | マテリアルパス | - |
+| `--shader` | シェーダー名 | Standard |
+| `--color` | 色 (r,g,b,a) | - |
+| `--property` | プロパティ名 | - |
+| `--value` | プロパティ値 | - |
 
 ```bash
 # 例: ポート6401でエラーのみ50件取得
