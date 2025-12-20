@@ -31,6 +31,13 @@ Usage:
 
     # Run tests
     results = client.run_tests(mode="edit")
+
+    # Batch execution
+    result = client.batch.execute([
+        {"tool": "read_console", "params": {"action": "clear"}},
+        {"tool": "manage_editor", "params": {"action": "play"}},
+        {"tool": "read_console", "params": {"action": "get", "types": ["error"]}}
+    ], fail_fast=True)
 """
 
 import socket
@@ -620,6 +627,159 @@ class AssetAPI:
         return self._conn.send_command("manage_asset", params)
 
 
+class BatchAPI:
+    """Batch execution operations"""
+
+    MAX_COMMANDS_PER_BATCH = 25
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def execute(self, commands: List[Dict[str, Any]],
+                parallel: Optional[bool] = None,
+                fail_fast: Optional[bool] = None,
+                max_parallelism: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Execute multiple commands as a batch.
+
+        Args:
+            commands: List of command specifications with 'tool' and 'params' keys.
+                     Example: [{"tool": "read_console", "params": {"action": "get"}}, ...]
+            parallel: Attempt to run read-only commands in parallel (Unity always runs sequentially)
+            fail_fast: Stop processing after the first failure
+            max_parallelism: Hint for maximum number of parallel workers
+
+        Returns:
+            Dict containing:
+                - results: List of individual command results
+                - callSuccessCount: Number of successful commands
+                - callFailureCount: Number of failed commands
+                - parallelRequested: Whether parallel execution was requested
+                - parallelApplied: Whether parallel execution was applied (always False in Unity)
+
+        Raises:
+            UnityMCPError: If validation fails or batch execution fails
+        """
+        if not isinstance(commands, list) or not commands:
+            raise UnityMCPError("'commands' must be a non-empty list of command specifications")
+
+        if len(commands) > self.MAX_COMMANDS_PER_BATCH:
+            raise UnityMCPError(
+                f"batch_execute supports up to {self.MAX_COMMANDS_PER_BATCH} commands; received {len(commands)}"
+            )
+
+        # Validate command structure
+        normalized_commands = []
+        for index, command in enumerate(commands):
+            if not isinstance(command, dict):
+                raise UnityMCPError(f"Command at index {index} must be a dict with 'tool' and 'params' keys")
+
+            tool_name = command.get("tool")
+            params = command.get("params", {})
+
+            if not tool_name or not isinstance(tool_name, str):
+                raise UnityMCPError(f"Command at index {index} is missing a valid 'tool' name")
+
+            if params is None:
+                params = {}
+            if not isinstance(params, dict):
+                raise UnityMCPError(f"Command '{tool_name}' must specify parameters as a dict")
+
+            normalized_commands.append({
+                "tool": tool_name,
+                "params": params,
+            })
+
+        # Build payload
+        payload = {"commands": normalized_commands}
+
+        if parallel is not None:
+            payload["parallel"] = bool(parallel)
+        if fail_fast is not None:
+            payload["failFast"] = bool(fail_fast)
+        if max_parallelism is not None:
+            payload["maxParallelism"] = int(max_parallelism)
+
+        return self._conn.send_command("batch_execute", payload)
+
+
+
+
+class MaterialAPI:
+    """Material management operations"""
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def create(self, material_path: str, shader: str = "Standard",
+               properties: Optional[Dict] = None) -> Dict[str, Any]:
+        """Create material"""
+        params = {
+            "action": "create",
+            "materialPath": material_path,
+            "shader": shader
+        }
+        if properties:
+            params["properties"] = properties
+
+        return self._conn.send_command("manage_material", params)
+
+    def set_shader_property(self, material_path: str, property: str,
+                           value: Any) -> Dict[str, Any]:
+        """Set shader property"""
+        return self._conn.send_command("manage_material", {
+            "action": "set_shader_property",
+            "materialPath": material_path,
+            "property": property,
+            "value": value
+        })
+
+    def set_color(self, material_path: str, color: List[float],
+                  property: str = "_BaseColor") -> Dict[str, Any]:
+        """Set material color"""
+        return self._conn.send_command("manage_material", {
+            "action": "set_color",
+            "materialPath": material_path,
+            "color": color,
+            "property": property
+        })
+
+    def assign_to_renderer(self, material_path: str, target: str,
+                          search_method: str = "by_name",
+                          slot: int = 0,
+                          mode: str = "shared") -> Dict[str, Any]:
+        """Assign material to renderer"""
+        return self._conn.send_command("manage_material", {
+            "action": "assign_to_renderer",
+            "materialPath": material_path,
+            "target": target,
+            "searchMethod": search_method,
+            "slot": slot,
+            "mode": mode
+        })
+
+    def set_renderer_color(self, target: str, color: List[float],
+                          search_method: str = "by_name",
+                          slot: int = 0,
+                          mode: str = "property_block") -> Dict[str, Any]:
+        """Set renderer color"""
+        return self._conn.send_command("manage_material", {
+            "action": "set_renderer_color",
+            "target": target,
+            "color": color,
+            "searchMethod": search_method,
+            "slot": slot,
+            "mode": mode
+        })
+
+    def get_info(self, material_path: str) -> Dict[str, Any]:
+        """Get material info"""
+        return self._conn.send_command("manage_material", {
+            "action": "get_info",
+            "materialPath": material_path
+        })
+
+
 class UnityMCPClient:
     """
     Complete Unity MCP client with all tools
@@ -635,6 +795,13 @@ class UnityMCPClient:
         client.editor.play()
         client.gameobject.create("Player", primitive_type="Cube")
         client.scene.load(path="Assets/Scenes/Main.unity")
+
+        # Batch execution
+        result = client.batch.execute([
+            {"tool": "read_console", "params": {"action": "clear"}},
+            {"tool": "manage_editor", "params": {"action": "play"}},
+            {"tool": "read_console", "params": {"action": "get", "types": ["error"]}}
+        ], fail_fast=True)
     """
 
     def __init__(self, host='localhost', port=6400, timeout=5.0):
@@ -646,6 +813,8 @@ class UnityMCPClient:
         self.gameobject = GameObjectAPI(self._conn)
         self.scene = SceneAPI(self._conn)
         self.asset = AssetAPI(self._conn)
+        self.batch = BatchAPI(self._conn)
+        self.material = MaterialAPI(self._conn)
 
     # Convenience methods
     def read_console(self, **kwargs) -> Dict[str, Any]:
@@ -705,12 +874,13 @@ Available commands:
   stop                    Exit play mode
   state                   Get editor state
   refresh                 Refresh assets
-  find <name>             Find GameObject by name
   tests <mode>            Run tests (edit|play)
   verify                  Verify build (refresh → clear → compile wait → console)
   config                  Show current configuration
   config init             Generate default .unity-mcp.toml
   scene <action>          Scene operations (create|load|save|hierarchy|active|build-settings)
+  gameobject <action>     GameObject operations (find|create|delete|modify)
+  material <action>       Material operations (create|info|set-color|set-property|assign|set-renderer-color)
 
 Examples:
   %(prog)s state
@@ -718,7 +888,6 @@ Examples:
   %(prog)s console --types error --count 50
   %(prog)s verify --timeout 120 --connection-timeout 60
   %(prog)s verify --types error warning log --retry 5
-  %(prog)s find "Main Camera"
   %(prog)s tests edit
   %(prog)s config
   %(prog)s config init
@@ -730,6 +899,14 @@ Examples:
   %(prog)s scene create --name NewScene --path Assets/Scenes
   %(prog)s scene save
   %(prog)s scene build-settings
+  %(prog)s gameobject find "Main Camera"
+  %(prog)s gameobject create --name "MyCube" --primitive Cube --position 0,0,0
+  %(prog)s gameobject create --name "Player" --parent "GameManager" --position 1,2,3 --scale 2,2,2
+  %(prog)s gameobject modify --name "MyCube" --position 5,0,0 --rotation 0,45,0
+  %(prog)s gameobject delete --name "MyCube"
+  %(prog)s material create --path Assets/Materials/New.mat --shader Standard
+  %(prog)s material info --path Assets/Materials/Existing.mat
+  %(prog)s material set-color --path Assets/Materials/Mat.mat --color 1,0,0,1
 
 Configuration:
   Settings can be stored in .unity-mcp.toml in the current directory
@@ -763,11 +940,39 @@ Configuration:
                         help=f"Maximum connection retry attempts (default: {config.retry}, verify only)")
     # Scene command arguments
     parser.add_argument("--name", default=None,
-                        help="Scene name (for scene create/load)")
+                        help="Scene/GameObject name (for scene create/load, gameobject create/modify/delete)")
     parser.add_argument("--path", default=None,
-                        help="Scene path (for scene create/load/save)")
+                        help="Scene path (for scene create/load/save) or Material path (for material commands)")
     parser.add_argument("--build-index", type=int, default=None,
                         help="Build index (for scene load)")
+    # Material command arguments
+    parser.add_argument("--shader", default="Standard",
+                        help="Shader name (for material create, default: Standard)")
+    parser.add_argument("--color", default=None,
+                        help="Color as comma-separated RGBA (e.g., 1,0,0,1 for red)")
+    parser.add_argument("--property", default="_BaseColor",
+                        help="Shader property name (default: _BaseColor)")
+    parser.add_argument("--value", default=None,
+                        help="Property value (for material set-property)")
+    parser.add_argument("--target", default=None,
+                        help="Target GameObject name (for material assign/set-renderer-color)")
+    parser.add_argument("--search-method", default="by_name",
+                        help="Search method (default: by_name)")
+    parser.add_argument("--slot", type=int, default=0,
+                        help="Material slot index (default: 0)")
+    parser.add_argument("--mode", default=None,
+                        help="Mode: 'shared' or 'instance' (for assign), 'property_block' or 'material' (for set-renderer-color)")
+    # GameObject command arguments
+    parser.add_argument("--primitive", default=None,
+                        help="Primitive type (for gameobject create). Options: Cube, Sphere, Capsule, Cylinder, Plane, Quad")
+    parser.add_argument("--position", default=None,
+                        help="Position as x,y,z (for gameobject create/modify)")
+    parser.add_argument("--rotation", default=None,
+                        help="Rotation as x,y,z (for gameobject create/modify)")
+    parser.add_argument("--scale", default=None,
+                        help="Scale as x,y,z (for gameobject create/modify)")
+    parser.add_argument("--parent", default=None,
+                        help="Parent GameObject name (for gameobject create)")
     # Config init arguments
     parser.add_argument("--output", "-o", default=None,
                         help="Output path for config init (default: ./.unity-mcp.toml)")
@@ -959,9 +1164,216 @@ Configuration:
                 print("Actions: create, load, save, hierarchy, active, build-settings")
                 sys.exit(1)
 
+        elif args.command == "material":
+            if not args.args:
+                print("Usage: material <action>")
+                print("Actions: create, info, set-color, set-property, assign, set-renderer-color")
+                sys.exit(1)
+
+            action = args.args[0]
+
+            # Helper function to parse color
+            def parse_color(s: str) -> List[float]:
+                parts = s.split(',')
+                if len(parts) != 4:
+                    raise ValueError(f"Invalid color format: {s} (expected r,g,b,a)")
+                return [float(p.strip()) for p in parts]
+
+            if action == "create":
+                if not args.path:
+                    print("Error: --path required for create")
+                    sys.exit(1)
+                result = client.material.create(
+                    material_path=args.path,
+                    shader=args.shader
+                )
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "info":
+                if not args.path:
+                    print("Error: --path required for info")
+                    sys.exit(1)
+                result = client.material.get_info(material_path=args.path)
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "set-color":
+                if not args.path:
+                    print("Error: --path required for set-color")
+                    sys.exit(1)
+                if not args.color:
+                    print("Error: --color required for set-color")
+                    sys.exit(1)
+                color = parse_color(args.color)
+                result = client.material.set_color(
+                    material_path=args.path,
+                    color=color,
+                    property=args.property
+                )
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "set-property":
+                if not args.path:
+                    print("Error: --path required for set-property")
+                    sys.exit(1)
+                if not args.property:
+                    print("Error: --property required for set-property")
+                    sys.exit(1)
+                if args.value is None:
+                    print("Error: --value required for set-property")
+                    sys.exit(1)
+                result = client.material.set_shader_property(
+                    material_path=args.path,
+                    property=args.property,
+                    value=args.value
+                )
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "assign":
+                if not args.path:
+                    print("Error: --path required for assign")
+                    sys.exit(1)
+                if not args.target:
+                    print("Error: --target required for assign")
+                    sys.exit(1)
+                mode = args.mode or "shared"
+                result = client.material.assign_to_renderer(
+                    material_path=args.path,
+                    target=args.target,
+                    search_method=args.search_method,
+                    slot=args.slot,
+                    mode=mode
+                )
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "set-renderer-color":
+                if not args.target:
+                    print("Error: --target required for set-renderer-color")
+                    sys.exit(1)
+                if not args.color:
+                    print("Error: --color required for set-renderer-color")
+                    sys.exit(1)
+                color = parse_color(args.color)
+                mode = args.mode or "property_block"
+                result = client.material.set_renderer_color(
+                    target=args.target,
+                    color=color,
+                    search_method=args.search_method,
+                    slot=args.slot,
+                    mode=mode
+                )
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            else:
+                print(f"Unknown material action: {action}")
+                print("Actions: create, info, set-color, set-property, assign, set-renderer-color")
+                sys.exit(1)
+
+        elif args.command == "gameobject":
+            if not args.args:
+                print("Usage: gameobject <action>")
+                print("Actions: find, create, delete, modify")
+                sys.exit(1)
+
+            action = args.args[0]
+
+            # Helper function to parse x,y,z format
+            def parse_vector3(s: str) -> List[float]:
+                parts = s.split(',')
+                if len(parts) != 3:
+                    raise ValueError(f"Invalid vector format: {s} (expected x,y,z)")
+                return [float(p.strip()) for p in parts]
+
+            if action == "find":
+                # gameobject find <name>
+                if len(args.args) < 2:
+                    print("Error: GameObject name required for find")
+                    sys.exit(1)
+                search_term = args.args[1]
+                result = client.gameobject.find(search_method="by_name", search_term=search_term)
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "create":
+                # gameobject create --name "..." [--primitive Cube] [--position x,y,z] [--rotation x,y,z] [--scale x,y,z] [--parent "..."]
+                if not args.name:
+                    print("Error: --name required for create")
+                    sys.exit(1)
+
+                kwargs = {}
+                if args.primitive:
+                    kwargs["primitive_type"] = args.primitive
+                if args.position:
+                    try:
+                        kwargs["position"] = parse_vector3(args.position)
+                    except ValueError as e:
+                        print(f"Error: {e}")
+                        sys.exit(1)
+                if args.rotation:
+                    try:
+                        kwargs["rotation"] = parse_vector3(args.rotation)
+                    except ValueError as e:
+                        print(f"Error: {e}")
+                        sys.exit(1)
+                if args.scale:
+                    try:
+                        kwargs["scale"] = parse_vector3(args.scale)
+                    except ValueError as e:
+                        print(f"Error: {e}")
+                        sys.exit(1)
+                if args.parent:
+                    kwargs["parent"] = args.parent
+
+                result = client.gameobject.create(name=args.name, **kwargs)
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "delete":
+                # gameobject delete --name "..."
+                if not args.name:
+                    print("Error: --name required for delete")
+                    sys.exit(1)
+                result = client.gameobject.delete(target=args.name, search_method="by_name")
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "modify":
+                # gameobject modify --name "..." [--position x,y,z] [--rotation x,y,z] [--scale x,y,z]
+                if not args.name:
+                    print("Error: --name required for modify")
+                    sys.exit(1)
+
+                kwargs = {}
+                if args.position:
+                    try:
+                        kwargs["position"] = parse_vector3(args.position)
+                    except ValueError as e:
+                        print(f"Error: {e}")
+                        sys.exit(1)
+                if args.rotation:
+                    try:
+                        kwargs["rotation"] = parse_vector3(args.rotation)
+                    except ValueError as e:
+                        print(f"Error: {e}")
+                        sys.exit(1)
+                if args.scale:
+                    try:
+                        kwargs["scale"] = parse_vector3(args.scale)
+                    except ValueError as e:
+                        print(f"Error: {e}")
+                        sys.exit(1)
+
+                if not kwargs:
+                    print("Error: At least one of --position, --rotation, or --scale required for modify")
+                    sys.exit(1)
+
+                result = client.gameobject.modify(target=args.name, search_method="by_name", **kwargs)
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            else:
+                print(f"Unknown gameobject action: {action}")
+                print("Actions: find, create, delete, modify")
+                sys.exit(1)
+
         else:
             print(f"Unknown command: {args.command}")
-            print("Available: config, console, clear, play, stop, state, refresh, find, tests, verify, scene")
+            print("Available: config, console, clear, play, stop, state, refresh, tests, verify, scene, material, gameobject")
             sys.exit(1)
 
     except UnityMCPError as e:
