@@ -559,6 +559,10 @@ class SceneAPI:
         """Get active scene info"""
         return self._conn.send_command("manage_scene", {"action": "get_active"})
 
+    def get_build_settings(self) -> Dict[str, Any]:
+        """Get build settings (scenes in build)"""
+        return self._conn.send_command("manage_scene", {"action": "get_build_settings"})
+
 
 class AssetAPI:
     """Asset management operations"""
@@ -691,6 +695,7 @@ Available commands:
   tests <mode>            Run tests (edit|play)
   verify                  Verify build (refresh → clear → compile wait → console)
   config                  Show current configuration
+  scene <action>          Scene operations (create|load|save|hierarchy|active|build-settings)
 
 Examples:
   %(prog)s state
@@ -701,6 +706,13 @@ Examples:
   %(prog)s find "Main Camera"
   %(prog)s tests edit
   %(prog)s config
+  %(prog)s scene active
+  %(prog)s scene hierarchy
+  %(prog)s scene load --name MainScene
+  %(prog)s scene load --path Assets/Scenes/Level1.unity
+  %(prog)s scene create --name NewScene --path Assets/Scenes
+  %(prog)s scene save
+  %(prog)s scene build-settings
 
 Configuration:
   Settings can be stored in .unity-mcp.toml in the current directory
@@ -732,6 +744,13 @@ Configuration:
                         help=f"TCP connection timeout in seconds (default: {config.connection_timeout}, verify only)")
     parser.add_argument("--retry", type=int, default=None,
                         help=f"Maximum connection retry attempts (default: {config.retry}, verify only)")
+    # Scene command arguments
+    parser.add_argument("--name", default=None,
+                        help="Scene name (for scene create/load)")
+    parser.add_argument("--path", default=None,
+                        help="Scene path (for scene create/load/save)")
+    parser.add_argument("--build-index", type=int, default=None,
+                        help="Build index (for scene load)")
 
     args = parser.parse_args()
 
@@ -858,9 +877,57 @@ Configuration:
             else:
                 print(f"✓ No logs found (searched types: {', '.join(log_types)})")
 
+        elif args.command == "scene":
+            if not args.args:
+                print("Usage: scene <action>")
+                print("Actions: create, load, save, hierarchy, active, build-settings")
+                sys.exit(1)
+
+            action = args.args[0]
+
+            if action == "active":
+                result = client.scene.get_active()
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "hierarchy":
+                result = client.scene.get_hierarchy()
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "build-settings":
+                result = client.scene.get_build_settings()
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "load":
+                if not args.name and not args.path and args.build_index is None:
+                    print("Error: --name, --path, or --build-index required for load")
+                    sys.exit(1)
+                result = client.scene.load(
+                    name=args.name,
+                    path=args.path,
+                    build_index=args.build_index
+                )
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "save":
+                result = client.scene.save(name=args.name, path=args.path)
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            elif action == "create":
+                if not args.name:
+                    print("Error: --name required for create")
+                    sys.exit(1)
+                path = args.path or "Scenes"
+                result = client.scene.create(name=args.name, path=path)
+                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+            else:
+                print(f"Unknown scene action: {action}")
+                print("Actions: create, load, save, hierarchy, active, build-settings")
+                sys.exit(1)
+
         else:
             print(f"Unknown command: {args.command}")
-            print("Available: config, console, clear, play, stop, state, refresh, find, tests, verify")
+            print("Available: config, console, clear, play, stop, state, refresh, find, tests, verify, scene")
             sys.exit(1)
 
     except UnityMCPError as e:
