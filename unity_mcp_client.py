@@ -128,6 +128,20 @@ class UnityMCPConfig:
             log_count=data.get("log_count", 20),
         )
 
+    def to_toml(self) -> str:
+        """Generate TOML string from config"""
+        log_types_str = ", ".join(f'"{t}"' for t in self.log_types)
+        return f'''# Unity MCP Client Configuration
+
+port = {self.port}
+host = "{self.host}"
+timeout = {self.timeout}
+connection_timeout = {self.connection_timeout}
+retry = {self.retry}
+log_types = [{log_types_str}]
+log_count = {self.log_count}
+'''
+
 
 def _detect_port_from_editor_prefs() -> Optional[int]:
     """
@@ -695,6 +709,7 @@ Available commands:
   tests <mode>            Run tests (edit|play)
   verify                  Verify build (refresh → clear → compile wait → console)
   config                  Show current configuration
+  config init             Generate default .unity-mcp.toml
   scene <action>          Scene operations (create|load|save|hierarchy|active|build-settings)
 
 Examples:
@@ -706,6 +721,8 @@ Examples:
   %(prog)s find "Main Camera"
   %(prog)s tests edit
   %(prog)s config
+  %(prog)s config init
+  %(prog)s config init --output my-config.toml
   %(prog)s scene active
   %(prog)s scene hierarchy
   %(prog)s scene load --name MainScene
@@ -751,6 +768,11 @@ Configuration:
                         help="Scene path (for scene create/load/save)")
     parser.add_argument("--build-index", type=int, default=None,
                         help="Build index (for scene load)")
+    # Config init arguments
+    parser.add_argument("--output", "-o", default=None,
+                        help="Output path for config init (default: ./.unity-mcp.toml)")
+    parser.add_argument("--force", "-f", action="store_true",
+                        help="Overwrite existing config file without confirmation")
 
     args = parser.parse_args()
 
@@ -767,16 +789,28 @@ Configuration:
 
     try:
         if args.command == "config":
-            config_file = UnityMCPConfig._find_config_file()
-            print("=== Unity MCP Configuration ===")
-            print(f"Config file: {config_file or 'Not found (using defaults)'}")
-            print(f"Port: {port}")
-            print(f"Host: {host}")
-            print(f"Timeout: {config.timeout}s")
-            print(f"Connection timeout: {connection_timeout}s")
-            print(f"Retry: {retry}")
-            print(f"Log types: {', '.join(log_types)}")
-            print(f"Log count: {log_count}")
+            # Check for 'init' subcommand
+            if args.args and args.args[0] == "init":
+                output_path = Path(args.output) if args.output else Path(CONFIG_FILE_NAME)
+
+                if output_path.exists() and not args.force:
+                    print(f"Error: {output_path} already exists. Use --force to overwrite.")
+                    sys.exit(1)
+
+                default_config = UnityMCPConfig()
+                output_path.write_text(default_config.to_toml())
+                print(f"Created {output_path}")
+            else:
+                config_file = UnityMCPConfig._find_config_file()
+                print("=== Unity MCP Configuration ===")
+                print(f"Config file: {config_file or 'Not found (using defaults)'}")
+                print(f"Port: {port}")
+                print(f"Host: {host}")
+                print(f"Timeout: {config.timeout}s")
+                print(f"Connection timeout: {connection_timeout}s")
+                print(f"Retry: {retry}")
+                print(f"Log types: {', '.join(log_types)}")
+                print(f"Log count: {log_count}")
 
         elif args.command == "console":
             result = client.read_console(types=log_types, count=log_count)
