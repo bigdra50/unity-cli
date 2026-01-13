@@ -277,18 +277,18 @@ class UnityMCPError(Exception):
 class UnityMCPConnection:
     """Low-level Unity MCP connection handler"""
 
-    def __init__(self, host="localhost", port=6400, timeout=5.0):
+    def __init__(self, host: str = "localhost", port: int = 6400, timeout: float = 5.0) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
 
-    def _write_frame(self, sock, payload_bytes: bytes):
+    def _write_frame(self, sock: socket.socket, payload_bytes: bytes) -> None:
         """Write framed message: 8-byte big-endian length + payload"""
         length = len(payload_bytes)
         header = struct.pack(">Q", length)
         sock.sendall(header + payload_bytes)
 
-    def _read_frame(self, sock) -> str:
+    def _read_frame(self, sock: socket.socket) -> str:
         """Read framed message: 8-byte header + payload"""
         sock.settimeout(self.timeout)
 
@@ -367,12 +367,13 @@ class UnityMCPConnection:
             if response.get("success") is False:
                 raise UnityMCPError(f"{tool_name} failed: {response.get('message', 'Unknown error')}")
 
-            return response.get("result", response)
+            result: dict[str, Any] = response.get("result", response)
+            return result
 
         finally:
             sock.close()
 
-    def read_resource(self, resource_name: str, params: dict[str, Any] = None) -> dict[str, Any]:
+    def read_resource(self, resource_name: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Read resource and return response (uses same protocol as Tools)"""
         if params is None:
             params = {}
@@ -428,7 +429,8 @@ class UnityMCPConnection:
             if response.get("success") is False:
                 raise UnityMCPError(f"Resource {resource_name} failed: {response.get('message', 'Unknown error')}")
 
-            return response.get("result", response)
+            result: dict[str, Any] = response.get("result", response)
+            return result
 
         finally:
             sock.close()
@@ -543,8 +545,9 @@ class EditorAPI:
     def get_project_root(self) -> str:
         """Get project root path via Resource API"""
         result = self._conn.read_resource("get_project_info")
-        data = result.get("data", {})
-        return data.get("projectRoot", "")
+        data: dict[str, Any] = result.get("data", {})
+        project_root: str = data.get("projectRoot", "")
+        return project_root
 
     def add_tag(self, tag_name: str) -> dict[str, Any]:
         """Add tag"""
@@ -628,7 +631,7 @@ class ScriptAPI:
         namespace: str | None = None,
         base_class: str | None = None,
         interfaces: list[str] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create a new C# script"""
         params: dict[str, Any] = {"action": "create", "name": name, "path": path}
@@ -648,7 +651,7 @@ class ScriptAPI:
         name: str,
         path: str = "Scripts",
         content: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Modify an existing C# script"""
         params: dict[str, Any] = {"action": "modify", "name": name, "path": path}
@@ -680,7 +683,7 @@ class ShaderAPI:
         name: str,
         path: str = "Shaders",
         shader_type: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create a new shader"""
         params: dict[str, Any] = {"action": "create", "name": name, "path": path}
@@ -694,7 +697,7 @@ class ShaderAPI:
         name: str,
         path: str = "Shaders",
         content: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Modify an existing shader"""
         params: dict[str, Any] = {"action": "modify", "name": name, "path": path}
@@ -726,7 +729,7 @@ class PrefabAPI:
         name: str,
         path: str = "Prefabs",
         source_object: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create a new prefab"""
         params: dict[str, Any] = {"action": "create", "name": name, "path": path}
@@ -741,7 +744,7 @@ class PrefabAPI:
         position: list[float] | None = None,
         rotation: list[float] | None = None,
         parent: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Instantiate a prefab in the scene"""
         params: dict[str, Any] = {"action": "instantiate", "path": path}
@@ -792,10 +795,10 @@ class GameObjectAPI:
         scale: list[float] | None = None,
         primitive_type: str | None = None,
         prefab_path: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create GameObject"""
-        params = {"action": "create", "name": name}
+        params: dict[str, Any] = {"action": "create", "name": name}
         if parent:
             params["parent"] = parent
         if position:
@@ -820,11 +823,15 @@ class GameObjectAPI:
         position: list[float] | None = None,
         rotation: list[float] | None = None,
         scale: list[float] | None = None,
-        component_properties: dict[str, dict] | None = None,
-        **kwargs,
+        component_properties: dict[str, dict[str, Any]] | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Modify GameObject"""
-        params = {"action": "modify", "target": target, "searchMethod": search_method}
+        params: dict[str, Any] = {
+            "action": "modify",
+            "target": target,
+            "searchMethod": search_method,
+        }
         if name:
             params["name"] = name
         if position:
@@ -905,7 +912,7 @@ class GameObjectAPI:
         target: str | None = None,
         search_inactive: bool = False,
         page_size: int = 50,
-    ):
+    ) -> Iterator[dict[str, Any]]:
         """
         Iterate through find results using pagination
 
@@ -972,10 +979,10 @@ class GameObjectAPI:
         target: str,
         components: list[str],
         search_method: str = "by_name",
-        component_properties: dict[str, dict] | None = None,
+        component_properties: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Add component(s)"""
-        params = {
+        params: dict[str, Any] = {
             "action": "add_component",
             "target": target,
             "componentsToAdd": components,
@@ -1009,9 +1016,14 @@ class SceneAPI:
         """Create new scene"""
         return self._conn.send_command("manage_scene", {"action": "create", "name": name, "path": path})
 
-    def load(self, name: str | None = None, path: str | None = None, build_index: int | None = None) -> dict[str, Any]:
+    def load(
+        self,
+        name: str | None = None,
+        path: str | None = None,
+        build_index: int | None = None,
+    ) -> dict[str, Any]:
         """Load scene"""
-        params = {"action": "load"}
+        params: dict[str, Any] = {"action": "load"}
         if name:
             params["name"] = name
         if path:
@@ -1023,7 +1035,7 @@ class SceneAPI:
 
     def save(self, name: str | None = None, path: str | None = None) -> dict[str, Any]:
         """Save current scene"""
-        params = {"action": "save"}
+        params: dict[str, Any] = {"action": "save"}
         if name:
             params["name"] = name
         if path:
@@ -1063,7 +1075,7 @@ class SceneAPI:
                 - total: Total available items
                 - items: List of GameObject summaries
         """
-        params = {"action": "get_hierarchy"}
+        params: dict[str, Any] = {"action": "get_hierarchy"}
 
         if page_size is not None:
             params["page_size"] = page_size
@@ -1108,15 +1120,15 @@ class SceneAPI:
 
         data = result.get("data", [])
 
-        def count_descendants(items: list) -> int:
+        def count_descendants(items: list[dict[str, Any]]) -> int:
             """Count all descendants recursively"""
             total = 0
             for item in items:
-                children = item.get("children", [])
+                children: list[dict[str, Any]] = item.get("children", [])
                 total += len(children) + count_descendants(children)
             return total
 
-        def truncate_to_depth(items: list, current_depth: int, max_depth: int) -> list:
+        def truncate_to_depth(items: list[dict[str, Any]], current_depth: int, max_depth: int) -> list[dict[str, Any]]:
             """Truncate hierarchy to specified depth"""
             truncated = []
             for item in items:
@@ -1161,7 +1173,7 @@ class SceneAPI:
         max_children_per_node: int | None = None,
         parent: Any | None = None,
         include_transform: bool | None = None,
-    ):
+    ) -> Iterator[dict[str, Any]]:
         """
         Iterate through entire scene hierarchy using cursor-based pagination
 
@@ -1230,7 +1242,7 @@ class SceneAPI:
                 data = result.get("data", {})
                 yield result
 
-    def _flatten_hierarchy(self, items: list, depth: int = 0) -> list:
+    def _flatten_hierarchy(self, items: list[dict[str, Any]], depth: int = 0) -> list[dict[str, Any]]:
         """Flatten nested hierarchy into a flat list with depth info"""
         result = []
         for item in items:
@@ -1249,15 +1261,19 @@ class AssetAPI:
     def __init__(self, conn: UnityMCPConnection):
         self._conn = conn
 
-    def create(self, path: str, asset_type: str, properties: dict | None = None) -> dict[str, Any]:
+    def create(self, path: str, asset_type: str, properties: dict[str, Any] | None = None) -> dict[str, Any]:
         """Create asset"""
-        params = {"action": "create", "path": path, "assetType": asset_type}
+        params: dict[str, Any] = {
+            "action": "create",
+            "path": path,
+            "assetType": asset_type,
+        }
         if properties:
             params["properties"] = properties
 
         return self._conn.send_command("manage_asset", params)
 
-    def modify(self, path: str, properties: dict) -> dict[str, Any]:
+    def modify(self, path: str, properties: dict[str, Any]) -> dict[str, Any]:
         """Modify asset"""
         return self._conn.send_command("manage_asset", {"action": "modify", "path": path, "properties": properties})
 
@@ -1371,7 +1387,7 @@ class BatchAPI:
             )
 
         # Build payload
-        payload = {"commands": normalized_commands}
+        payload: dict[str, Any] = {"commands": normalized_commands}
 
         if parallel is not None:
             payload["parallel"] = bool(parallel)
@@ -1389,9 +1405,18 @@ class MaterialAPI:
     def __init__(self, conn: UnityMCPConnection):
         self._conn = conn
 
-    def create(self, material_path: str, shader: str = "Standard", properties: dict | None = None) -> dict[str, Any]:
+    def create(
+        self,
+        material_path: str,
+        shader: str = "Standard",
+        properties: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Create material"""
-        params = {"action": "create", "materialPath": material_path, "shader": shader}
+        params: dict[str, Any] = {
+            "action": "create",
+            "materialPath": material_path,
+            "shader": shader,
+        }
         if properties:
             params["properties"] = properties
 
@@ -1495,7 +1520,7 @@ class UnityMCPClient:
         ], fail_fast=True)
     """
 
-    def __init__(self, host="localhost", port=6400, timeout=5.0):
+    def __init__(self, host: str = "localhost", port: int = 6400, timeout: float = 5.0) -> None:
         self._conn = UnityMCPConnection(host, port, timeout)
 
         # API objects
@@ -1513,7 +1538,7 @@ class UnityMCPClient:
         self.prefab = PrefabAPI(self._conn)
 
 
-def main():
+def main() -> None:
     """CLI entry point for unity-mcp command"""
     import argparse
     import sys

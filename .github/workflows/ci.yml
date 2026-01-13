@@ -46,8 +46,7 @@ jobs:
         run: uv tool install mypy
 
       - name: Run mypy
-        run: uvx mypy unity_mcp_client.py --ignore-missing-imports || echo "::warning::mypy errors found, but not blocking"
-        continue-on-error: true
+        run: uvx mypy unity_mcp_client.py --strict
 
   build:
     runs-on: ubuntu-latest
