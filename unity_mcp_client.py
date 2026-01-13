@@ -543,6 +543,85 @@ class GameObjectAPI:
 
         return self._conn.send_command("manage_gameobject", params)
 
+    def iterate_find(self, search_method: str = "by_name",
+                     search_term: Optional[str] = None,
+                     target: Optional[str] = None,
+                     search_inactive: bool = False,
+                     page_size: int = 50):
+        """
+        Iterate through find results using pagination
+
+        This is a generator that automatically fetches all pages until completion.
+        Supports both:
+        - Server v8.6.0+: Paged responses with pagination info
+        - Server v8.3.0 and earlier: Full response (client-side paging)
+
+        Args:
+            search_method: Search method (default: "by_name")
+            search_term: Search keyword
+            target: Target name (alternative to search_term)
+            search_inactive: Include inactive GameObjects
+            page_size: Items per page (1-500, default: 50)
+
+        Yields:
+            Dict for each page containing find results
+        """
+        result = self.find(
+            search_method=search_method,
+            search_term=search_term,
+            target=target,
+            find_all=True,
+            search_inactive=search_inactive,
+            page_size=page_size,
+            cursor="0"
+        )
+
+        data = result.get('data', [])
+
+        # Detect server response format
+        if isinstance(data, list):
+            # Legacy server: data is a flat list, do client-side pagination
+            all_items = data
+            total = len(all_items)
+
+            for offset in range(0, max(total, 1), page_size):
+                page_items = all_items[offset:offset + page_size]
+                yield {
+                    "success": True,
+                    "message": result.get("message", ""),
+                    "data": {
+                        "items": page_items,
+                        "cursor": str(offset),
+                        "pageSize": len(page_items),
+                        "nextCursor": str(offset + page_size) if offset + page_size < total else None,
+                        "totalCount": total,
+                        "hasMore": offset + page_size < total,
+                        "_client_paged": True
+                    }
+                }
+                if not page_items:
+                    break
+        else:
+            # Modern server: data is a dict with pagination info
+            yield result
+
+            while data.get('hasMore') or data.get('nextCursor'):
+                next_cursor = data.get('nextCursor')
+                if next_cursor is None:
+                    break
+
+                result = self.find(
+                    search_method=search_method,
+                    search_term=search_term,
+                    target=target,
+                    find_all=True,
+                    search_inactive=search_inactive,
+                    page_size=page_size,
+                    cursor=str(next_cursor)
+                )
+                data = result.get('data', {})
+                yield result
+
     def add_component(self, target: str, components: List[str],
                       search_method: str = "by_name",
                       component_properties: Optional[Dict[str, Dict]] = None) -> Dict[str, Any]:
@@ -1166,7 +1245,7 @@ Configuration:
     parser.add_argument("--include-transform", action="store_true",
                         help="Include transform information (for scene hierarchy)")
     parser.add_argument("--iterate-all", action="store_true",
-                        help="Iterate through all pages (for scene hierarchy)")
+                        help="Iterate through all pages (for scene hierarchy, gameobject find)")
     # Config init arguments
     parser.add_argument("--output", "-o", default=None,
                         help="Output path for config init (default: ./.unity-mcp.toml)")
@@ -1514,13 +1593,41 @@ Configuration:
                 return [float(p.strip()) for p in parts]
 
             if action == "find":
-                # gameobject find <name>
+                # gameobject find <name> [--iterate-all] [--page-size N]
                 if len(args.args) < 2:
                     print("Error: GameObject name required for find")
                     sys.exit(1)
                 search_term = args.args[1]
-                result = client.gameobject.find(search_method="by_name", search_term=search_term)
-                print(json.dumps(result, indent=2, ensure_ascii=False))
+
+                if args.iterate_all:
+                    # Iterate through all pages
+                    all_items = []
+                    total_pages = 0
+
+                    for page in client.gameobject.iterate_find(
+                        search_method="by_name",
+                        search_term=search_term,
+                        page_size=args.page_size or 50
+                    ):
+                        total_pages += 1
+                        data = page.get('data', {})
+                        items = data.get('items', [])
+                        all_items.extend(items)
+                        print(f"Page {total_pages}: {len(items)} items (total so far: {len(all_items)})", file=sys.stderr)
+
+                    result = {
+                        "success": True,
+                        "message": f"Found {len(all_items)} GameObject(s) across {total_pages} pages",
+                        "data": {
+                            "total": len(all_items),
+                            "pages": total_pages,
+                            "items": all_items
+                        }
+                    }
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
+                else:
+                    result = client.gameobject.find(search_method="by_name", search_term=search_term)
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
 
             elif action == "create":
                 # gameobject create --name "..." [--primitive Cube] [--position x,y,z] [--rotation x,y,z] [--scale x,y,z] [--parent "..."]

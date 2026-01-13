@@ -117,6 +117,7 @@ unity-mcp scene create --name NewScene --path Assets/Scenes
 
 # GameObject操作
 unity-mcp gameobject find "Main Camera"
+unity-mcp gameobject find "Player" --iterate-all --page-size 20  # ページング対応
 unity-mcp gameobject create --name "MyCube" --primitive Cube --position 0,1,0
 unity-mcp gameobject modify --name "MyCube" --position 5,0,0 --rotation 0,45,0
 unity-mcp gameobject delete --name "MyCube"
@@ -200,7 +201,7 @@ log_count = 20
 | `--max-nodes` | 取得ノード総数の上限（hierarchy） | 1000 |
 | `--max-children-per-node` | ノードあたりの子要素上限（hierarchy） | 200 |
 | `--include-transform` | Transform情報を含める（hierarchy） | false |
-| `--iterate-all` | 全ページを自動取得（hierarchy） | false |
+| `--iterate-all` | 全ページを自動取得（hierarchy, find） | false |
 
 ### gameobject専用オプション
 
