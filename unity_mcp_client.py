@@ -48,7 +48,7 @@ import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Iterator, Callable
 
 
 CONFIG_FILE_NAME = ".unity-mcp.toml"
@@ -359,6 +359,60 @@ class UnityMCPConnection:
             sock.close()
 
 
+def _client_side_paginate(
+    items: List[Any],
+    page_size: int,
+    base_message: str,
+    *,
+    use_int_cursor: bool = False,
+    yield_on_empty: bool = False,
+) -> Iterator[Dict[str, Any]]:
+    """
+    Common client-side pagination for legacy server responses.
+
+    Args:
+        items: Flat list of items to paginate
+        page_size: Items per page
+        base_message: Message from original response
+        use_int_cursor: Use int cursor (hierarchy) vs str cursor (find)
+        yield_on_empty: Yield one page even if items is empty
+
+    Yields:
+        Paginated response dicts with consistent structure
+    """
+    total = len(items)
+
+    # Handle empty case consistently
+    if total == 0 and not yield_on_empty:
+        return
+
+    for offset in range(0, max(total, 1), page_size):
+        page_items = items[offset:offset + page_size]
+        has_more = offset + page_size < total
+
+        cursor_val = offset if use_int_cursor else str(offset)
+        next_cursor_val: Optional[Union[int, str]] = None
+        if has_more:
+            next_cursor_val = offset + page_size if use_int_cursor else str(offset + page_size)
+
+        yield {
+            "success": True,
+            "message": base_message,
+            "data": {
+                "items": page_items,
+                "cursor": cursor_val,
+                "pageSize": len(page_items),
+                "next_cursor": next_cursor_val,
+                "totalCount": total,
+                "hasMore": has_more,
+                "_client_paged": True,
+            }
+        }
+
+        if not page_items:
+            break
+
+
 class ConsoleAPI:
     """Console log operations"""
 
@@ -501,7 +555,7 @@ class GameObjectAPI:
              page_size: Optional[int] = None,
              page: Optional[int] = None,
              offset: Optional[int] = None,
-             cursor: Optional[str] = None) -> Dict[str, Any]:
+             cursor: Optional[Union[int, str]] = None) -> Dict[str, Any]:
         """
         Find GameObject(s) with pagination support
 
@@ -514,7 +568,7 @@ class GameObjectAPI:
             page_size: Items per page (1-500, default: 50)
             page: Page number (for page-based pagination)
             offset: Offset value (for offset-based pagination)
-            cursor: Cursor value (for cursor-based pagination)
+            cursor: Cursor value (for cursor-based pagination). Accepts int or str.
 
         Returns:
             Dict containing:
@@ -581,26 +635,13 @@ class GameObjectAPI:
         # Detect server response format
         if isinstance(data, list):
             # Legacy server: data is a flat list, do client-side pagination
-            all_items = data
-            total = len(all_items)
-
-            for offset in range(0, max(total, 1), page_size):
-                page_items = all_items[offset:offset + page_size]
-                yield {
-                    "success": True,
-                    "message": result.get("message", ""),
-                    "data": {
-                        "items": page_items,
-                        "cursor": str(offset),
-                        "pageSize": len(page_items),
-                        "nextCursor": str(offset + page_size) if offset + page_size < total else None,
-                        "totalCount": total,
-                        "hasMore": offset + page_size < total,
-                        "_client_paged": True
-                    }
-                }
-                if not page_items:
-                    break
+            yield from _client_side_paginate(
+                items=data,
+                page_size=page_size,
+                base_message=result.get("message", ""),
+                use_int_cursor=False,
+                yield_on_empty=False,
+            )
         else:
             # Modern server: data is a dict with pagination info
             yield result
@@ -687,7 +728,7 @@ class SceneAPI:
 
     def get_hierarchy(self,
                       page_size: Optional[int] = None,
-                      cursor: Optional[int] = None,
+                      cursor: Optional[Union[int, str]] = None,
                       max_nodes: Optional[int] = None,
                       max_depth: Optional[int] = None,
                       max_children_per_node: Optional[int] = None,
@@ -698,7 +739,7 @@ class SceneAPI:
 
         Args:
             page_size: Items per page (1-500, default: 50)
-            cursor: Starting position (default: 0)
+            cursor: Starting position (default: 0). Accepts int or str.
             max_nodes: Total node limit (1-5000, default: 1000)
             max_depth: Depth limit (for future compatibility)
             max_children_per_node: Children per node limit (0-2000, default: 200)
@@ -773,11 +814,9 @@ class SceneAPI:
                 for item in items:
                     print(f"  - {item['name']}")
         """
-        cursor = 0
-
         result = self.get_hierarchy(
             page_size=page_size,
-            cursor=cursor,
+            cursor=0,
             max_nodes=max_nodes,
             max_children_per_node=max_children_per_node,
             parent=parent,
@@ -791,23 +830,13 @@ class SceneAPI:
             # Legacy server (v8.3.0 and earlier): data is a flat list
             # Perform client-side pagination
             all_items = self._flatten_hierarchy(data)
-            total = len(all_items)
-
-            for offset in range(0, total, page_size):
-                page_items = all_items[offset:offset + page_size]
-                yield {
-                    "success": True,
-                    "message": result.get("message", ""),
-                    "data": {
-                        "items": page_items,
-                        "cursor": offset,
-                        "pageSize": len(page_items),
-                        "next_cursor": offset + page_size if offset + page_size < total else None,
-                        "total": total,
-                        "truncated": offset + page_size < total,
-                        "_client_paged": True  # Marker for client-side pagination
-                    }
-                }
+            yield from _client_side_paginate(
+                items=all_items,
+                page_size=page_size,
+                base_message=result.get("message", ""),
+                use_int_cursor=True,
+                yield_on_empty=False,
+            )
         else:
             # Modern server (v8.6.0+): data is a dict with pagination info
             yield result
@@ -817,10 +846,9 @@ class SceneAPI:
                 if next_cursor is None:
                     break
 
-                cursor = int(next_cursor)
                 result = self.get_hierarchy(
                     page_size=page_size,
-                    cursor=cursor,
+                    cursor=int(next_cursor),
                     max_nodes=max_nodes,
                     max_children_per_node=max_children_per_node,
                     parent=parent,
@@ -1411,7 +1439,7 @@ Configuration:
                         page_size=args.page_size or 50,
                         max_nodes=args.max_nodes,
                         max_children_per_node=args.max_children_per_node,
-                        include_transform=args.include_transform or None
+                        include_transform=args.include_transform if args.include_transform else None
                     ):
                         total_pages += 1
                         data = page.get('data', {})
@@ -1437,7 +1465,7 @@ Configuration:
                         cursor=args.cursor,
                         max_nodes=args.max_nodes,
                         max_children_per_node=args.max_children_per_node,
-                        include_transform=args.include_transform or None
+                        include_transform=args.include_transform if args.include_transform else None
                     )
                     print(json.dumps(result, indent=2, ensure_ascii=False))
 
