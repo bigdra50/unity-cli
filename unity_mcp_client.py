@@ -46,12 +46,85 @@ import struct
 import subprocess
 import sys
 import tomllib
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union, Iterator, Callable
+from typing import Dict, List, Optional, Any, Union, Iterator, Callable, Sequence
 
 
 CONFIG_FILE_NAME = ".unity-mcp.toml"
+
+
+# =============================================================================
+# Domain Types
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class Vector3:
+    """Immutable 3D vector for position, rotation, scale"""
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+
+    def to_list(self) -> List[float]:
+        return [self.x, self.y, self.z]
+
+    @classmethod
+    def from_list(cls, v: List[float]) -> "Vector3":
+        return cls(v[0], v[1], v[2]) if len(v) >= 3 else cls()
+
+
+@dataclass(frozen=True)
+class Color:
+    """Immutable RGBA color"""
+    r: float = 1.0
+    g: float = 1.0
+    b: float = 1.0
+    a: float = 1.0
+
+    def to_list(self) -> List[float]:
+        return [self.r, self.g, self.b, self.a]
+
+    @classmethod
+    def from_list(cls, v: List[float]) -> "Color":
+        if len(v) >= 4:
+            return cls(v[0], v[1], v[2], v[3])
+        if len(v) >= 3:
+            return cls(v[0], v[1], v[2])
+        return cls()
+
+
+# =============================================================================
+# Options Classes
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class PaginationOptions:
+    """Reusable pagination settings"""
+    page_size: int = 50
+    cursor: Optional[Union[int, str]] = None
+    max_nodes: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class TestFilterOptions:
+    """Test filtering options.
+
+    When multiple filters are specified, they combine with AND logic.
+    Tests must match ALL specified filters to be included.
+
+    Args:
+        test_names: Full test names (exact match, e.g., "MyNamespace.MyTests.TestMethod")
+        group_names: Regex patterns for test names
+        category_names: NUnit category names ([Category] attribute)
+        assembly_names: Assembly names to filter by
+    """
+    test_names: Optional[Sequence[str]] = None
+    group_names: Optional[Sequence[str]] = None
+    category_names: Optional[Sequence[str]] = None
+    assembly_names: Optional[Sequence[str]] = None
 
 
 @dataclass
@@ -485,6 +558,208 @@ class EditorAPI:
     def get_layers(self) -> Dict[str, Any]:
         """Get all layers via Resource API"""
         return self._conn.read_resource("get_layers")
+
+
+class TestAPI:
+    """Test execution operations"""
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def run(
+        self,
+        mode: str = "edit",
+        timeout_seconds: int = 600,
+        *,
+        filter_options: Optional[TestFilterOptions] = None,
+    ) -> Dict[str, Any]:
+        """
+        Run Unity tests with optional filtering.
+
+        Args:
+            mode: Test mode ("edit" or "play")
+            timeout_seconds: Maximum test run duration
+            filter_options: Optional TestFilterOptions for filtering tests
+
+        Note:
+            When multiple filters are specified in filter_options,
+            they combine with AND logic.
+        """
+        params: Dict[str, Any] = {"mode": mode, "timeoutSeconds": timeout_seconds}
+
+        if filter_options:
+            if filter_options.test_names:
+                params["testNames"] = list(filter_options.test_names)
+            if filter_options.group_names:
+                params["groupNames"] = list(filter_options.group_names)
+            if filter_options.category_names:
+                params["categoryNames"] = list(filter_options.category_names)
+            if filter_options.assembly_names:
+                params["assemblyNames"] = list(filter_options.assembly_names)
+
+        return self._conn.send_command("run_tests", params)
+
+
+class MenuAPI:
+    """Menu operations"""
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def execute(self, menu_path: str) -> Dict[str, Any]:
+        """Execute Unity menu item"""
+        return self._conn.send_command("execute_menu_item", {"menu_path": menu_path})
+
+
+class ScriptAPI:
+    """C# script operations"""
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def create(
+        self,
+        name: str,
+        path: str = "Scripts",
+        template: Optional[str] = None,
+        namespace: Optional[str] = None,
+        base_class: Optional[str] = None,
+        interfaces: Optional[List[str]] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Create a new C# script"""
+        params: Dict[str, Any] = {"action": "create", "name": name, "path": path}
+        if template:
+            params["template"] = template
+        if namespace:
+            params["namespace"] = namespace
+        if base_class:
+            params["baseClass"] = base_class
+        if interfaces:
+            params["interfaces"] = interfaces
+        params.update(kwargs)
+        return self._conn.send_command("manage_script", params)
+
+    def modify(
+        self,
+        name: str,
+        path: str = "Scripts",
+        content: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Modify an existing C# script"""
+        params: Dict[str, Any] = {"action": "modify", "name": name, "path": path}
+        if content:
+            params["content"] = content
+        params.update(kwargs)
+        return self._conn.send_command("manage_script", params)
+
+    def delete(self, name: str, path: str = "Scripts") -> Dict[str, Any]:
+        """Delete a C# script"""
+        return self._conn.send_command("manage_script", {
+            "action": "delete",
+            "name": name,
+            "path": path,
+        })
+
+
+class ShaderAPI:
+    """Shader operations"""
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def create(
+        self,
+        name: str,
+        path: str = "Shaders",
+        shader_type: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Create a new shader"""
+        params: Dict[str, Any] = {"action": "create", "name": name, "path": path}
+        if shader_type:
+            params["shaderType"] = shader_type
+        params.update(kwargs)
+        return self._conn.send_command("manage_shader", params)
+
+    def modify(
+        self,
+        name: str,
+        path: str = "Shaders",
+        content: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Modify an existing shader"""
+        params: Dict[str, Any] = {"action": "modify", "name": name, "path": path}
+        if content:
+            params["content"] = content
+        params.update(kwargs)
+        return self._conn.send_command("manage_shader", params)
+
+    def delete(self, name: str, path: str = "Shaders") -> Dict[str, Any]:
+        """Delete a shader"""
+        return self._conn.send_command("manage_shader", {
+            "action": "delete",
+            "name": name,
+            "path": path,
+        })
+
+
+class PrefabAPI:
+    """Prefab operations"""
+
+    def __init__(self, conn: UnityMCPConnection):
+        self._conn = conn
+
+    def create(
+        self,
+        name: str,
+        path: str = "Prefabs",
+        source_object: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Create a new prefab"""
+        params: Dict[str, Any] = {"action": "create", "name": name, "path": path}
+        if source_object:
+            params["sourceObject"] = source_object
+        params.update(kwargs)
+        return self._conn.send_command("manage_prefabs", params)
+
+    def instantiate(
+        self,
+        path: str,
+        position: Optional[List[float]] = None,
+        rotation: Optional[List[float]] = None,
+        parent: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Instantiate a prefab in the scene"""
+        params: Dict[str, Any] = {"action": "instantiate", "path": path}
+        if position:
+            params["position"] = position
+        if rotation:
+            params["rotation"] = rotation
+        if parent:
+            params["parent"] = parent
+        params.update(kwargs)
+        return self._conn.send_command("manage_prefabs", params)
+
+    def apply(self, target: str, search_method: str = "by_name") -> Dict[str, Any]:
+        """Apply changes to prefab"""
+        return self._conn.send_command("manage_prefabs", {
+            "action": "apply",
+            "target": target,
+            "searchMethod": search_method,
+        })
+
+    def revert(self, target: str, search_method: str = "by_name") -> Dict[str, Any]:
+        """Revert prefab instance to original"""
+        return self._conn.send_command("manage_prefabs", {
+            "action": "revert",
+            "target": target,
+            "searchMethod": search_method,
+        })
 
 
 class GameObjectAPI:
@@ -961,18 +1236,39 @@ class AssetAPI:
         """Delete asset"""
         return self._conn.send_command("manage_asset", {"action": "delete", "path": path})
 
-    def search(self, search_pattern: Optional[str] = None,
-               filter_type: Optional[str] = None,
-               path: Optional[str] = None,
-               page_size: int = 50) -> Dict[str, Any]:
-        """Search assets"""
-        params = {"action": "search", "pageSize": page_size}
+    def search(
+        self,
+        search_pattern: Optional[str] = None,
+        filter_type: Optional[str] = None,
+        path: Optional[str] = None,
+        page_size: int = 50,
+        page_number: int = 1,
+        filter_date_after: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Search assets with filtering and pagination.
+
+        Args:
+            search_pattern: Search pattern for asset names
+            filter_type: Asset type filter (e.g., "Prefab", "Material", "Texture2D")
+            path: Folder path to search in
+            page_size: Items per page (default: 50)
+            page_number: Page number (1-based, default: 1)
+            filter_date_after: ISO 8601 date string to filter assets modified after this date
+        """
+        params: Dict[str, Any] = {
+            "action": "search",
+            "pageSize": page_size,
+            "pageNumber": page_number,
+        }
         if search_pattern:
             params["searchPattern"] = search_pattern
         if filter_type:
             params["filterType"] = filter_type
         if path:
             params["path"] = path
+        if filter_date_after:
+            params["filterDateAfter"] = filter_date_after
 
         return self._conn.send_command("manage_asset", params)
 
@@ -1137,14 +1433,15 @@ class UnityMCPClient:
     Usage:
         client = UnityMCPClient()
 
-        # Direct console access
-        logs = client.read_console(types=["error"])
-        client.clear_console()
-
-        # Via API objects
+        # Via API objects (recommended)
         client.editor.play()
         client.gameobject.create("Player", primitive_type="Cube")
         client.scene.load(path="Assets/Scenes/Main.unity")
+        client.tests.run("edit", filter_options=TestFilterOptions(category_names=["Unit"]))
+        client.menu.execute("Assets/Refresh")
+        client.script.create("MyScript", namespace="MyGame")
+        client.shader.create("MyShader")
+        client.prefab.create("MyPrefab", source_object="Player")
 
         # Batch execution
         result = client.batch.execute([
@@ -1165,6 +1462,11 @@ class UnityMCPClient:
         self.asset = AssetAPI(self._conn)
         self.batch = BatchAPI(self._conn)
         self.material = MaterialAPI(self._conn)
+        self.tests = TestAPI(self._conn)
+        self.menu = MenuAPI(self._conn)
+        self.script = ScriptAPI(self._conn)
+        self.shader = ShaderAPI(self._conn)
+        self.prefab = PrefabAPI(self._conn)
 
     # Convenience methods
     def read_console(self, **kwargs) -> Dict[str, Any]:
@@ -1176,30 +1478,82 @@ class UnityMCPClient:
         return self.console.clear()
 
     def execute_menu_item(self, menu_path: str) -> Dict[str, Any]:
-        """Execute Unity menu item"""
-        return self._conn.send_command("execute_menu_item", {"menu_path": menu_path})
+        """Execute Unity menu item.
 
-    def run_tests(self, mode: str = "edit", timeout_seconds: int = 600) -> Dict[str, Any]:
-        """Run Unity tests"""
-        return self._conn.send_command("run_tests", {
-            "mode": mode,
-            "timeoutSeconds": timeout_seconds
-        })
+        .. deprecated::
+            Use `client.menu.execute()` instead.
+        """
+        warnings.warn(
+            "execute_menu_item() is deprecated, use client.menu.execute()",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.menu.execute(menu_path)
+
+    def run_tests(
+        self,
+        mode: str = "edit",
+        timeout_seconds: int = 600,
+        *,
+        filter_options: Optional[TestFilterOptions] = None,
+    ) -> Dict[str, Any]:
+        """Run Unity tests.
+
+        .. deprecated::
+            Use `client.tests.run()` instead.
+        """
+        warnings.warn(
+            "run_tests() is deprecated, use client.tests.run()",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.tests.run(
+            mode=mode,
+            timeout_seconds=timeout_seconds,
+            filter_options=filter_options,
+        )
 
     def manage_script(self, action: str, name: str, path: str = "Scripts", **kwargs) -> Dict[str, Any]:
-        """Manage C# scripts"""
+        """Manage C# scripts.
+
+        .. deprecated::
+            Use `client.script.create/modify/delete()` instead.
+        """
+        warnings.warn(
+            "manage_script() is deprecated, use client.script.create/modify/delete()",
+            DeprecationWarning,
+            stacklevel=2
+        )
         params = {"action": action, "name": name, "path": path}
         params.update(kwargs)
         return self._conn.send_command("manage_script", params)
 
     def manage_shader(self, action: str, name: str, path: str = "Shaders", **kwargs) -> Dict[str, Any]:
-        """Manage shaders"""
+        """Manage shaders.
+
+        .. deprecated::
+            Use `client.shader.create/modify/delete()` instead.
+        """
+        warnings.warn(
+            "manage_shader() is deprecated, use client.shader.create/modify/delete()",
+            DeprecationWarning,
+            stacklevel=2
+        )
         params = {"action": action, "name": name, "path": path}
         params.update(kwargs)
         return self._conn.send_command("manage_shader", params)
 
     def manage_prefabs(self, action: str, **kwargs) -> Dict[str, Any]:
-        """Manage prefabs"""
+        """Manage prefabs.
+
+        .. deprecated::
+            Use `client.prefab.create/instantiate/apply/revert()` instead.
+        """
+        warnings.warn(
+            "manage_prefabs() is deprecated, use client.prefab.create/instantiate/apply/revert()",
+            DeprecationWarning,
+            stacklevel=2
+        )
         params = {"action": action}
         params.update(kwargs)
         return self._conn.send_command("manage_prefabs", params)
@@ -1224,7 +1578,7 @@ Available commands:
   stop                    Exit play mode
   state                   Get editor state
   refresh                 Refresh assets
-  tests <mode>            Run tests (edit|play)
+  tests <mode>            Run tests (edit|play) with optional filtering
   verify                  Verify build (refresh → clear → compile wait → console)
   config                  Show current configuration
   config init             Generate default .unity-mcp.toml
@@ -1239,6 +1593,9 @@ Examples:
   %(prog)s verify --timeout 120 --connection-timeout 60
   %(prog)s verify --types error warning log --retry 5
   %(prog)s tests edit
+  %(prog)s tests edit --test-names "MyTests.SampleTest"
+  %(prog)s tests edit --category-names "Unit" "Integration"
+  %(prog)s tests play --assembly-names "MyGame.Tests"
   %(prog)s config
   %(prog)s config init
   %(prog)s config init --output my-config.toml
@@ -1348,6 +1705,15 @@ Configuration:
                         help="Output path for config init (default: ./.unity-mcp.toml)")
     parser.add_argument("--force", "-f", action="store_true",
                         help="Overwrite existing config file without confirmation")
+    # Test filter arguments
+    parser.add_argument("--test-names", nargs="+", default=None,
+                        help="Test names to run (exact match)")
+    parser.add_argument("--group-names", nargs="+", default=None,
+                        help="Test group names (regex patterns)")
+    parser.add_argument("--category-names", nargs="+", default=None,
+                        help="NUnit category names ([Category] attribute)")
+    parser.add_argument("--assembly-names", nargs="+", default=None,
+                        help="Assembly names to filter by")
 
     args = parser.parse_args()
 
@@ -1418,7 +1784,18 @@ Configuration:
 
         elif args.command == "tests":
             mode = args.args[0] if args.args else "edit"
-            result = client.run_tests(mode=mode)
+
+            # Build filter options if any filter is specified
+            filter_options = None
+            if any([args.test_names, args.group_names, args.category_names, args.assembly_names]):
+                filter_options = TestFilterOptions(
+                    test_names=args.test_names,
+                    group_names=args.group_names,
+                    category_names=args.category_names,
+                    assembly_names=args.assembly_names,
+                )
+
+            result = client.tests.run(mode=mode, filter_options=filter_options)
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
         elif args.command == "verify":
