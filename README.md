@@ -45,7 +45,7 @@ unity-mcp scene hierarchy --iterate-all  # フラット化してページング�
 
 #### Python API
 ```python
-from unity_mcp_client import UnityMCPClient
+from unity_mcp_client import UnityMCPClient, TestFilterOptions
 
 client = UnityMCPClient()
 
@@ -59,6 +59,33 @@ for item in result['data']['items']:
 for page in client.scene.iterate_hierarchy(page_size=100):
     for item in page['data']['items']:
         print(f"- {item['name']} (depth: {item.get('_depth', 0)})")
+
+# テスト実行（フィルタリング）
+result = client.tests.run("edit")
+result = client.tests.run("edit", filter_options=TestFilterOptions(
+    category_names=["Unit", "Integration"]
+))
+
+# メニュー実行
+client.menu.execute("Assets/Refresh")
+
+# アセット検索（日付フィルタ、ページング）
+result = client.asset.search("player", filter_type="Prefab", page_number=2)
+result = client.asset.search(filter_date_after="2024-01-01")
+
+# スクリプト操作
+client.script.create("MyScript", path="Scripts", namespace="MyGame")
+client.script.modify("MyScript", content="// new content")
+client.script.delete("MyScript")
+
+# シェーダー操作
+client.shader.create("MyShader", path="Shaders")
+
+# プレハブ操作
+client.prefab.create("MyPrefab", source_object="Player")
+client.prefab.instantiate("Assets/Prefabs/MyPrefab.prefab", position=[0, 1, 0])
+client.prefab.apply("Player")  # 変更を適用
+client.prefab.revert("Player")  # 元に戻す
 ```
 
 #### 機能
@@ -66,6 +93,34 @@ for page in client.scene.iterate_hierarchy(page_size=100):
 - **段階的な詳細取得**: `--depth` で必要な深さまで展開
 - **ページングサポート**: `--iterate-all` で全階層をメモリ効率よく取得
 - **サーバーバージョン互換**: v8.6.0+とv8.3.0以前の両方に対応
+
+## v2.0 マイグレーションガイド
+
+v2.0で以下のメソッドが削除されました。専用APIクラス経由でアクセスしてください。
+
+| 削除されたメソッド | 移行先 |
+|-------------------|--------|
+| `client.read_console()` | `client.console.get()` |
+| `client.clear_console()` | `client.console.clear()` |
+| `client.execute_menu_item()` | `client.menu.execute()` |
+| `client.run_tests()` | `client.tests.run()` |
+| `client.manage_script()` | `client.script.create/modify/delete()` |
+| `client.manage_shader()` | `client.shader.create()` |
+| `client.manage_prefabs()` | `client.prefab.create/instantiate/apply/revert()` |
+
+### 移行例
+
+```python
+# v1.x (非推奨)
+client.read_console(types=["error"])
+client.run_tests("edit")
+client.execute_menu_item("Assets/Refresh")
+
+# v2.0
+client.console.get(types=["error"])
+client.tests.run("edit")
+client.menu.execute("Assets/Refresh")
+```
 
 ## 動作要件
 
@@ -117,6 +172,13 @@ unity-mcp find "Main Camera"
 # テスト実行
 unity-mcp tests edit
 unity-mcp tests play
+
+# テストフィルタリング
+unity-mcp tests edit --test-names "MyTests.SampleTest"
+unity-mcp tests edit --category-names "Unit" "Integration"
+unity-mcp tests edit --group-names "Core"
+unity-mcp tests play --assembly-names "MyGame.Tests"
+unity-mcp tests edit --category-names "Unit" --assembly-names "MyGame.Tests"  # 複合フィルタ
 
 # ビルド検証（リフレッシュ→クリア→コンパイル待機→コンソール確認）
 unity-mcp verify
@@ -246,6 +308,17 @@ log_count = 20
 | `--color` | 色 (r,g,b,a) | - |
 | `--property` | プロパティ名 | - |
 | `--value` | プロパティ値 | - |
+
+### tests専用オプション
+
+| オプション | 説明 | デフォルト |
+|-----------|------|-----------|
+| `--test-names` | テスト名（完全一致） | - |
+| `--group-names` | グループ名（正規表現パターン） | - |
+| `--category-names` | NUnitカテゴリ名（[Category]属性） | - |
+| `--assembly-names` | アセンブリ名 | - |
+
+複数のフィルタを指定した場合、AND論理で結合されます。
 
 ```bash
 # 例: ポート6401でエラーのみ50件取得
