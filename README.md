@@ -26,36 +26,45 @@ MCPサーバー経由ではなく直接通信する理由:
 
 ### シーン階層探索
 
-#### デフォルト動作
+#### デフォルト動作（サマリー）
+大規模シーンでも安全に使えるよう、デフォルトはルートオブジェクトのみを返します。
+
 ```bash
-unity-mcp scene hierarchy  # 全階層をネストされたリストで取得
+# デフォルト: ルートオブジェクトのみ（子の数を含む）
+unity-mcp scene hierarchy
+# → 7 roots, 387 total objects
+
+# 深さを指定して展開
+unity-mcp scene hierarchy --depth 1   # ルート + 直下の子
+unity-mcp scene hierarchy --depth 2   # 2階層まで
+
+# 全階層を取得（大規模シーン注意）
+unity-mcp scene hierarchy --full      # ネスト構造で全取得
+unity-mcp scene hierarchy --iterate-all  # フラット化してページング取得
 ```
 
-#### ページング対応（大規模シーン向け）
-`iterate_hierarchy()` を使うとサーバーバージョンに関係なく統一されたページング形式で取得できます。
-
+#### Python API
 ```python
 from unity_mcp_client import UnityMCPClient
 
 client = UnityMCPClient()
 
-# 全階層を自動的にイテレート（推奨）
-# サーバーv8.6.0+: サーバー側ページング使用
-# サーバーv8.3.0以前: クライアント側でページングをエミュレート
+# サマリー取得（推奨）
+result = client.scene.get_hierarchy_summary(depth=0)
+print(f"Total: {result['data']['summary']['totalCount']} objects")
+for item in result['data']['items']:
+    print(f"- {item['name']} ({item['descendantCount']} descendants)")
+
+# 全階層をイテレート（大規模シーン対応）
 for page in client.scene.iterate_hierarchy(page_size=100):
     for item in page['data']['items']:
         print(f"- {item['name']} (depth: {item.get('_depth', 0)})")
 ```
 
-```bash
-# CLI: --iterate-all で全ページを自動取得
-unity-mcp scene hierarchy --iterate-all --page-size 100
-```
-
 #### 機能
-- **ページングサポート**: 大規模シーンでもメモリ効率よく階層を取得
-- **カーソルベースの反復処理**: `iterate_hierarchy()` で全階層を自動的に走査
-- **柔軟な制御**: ノード数制限、子要素数制限、Transform情報の有無を選択可能
+- **安全なデフォルト**: ルートオブジェクトのみ返却、大規模シーンでも高速
+- **段階的な詳細取得**: `--depth` で必要な深さまで展開
+- **ページングサポート**: `--iterate-all` で全階層をメモリ効率よく取得
 - **サーバーバージョン互換**: v8.6.0+とv8.3.0以前の両方に対応
 
 ## 動作要件
@@ -115,10 +124,10 @@ unity-mcp verify --timeout 120 --connection-timeout 60
 
 # シーン操作
 unity-mcp scene active          # アクティブシーン情報
-unity-mcp scene hierarchy       # シーン階層
-unity-mcp scene hierarchy --page-size 100 --cursor 0  # ページング対応
-unity-mcp scene hierarchy --iterate-all --page-size 200  # 全階層を自動取得
-unity-mcp scene hierarchy --max-nodes 500 --include-transform  # 詳細設定
+unity-mcp scene hierarchy       # ルートオブジェクトのみ（サマリー）
+unity-mcp scene hierarchy --depth 1   # ルート+直下の子まで
+unity-mcp scene hierarchy --full      # 全階層（ネスト構造）
+unity-mcp scene hierarchy --iterate-all --page-size 100  # 全階層（フラット化）
 unity-mcp scene build-settings  # ビルド設定のシーン一覧
 unity-mcp scene load --name MainScene
 unity-mcp scene load --path Assets/Scenes/Level1.unity
@@ -206,10 +215,12 @@ log_count = 20
 | `--name` | シーン名（create/load） | - |
 | `--path` | シーンパス（create/load/save） | - |
 | `--build-index` | ビルドインデックス（load） | - |
-| `--page-size` | 1ページあたりのアイテム数（hierarchy）※1 | 50 |
-| `--cursor` | 開始カーソル位置（hierarchy）※1 | 0 |
-| `--max-nodes` | 取得ノード総数の上限（hierarchy）※1 | 1000 |
-| `--max-children-per-node` | ノードあたりの子要素上限（hierarchy）※1 | 200 |
+| `--depth` | 階層の深さ（0=ルートのみ, 1=直下の子まで等） | 0 |
+| `--full` | 全階層をネスト構造で取得 | false |
+| `--page-size` | 1ページあたりのアイテム数（--iterate-all時）※1 | 50 |
+| `--cursor` | 開始カーソル位置（--full時）※1 | 0 |
+| `--max-nodes` | 取得ノード総数の上限（--full時）※1 | 1000 |
+| `--max-children-per-node` | ノードあたりの子要素上限（--full時）※1 | 200 |
 | `--include-transform` | Transform情報を含める（hierarchy） | false |
 | `--iterate-all` | 全ページを自動取得（hierarchy, find） | false |
 

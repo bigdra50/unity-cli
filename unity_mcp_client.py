@@ -783,6 +783,71 @@ class SceneAPI:
         """Get build settings (scenes in build)"""
         return self._conn.send_command("manage_scene", {"action": "get_build_settings"})
 
+    def get_hierarchy_summary(self, depth: int = 0,
+                               include_transform: bool = False) -> Dict[str, Any]:
+        """
+        Get scene hierarchy summary (safe default for large scenes)
+
+        Args:
+            depth: How deep to traverse (0 = root only, 1 = root + direct children, etc.)
+            include_transform: Include transform information
+
+        Returns:
+            Dict with summary info and limited hierarchy data
+        """
+        result = self.get_hierarchy(include_transform=include_transform)
+
+        if not result.get('success'):
+            return result
+
+        data = result.get('data', [])
+
+        def count_descendants(items: list) -> int:
+            """Count all descendants recursively"""
+            total = 0
+            for item in items:
+                children = item.get('children', [])
+                total += len(children) + count_descendants(children)
+            return total
+
+        def truncate_to_depth(items: list, current_depth: int, max_depth: int) -> list:
+            """Truncate hierarchy to specified depth"""
+            truncated = []
+            for item in items:
+                new_item = {k: v for k, v in item.items() if k != 'children'}
+                children = item.get('children', [])
+                new_item['childCount'] = len(children)
+                new_item['descendantCount'] = len(children) + count_descendants(children)
+
+                if current_depth < max_depth and children:
+                    new_item['children'] = truncate_to_depth(children, current_depth + 1, max_depth)
+                elif children:
+                    new_item['children'] = []  # Truncated
+
+                truncated.append(new_item)
+            return truncated
+
+        if isinstance(data, list):
+            total_objects = len(data) + count_descendants(data)
+            truncated_data = truncate_to_depth(data, 0, depth)
+
+            return {
+                "success": True,
+                "message": f"Hierarchy summary (depth={depth}, total={total_objects} objects)",
+                "data": {
+                    "summary": {
+                        "rootCount": len(data),
+                        "totalCount": total_objects,
+                        "depth": depth,
+                        "truncated": depth < 100  # Always truncated unless very deep
+                    },
+                    "items": truncated_data
+                }
+            }
+        else:
+            # Server v8.6.0+ with paging - return as-is for now
+            return result
+
     def iterate_hierarchy(self,
                          page_size: int = 50,
                          max_nodes: Optional[int] = None,
@@ -1272,6 +1337,10 @@ Configuration:
                         help="Children per node limit (0-2000, default: 200)")
     parser.add_argument("--include-transform", action="store_true",
                         help="Include transform information (for scene hierarchy)")
+    parser.add_argument("--depth", type=int, default=None,
+                        help="Hierarchy depth (0=roots only, 1=roots+children, etc. Default: 0)")
+    parser.add_argument("--full", action="store_true",
+                        help="Get full hierarchy (no depth limit, legacy behavior)")
     parser.add_argument("--iterate-all", action="store_true",
                         help="Iterate through all pages (for scene hierarchy, gameobject find)")
     # Config init arguments
@@ -1431,7 +1500,7 @@ Configuration:
 
             elif action == "hierarchy":
                 if args.iterate_all:
-                    # Iterate through all pages
+                    # Iterate through all pages (flattened)
                     all_items = []
                     total_pages = 0
 
@@ -1447,7 +1516,6 @@ Configuration:
                         all_items.extend(items)
                         print(f"Page {total_pages}: {len(items)} items (total so far: {len(all_items)})", file=sys.stderr)
 
-                    # Print combined result
                     result = {
                         "success": True,
                         "message": f"Retrieved all {len(all_items)} items across {total_pages} pages",
@@ -1458,14 +1526,22 @@ Configuration:
                         }
                     }
                     print(json.dumps(result, indent=2, ensure_ascii=False))
-                else:
-                    # Single page request
+                elif args.full:
+                    # Full hierarchy (legacy behavior, nested structure)
                     result = client.scene.get_hierarchy(
                         page_size=args.page_size,
                         cursor=args.cursor,
                         max_nodes=args.max_nodes,
                         max_children_per_node=args.max_children_per_node,
                         include_transform=args.include_transform if args.include_transform else None
+                    )
+                    print(json.dumps(result, indent=2, ensure_ascii=False))
+                else:
+                    # Default: summary (safe for large scenes)
+                    depth = args.depth if args.depth is not None else 0
+                    result = client.scene.get_hierarchy_summary(
+                        depth=depth,
+                        include_transform=args.include_transform
                     )
                     print(json.dumps(result, indent=2, ensure_ascii=False))
 
