@@ -396,7 +396,7 @@ namespace UnityBridge
             if (_uvPath != null)
             {
                 startInfo.FileName = _uvPath;
-                startInfo.Arguments = $"run --from {PackageSource} unity-relay --port {port}";
+                startInfo.Arguments = $"tool run --from {PackageSource} unity-relay --port {port}";
                 Debug.Log("[UnityBridge] Using uvx with remote package");
                 return startInfo;
             }
