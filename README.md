@@ -1,19 +1,31 @@
 # Unity CLI
 
-Unity Editor を外部から制御するCLIツール + Relay Server。
+コマンドラインから Unity Editor を操作する CLI ツール。
 
 ## 概要
 
-独自のRelay Serverアーキテクチャを採用し、複数のUnity Editorインスタンスを同時に制御できます。
+Play Mode 制御、コンソールログ取得、テスト実行、シーン/GameObject 操作など、Unity Editor の主要機能を CLI から実行できます。
 
-```
-CLI ←──TCP:6500──→ Relay Server ←──TCP:6500──→ Unity Editor(s)
+```bash
+# Play Mode 制御
+unity-cli play
+unity-cli stop
+
+# コンソールログ取得
+unity-cli console get --types error
+
+# メニュー実行
+unity-cli menu exec "Assets/Refresh"
+
+# ContextMenu 実行
+unity-cli menu context "DoSomething" -t "/Player"
 ```
 
 **主な特徴:**
-- 複数Unityインスタンス対応
+- Unity Editor の主要操作を CLI で実行
+- MenuItem / ContextMenu の実行に対応
+- 複数 Unity インスタンスの同時制御
 - ドメインリロード耐性（自動再接続）
-- ゼロ外部依存（Python stdlib only）
 
 ## 動作要件
 
