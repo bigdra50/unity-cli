@@ -21,7 +21,7 @@ unity-cli menu exec "Assets/Refresh"
 unity-cli menu context "DoSomething" -t "/Player"
 ```
 
-**主な特徴:**
+主な特徴:
 - Unity Editor の主要操作を CLI で実行
 - MenuItem / ContextMenu の実行に対応
 - 複数 Unity インスタンスの同時制御
@@ -47,8 +47,8 @@ https://github.com/bigdra50/unity-cli.git?path=UnityBridge
 ### 2. 接続
 
 Unity Editorで `Window > Unity Bridge` を開き:
-1. **Start Server** をクリック（Relay Server起動）
-2. **Connect** をクリック（Unity → Relay接続）
+1. Start Server をクリック（Relay Server起動）
+2. Connect をクリック（Unity → Relay接続）
 
 ### 3. CLIで操作
 
@@ -223,51 +223,6 @@ unity-cli material create --path Assets/Materials/New.mat --shader Standard
 unity-cli material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 ```
 
-## Python API
-
-```python
-from unity_cli import UnityClient
-
-client = UnityClient()
-
-# エディタ状態
-result = client.editor.get_state()
-print(f"Playing: {result['data']['isPlaying']}")
-
-# Play Mode
-client.editor.play()
-client.editor.stop()
-
-# コンソールログ
-logs = client.console.get(types=["error"], count=10)
-
-# シーン階層
-for page in client.scene.iterate_hierarchy(page_size=100):
-    for item in page['data']['items']:
-        print(f"- {item['name']}")
-
-# テスト実行
-result = client.tests.run("edit", filter_options=TestFilterOptions(
-    category_names=["Unit"]
-))
-
-# メニュー実行
-client.menu.execute("Edit/Play")
-client.menu.list(filter_text="Assets", limit=50)
-
-# ContextMenu実行
-client.menu.context("DoSomething", target="/Player")
-client.menu.context("LogInfo", target="Assets/Data/Config.asset")
-
-# コンポーネント操作
-client.component.add("Rigidbody", target="Player")
-client.component.remove("Rigidbody", target="Player")
-
-# アセット作成
-client.asset.create_prefab("Assets/Prefabs/Player.prefab", source="Player")
-client.asset.create_scriptable_object("GameConfig", "Assets/Data/Config.asset")
-```
-
 ## オプション
 
 ### 共通オプション
@@ -330,10 +285,10 @@ client.asset.create_scriptable_object("GameConfig", "Assets/Data/Config.asset")
 
 詳細は [docs/protocol-spec.md](docs/protocol-spec.md) を参照。
 
-- **Framing**: 4-byte big-endian length + JSON
-- **State Machine**: DISCONNECTED → READY → BUSY → RELOADING
-- **Heartbeat**: 5秒間隔、15秒タイムアウト（3回リトライ）
-- **Retry**: Exponential Backoff（500ms → 8s、最大30秒）
+- Framing: 4-byte big-endian length + JSON
+- State Machine: DISCONNECTED → READY → BUSY → RELOADING
+- Heartbeat: 5秒間隔、15秒タイムアウト（3回リトライ）
+- Retry: Exponential Backoff（500ms → 8s、最大30秒）
 
 ## トラブルシューティング
 
