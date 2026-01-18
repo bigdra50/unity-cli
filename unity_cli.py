@@ -271,6 +271,47 @@ class TimeoutError(UnityCLIError):
 
 
 # =============================================================================
+# Output Formatting (gh-style)
+# =============================================================================
+
+
+def filter_json_fields(data: Any, fields: list[str] | None) -> Any:
+    """Filter JSON output to include only specified fields.
+
+    Args:
+        data: The data to filter (dict, list of dicts, or other)
+        fields: List of field names to include. If None or empty, return all.
+
+    Returns:
+        Filtered data with only the specified fields.
+    """
+    if not fields:
+        return data
+
+    if isinstance(data, dict):
+        return {k: v for k, v in data.items() if k in fields}
+    elif isinstance(data, list):
+        return [filter_json_fields(item, fields) for item in data]
+    else:
+        return data
+
+
+def format_output(data: Any, json_fields: list[str] | None, json_mode: bool = True) -> str:
+    """Format output based on --json flag.
+
+    Args:
+        data: The data to format
+        json_fields: List of fields to include (from --json args)
+        json_mode: Whether --json flag was provided (default: True for backward compat)
+
+    Returns:
+        Formatted string for output
+    """
+    filtered = filter_json_fields(data, json_fields) if json_fields else data
+    return json.dumps(filtered, indent=2, ensure_ascii=False)
+
+
+# =============================================================================
 # Relay Connection
 # =============================================================================
 
@@ -758,155 +799,161 @@ class MenuAPI:
 
 
 class GameObjectAPI:
-    """GameObject operations"""
+    """GameObject operations via 'gameobject' tool"""
 
     def __init__(self, conn: RelayConnection):
         self._conn = conn
+
+    def find(
+        self,
+        name: str | None = None,
+        instance_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Find GameObject(s) by name or instance ID"""
+        params: dict[str, Any] = {"action": "find"}
+        if name:
+            params["name"] = name
+        if instance_id is not None:
+            params["id"] = instance_id
+        return self._conn.send_request("gameobject", params)
 
     def create(
         self,
         name: str,
-        parent: str | None = None,
+        primitive_type: str | None = None,
         position: list[float] | None = None,
         rotation: list[float] | None = None,
         scale: list[float] | None = None,
-        primitive_type: str | None = None,
-        **kwargs: Any,
     ) -> dict[str, Any]:
         """Create GameObject"""
         params: dict[str, Any] = {"action": "create", "name": name}
-        if parent:
-            params["parent"] = parent
+        if primitive_type:
+            params["primitive"] = primitive_type
         if position:
             params["position"] = position
         if rotation:
             params["rotation"] = rotation
         if scale:
             params["scale"] = scale
-        if primitive_type:
-            params["primitiveType"] = primitive_type
-        params.update(kwargs)
-
-        return self._conn.send_request("manage_gameobject", params)
+        return self._conn.send_request("gameobject", params)
 
     def modify(
         self,
-        target: str,
-        search_method: str = "by_name",
         name: str | None = None,
+        instance_id: int | None = None,
         position: list[float] | None = None,
         rotation: list[float] | None = None,
         scale: list[float] | None = None,
-        **kwargs: Any,
     ) -> dict[str, Any]:
-        """Modify GameObject"""
-        params: dict[str, Any] = {
-            "action": "modify",
-            "target": target,
-            "searchMethod": search_method,
-        }
+        """Modify GameObject transform"""
+        params: dict[str, Any] = {"action": "modify"}
         if name:
             params["name"] = name
+        if instance_id is not None:
+            params["id"] = instance_id
         if position:
             params["position"] = position
         if rotation:
             params["rotation"] = rotation
         if scale:
             params["scale"] = scale
-        params.update(kwargs)
+        return self._conn.send_request("gameobject", params)
 
-        return self._conn.send_request("manage_gameobject", params)
-
-    def delete(self, target: str, search_method: str = "by_name") -> dict[str, Any]:
-        """Delete GameObject"""
-        return self._conn.send_request(
-            "manage_gameobject", {"action": "delete", "target": target, "searchMethod": search_method}
-        )
-
-    def find(
+    def delete(
         self,
-        search_method: str = "by_name",
-        search_term: str | None = None,
-        target: str | None = None,
-        find_all: bool = False,
-        page_size: int | None = None,
-        cursor: int | str | None = None,
+        name: str | None = None,
+        instance_id: int | None = None,
     ) -> dict[str, Any]:
-        """Find GameObject(s)"""
-        params: dict[str, Any] = {"action": "find", "searchMethod": search_method, "findAll": find_all}
-        if search_term:
-            params["searchTerm"] = search_term
-        if target:
-            params["target"] = target
-        if page_size is not None:
-            params["pageSize"] = page_size
-        if cursor is not None:
-            params["cursor"] = cursor
-
-        return self._conn.send_request("manage_gameobject", params)
+        """Delete GameObject"""
+        params: dict[str, Any] = {"action": "delete"}
+        if name:
+            params["name"] = name
+        if instance_id is not None:
+            params["id"] = instance_id
+        return self._conn.send_request("gameobject", params)
 
 
 class SceneAPI:
-    """Scene management operations"""
+    """Scene management operations via 'scene' tool"""
 
     def __init__(self, conn: RelayConnection):
         self._conn = conn
 
-    def create(self, name: str, path: str = "Scenes") -> dict[str, Any]:
-        """Create new scene"""
-        return self._conn.send_request("manage_scene", {"action": "create", "name": name, "path": path})
+    def get_active(self) -> dict[str, Any]:
+        """Get active scene info"""
+        return self._conn.send_request("scene", {"action": "active"})
+
+    def get_hierarchy(
+        self,
+        depth: int = 1,
+        page_size: int = 50,
+        cursor: int = 0,
+    ) -> dict[str, Any]:
+        """Get scene hierarchy"""
+        return self._conn.send_request(
+            "scene",
+            {
+                "action": "hierarchy",
+                "depth": depth,
+                "page_size": page_size,
+                "cursor": cursor,
+            },
+        )
 
     def load(
         self,
         name: str | None = None,
         path: str | None = None,
-        build_index: int | None = None,
+        additive: bool = False,
     ) -> dict[str, Any]:
         """Load scene"""
-        params: dict[str, Any] = {"action": "load"}
+        params: dict[str, Any] = {"action": "load", "additive": additive}
         if name:
             params["name"] = name
         if path:
             params["path"] = path
-        if build_index is not None:
-            params["buildIndex"] = build_index
+        return self._conn.send_request("scene", params)
 
-        return self._conn.send_request("manage_scene", params)
-
-    def save(self, name: str | None = None, path: str | None = None) -> dict[str, Any]:
+    def save(self, path: str | None = None) -> dict[str, Any]:
         """Save current scene"""
         params: dict[str, Any] = {"action": "save"}
-        if name:
-            params["name"] = name
         if path:
             params["path"] = path
+        return self._conn.send_request("scene", params)
 
-        return self._conn.send_request("manage_scene", params)
 
-    def get_hierarchy(
+class ComponentAPI:
+    """Component operations via 'component' tool"""
+
+    def __init__(self, conn: RelayConnection):
+        self._conn = conn
+
+    def list(
         self,
-        page_size: int | None = None,
-        cursor: int | str | None = None,
-        max_nodes: int | None = None,
-        include_transform: bool | None = None,
+        target: str | None = None,
+        target_id: int | None = None,
     ) -> dict[str, Any]:
-        """Get scene hierarchy"""
-        params: dict[str, Any] = {"action": "get_hierarchy"}
+        """List components on a GameObject"""
+        params: dict[str, Any] = {"action": "list"}
+        if target:
+            params["target"] = target
+        if target_id is not None:
+            params["targetId"] = target_id
+        return self._conn.send_request("component", params)
 
-        if page_size is not None:
-            params["page_size"] = page_size
-        if cursor is not None:
-            params["cursor"] = cursor
-        if max_nodes is not None:
-            params["max_nodes"] = max_nodes
-        if include_transform is not None:
-            params["include_transform"] = include_transform
-
-        return self._conn.send_request("manage_scene", params)
-
-    def get_active(self) -> dict[str, Any]:
-        """Get active scene info"""
-        return self._conn.send_request("manage_scene", {"action": "get_active"})
+    def inspect(
+        self,
+        component_type: str,
+        target: str | None = None,
+        target_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Inspect component properties"""
+        params: dict[str, Any] = {"action": "inspect", "type": component_type}
+        if target:
+            params["target"] = target
+        if target_id is not None:
+            params["targetId"] = target_id
+        return self._conn.send_request("component", params)
 
 
 class MaterialAPI:
@@ -994,6 +1041,7 @@ class UnityClient:
         self.editor = EditorAPI(self._conn)
         self.gameobject = GameObjectAPI(self._conn)
         self.scene = SceneAPI(self._conn)
+        self.component = ComponentAPI(self._conn)
         self.material = MaterialAPI(self._conn)
         self.tests = TestAPI(self._conn)
         self.menu = MenuAPI(self._conn)
@@ -1035,6 +1083,19 @@ Available commands:
                             run [mode]     - Run tests (edit|play)
                             list [mode]    - List available tests
                             status         - Check running test status
+  scene <action> [args]   Scene commands:
+                            active         - Get active scene info
+                            hierarchy      - Get scene hierarchy
+                            load           - Load a scene
+                            save           - Save current scene
+  gameobject <action>     GameObject commands:
+                            find           - Find GameObjects by name
+                            create         - Create a new GameObject
+                            modify         - Modify transform
+                            delete         - Delete a GameObject
+  component <action>      Component commands:
+                            list           - List components on a GameObject
+                            inspect        - Inspect component properties
   config                  Show current configuration
   config init             Generate default .unity-cli.toml
 
@@ -1051,10 +1112,17 @@ Examples:
   %(prog)s play --instance /path/to/project
   %(prog)s console --types error --count 50
   %(prog)s tests run edit
-  %(prog)s tests list edit
   %(prog)s tests run edit --test-names "MyTests.TestMethod"
-  %(prog)s tests run edit --categories Unit Integration
-  %(prog)s config init
+  %(prog)s scene active
+  %(prog)s scene hierarchy --depth 2
+  %(prog)s gameobject find --name "Player"
+  %(prog)s gameobject create --name "Cube" --primitive Cube
+  %(prog)s component list --target "Player"
+  %(prog)s component inspect --target "Player" --type "Rigidbody"
+
+  # JSON output with field filtering (gh-style)
+  %(prog)s scene hierarchy --json name instanceID
+  %(prog)s scene hierarchy --json name instanceID | jq '.[].name'
         """,
     )
     parser.add_argument("command", help="Command to execute")
@@ -1073,6 +1141,28 @@ Examples:
     parser.add_argument("--assemblies", nargs="+", default=None, help="Filter by assembly names")
     parser.add_argument("--group-pattern", default=None, help="Filter by regex pattern")
     parser.add_argument("--sync", action="store_true", help="Run tests synchronously (EditMode only)")
+    # Scene/GameObject/Component options
+    parser.add_argument("--name", default=None, help="Name for find/create/modify/delete")
+    parser.add_argument("--id", type=int, default=None, help="Instance ID for targeting specific objects")
+    parser.add_argument("--target", default=None, help="Target GameObject name (for component commands)")
+    parser.add_argument("--target-id", type=int, default=None, help="Target GameObject instance ID")
+    parser.add_argument("--depth", type=int, default=1, help="Hierarchy depth (default: 1)")
+    parser.add_argument("--page-size", type=int, default=50, help="Page size for hierarchy (default: 50)")
+    parser.add_argument("--cursor", type=int, default=0, help="Cursor for pagination")
+    parser.add_argument("--path", default=None, help="Scene path for load/save")
+    parser.add_argument("--primitive", default=None, help="Primitive type (Cube, Sphere, etc.)")
+    parser.add_argument("--position", nargs=3, type=float, default=None, metavar=("X", "Y", "Z"), help="Position")
+    parser.add_argument("--rotation", nargs=3, type=float, default=None, metavar=("X", "Y", "Z"), help="Rotation")
+    parser.add_argument("--scale", nargs=3, type=float, default=None, metavar=("X", "Y", "Z"), help="Scale")
+    parser.add_argument("--type", default=None, dest="component_type", help="Component type name for inspect")
+    parser.add_argument("--additive", action="store_true", help="Load scene additively")
+    # Output formatting (gh-style)
+    parser.add_argument(
+        "--json",
+        nargs="*",
+        metavar="FIELD",
+        help="Output JSON with specified fields (e.g., --json name instanceID). Empty for all fields.",
+    )
 
     args = parser.parse_args()
 
@@ -1082,6 +1172,10 @@ Examples:
     instance = args.instance or config.instance
     log_types = args.types or config.log_types
     log_count = args.count or config.log_count
+
+    # --json flag handling: None means not specified, [] means --json without fields
+    json_mode = args.json is not None
+    json_fields = args.json if args.json else None
 
     client = UnityClient(
         relay_host=relay_host,
@@ -1115,7 +1209,9 @@ Examples:
 
         elif args.command == "instances":
             instances = client.list_instances()
-            if not instances:
+            if json_mode:
+                print(format_output(instances, json_fields, json_mode))
+            elif not instances:
                 print("No Unity instances connected")
             else:
                 print(f"Connected instances ({len(instances)}):")
@@ -1128,7 +1224,7 @@ Examples:
 
         elif args.command == "state":
             result = client.editor.get_state()
-            print(json.dumps(result, indent=2, ensure_ascii=False))
+            print(format_output(result, json_fields, json_mode))
 
         elif args.command == "play":
             client.editor.play()
@@ -1144,7 +1240,7 @@ Examples:
 
         elif args.command == "console":
             result = client.console.get(types=log_types, count=log_count)
-            print(json.dumps(result, indent=2, ensure_ascii=False))
+            print(format_output(result, json_fields, json_mode))
 
         elif args.command == "clear":
             client.console.clear()
@@ -1167,21 +1263,134 @@ Examples:
                     group_pattern=args.group_pattern,
                     synchronous=args.sync,
                 )
-                print(json.dumps(result, indent=2, ensure_ascii=False))
+                print(format_output(result, json_fields, json_mode))
             elif action == "list":
                 result = client.tests.list(mode=mode)
-                print(json.dumps(result, indent=2, ensure_ascii=False))
+                print(format_output(result, json_fields, json_mode))
             elif action == "status":
                 result = client.tests.status()
-                print(json.dumps(result, indent=2, ensure_ascii=False))
+                print(format_output(result, json_fields, json_mode))
             else:
                 print(f"Unknown test action: {action}")
                 print("Available: run, list, status")
                 sys.exit(1)
 
+        elif args.command == "scene":
+            action = args.args[0] if args.args else "active"
+
+            if action == "active":
+                result = client.scene.get_active()
+                print(format_output(result, json_fields, json_mode))
+            elif action == "hierarchy":
+                result = client.scene.get_hierarchy(
+                    depth=args.depth,
+                    page_size=args.page_size,
+                    cursor=args.cursor,
+                )
+                # For --json with fields, output items array directly for easier jq processing
+                if json_fields:
+                    items = result.get("items", [])
+                    print(format_output(items, json_fields, json_mode))
+                else:
+                    print(format_output(result, json_fields, json_mode))
+            elif action == "load":
+                if not args.path and not args.name:
+                    print("Error: --path or --name required for scene load")
+                    sys.exit(1)
+                result = client.scene.load(path=args.path, name=args.name, additive=args.additive)
+                print(format_output(result, json_fields, json_mode))
+            elif action == "save":
+                result = client.scene.save(path=args.path)
+                print(format_output(result, json_fields, json_mode))
+            else:
+                print(f"Unknown scene action: {action}")
+                print("Available: active, hierarchy, load, save")
+                sys.exit(1)
+
+        elif args.command == "gameobject":
+            action = args.args[0] if args.args else "find"
+
+            if action == "find":
+                if not args.name and not args.id:
+                    print("Error: --name or --id required for gameobject find")
+                    sys.exit(1)
+                result = client.gameobject.find(name=args.name, instance_id=args.id)
+                # For --json with fields, output objects array directly
+                if json_fields:
+                    objects = result.get("objects", [])
+                    print(format_output(objects, json_fields, json_mode))
+                else:
+                    print(format_output(result, json_fields, json_mode))
+            elif action == "create":
+                if not args.name:
+                    print("Error: --name required for gameobject create")
+                    sys.exit(1)
+                result = client.gameobject.create(
+                    name=args.name,
+                    primitive_type=args.primitive,
+                    position=args.position,
+                    rotation=args.rotation,
+                    scale=args.scale,
+                )
+                print(format_output(result, json_fields, json_mode))
+            elif action == "modify":
+                if not args.name and not args.id:
+                    print("Error: --name or --id required for gameobject modify")
+                    sys.exit(1)
+                result = client.gameobject.modify(
+                    name=args.name,
+                    instance_id=args.id,
+                    position=args.position,
+                    rotation=args.rotation,
+                    scale=args.scale,
+                )
+                print(format_output(result, json_fields, json_mode))
+            elif action == "delete":
+                if not args.name and not args.id:
+                    print("Error: --name or --id required for gameobject delete")
+                    sys.exit(1)
+                result = client.gameobject.delete(name=args.name, instance_id=args.id)
+                print(format_output(result, json_fields, json_mode))
+            else:
+                print(f"Unknown gameobject action: {action}")
+                print("Available: find, create, modify, delete")
+                sys.exit(1)
+
+        elif args.command == "component":
+            action = args.args[0] if args.args else "list"
+
+            if action == "list":
+                if not args.target and not args.target_id:
+                    print("Error: --target or --target-id required for component list")
+                    sys.exit(1)
+                result = client.component.list(target=args.target, target_id=args.target_id)
+                # For --json with fields, output components array directly
+                if json_fields:
+                    components = result.get("components", [])
+                    print(format_output(components, json_fields, json_mode))
+                else:
+                    print(format_output(result, json_fields, json_mode))
+            elif action == "inspect":
+                if not args.target and not args.target_id:
+                    print("Error: --target or --target-id required for component inspect")
+                    sys.exit(1)
+                if not args.component_type:
+                    print("Error: --type required for component inspect")
+                    sys.exit(1)
+                result = client.component.inspect(
+                    target=args.target,
+                    target_id=args.target_id,
+                    component_type=args.component_type,
+                )
+                print(format_output(result, json_fields, json_mode))
+            else:
+                print(f"Unknown component action: {action}")
+                print("Available: list, inspect")
+                sys.exit(1)
+
         else:
             print(f"Unknown command: {args.command}")
-            print("Available: config, instances, state, play, stop, pause, console, clear, tests")
+            print("Available: config, instances, state, play, stop, pause, console, clear, refresh, tests, scene, gameobject, component")
             sys.exit(1)
 
     except UnityCLIError as e:
