@@ -1494,7 +1494,7 @@ def screenshot(
 # =============================================================================
 
 
-@app.command()
+@app.command(hidden=True)
 def completion(
     shell: Annotated[
         str,
