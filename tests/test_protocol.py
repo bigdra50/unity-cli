@@ -134,8 +134,10 @@ class TestRegisterMessage:
         assert "ts" in d
 
     def test_immutable(self) -> None:
+        from pydantic import ValidationError
+
         msg = RegisterMessage()
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             msg.instance_id = "new_id"  # type: ignore
 
 
