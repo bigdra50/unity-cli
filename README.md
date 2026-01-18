@@ -5,282 +5,284 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unity](https://img.shields.io/badge/Unity-2021.3%2B-black?logo=unity)](https://unity.com/)
 
-コマンドラインから Unity Editor を操作する CLI ツール。
+[日本語版](README.jp.md)
 
-## 概要
+A CLI tool for controlling Unity Editor from the command line.
 
-Play Mode 制御、コンソールログ取得、テスト実行、シーン/GameObject 操作など、Unity Editor の主要機能を CLI から実行できます。
+## Overview
+
+Execute Unity Editor operations from CLI: Play Mode control, console log retrieval, test execution, scene/GameObject manipulation, and more.
 
 ```bash
-# Play Mode 制御
+# Play Mode control
 unity-cli play
 unity-cli stop
 
-# コンソールログ取得
+# Get console logs
 unity-cli console get --types error
 
-# メニュー実行
+# Execute menu items
 unity-cli menu exec "Assets/Refresh"
 
-# ContextMenu 実行
+# Execute ContextMenu
 unity-cli menu context "DoSomething" -t "/Player"
 ```
 
-主な特徴:
-- Unity Editor の主要操作を CLI で実行
-- MenuItem / ContextMenu の実行に対応
-- 複数 Unity インスタンスの同時制御
-- ドメインリロード耐性（自動再接続）
-- プロジェクトを適切なバージョンで開く（Unity Hub連携）
-- プロジェクト情報取得（Relay Server不要）
+Key features:
+- Execute Unity Editor operations from CLI
+- Support for MenuItem / ContextMenu execution
+- Simultaneous control of multiple Unity instances
+- Domain reload resilience (auto-reconnection)
+- Open projects with appropriate version (Unity Hub integration)
+- Project information retrieval (no Relay Server required)
 
-## 動作要件
+## Requirements
 
-- [uv](https://docs.astral.sh/uv/) (Python パッケージマネージャー)
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 - Python 3.11+
 - Unity 2021.3+
-- Unity Hub（`open`/`editor`コマンド使用時）
+- Unity Hub (for `open`/`editor` commands)
 
-## クイックスタート
+## Quick Start
 
-### 1. Unity側セットアップ
+### 1. Unity Setup
 
-UnityプロジェクトにUnityBridgeパッケージを追加:
+Add the UnityBridge package to your Unity project:
 
 ```
 Window > Package Manager > + > Add package from git URL...
 https://github.com/bigdra50/unity-cli.git?path=UnityBridge
 ```
 
-### 2. 接続
+### 2. Connection
 
-Unity Editorで `Window > Unity Bridge` を開き:
-1. Start Server をクリック（Relay Server起動）
-2. Connect をクリック（Unity → Relay接続）
+In Unity Editor, open `Window > Unity Bridge`:
+1. Click Start Server (launches Relay Server)
+2. Click Connect (Unity → Relay connection)
 
-### 3. CLIで操作
+### 3. CLI Operations
 
 ```bash
-# uvx で直接実行（インストール不要）
+# Run directly with uvx (no installation required)
 uvx --from git+https://github.com/bigdra50/unity-cli unity-cli state
 
-# Play Mode制御
+# Play Mode control
 uvx --from git+https://github.com/bigdra50/unity-cli unity-cli play
 uvx --from git+https://github.com/bigdra50/unity-cli unity-cli stop
 
-# コンソールログ取得
+# Get console logs
 uvx --from git+https://github.com/bigdra50/unity-cli unity-cli console --types error
 ```
 
-## インストール
+## Installation
 
 ```bash
-# グローバルインストール
+# Global installation
 uv tool install git+https://github.com/bigdra50/unity-cli
 
-# インタラクティブUI付き（エディタ選択プロンプト）
+# With interactive UI (editor selection prompt)
 uv tool install "git+https://github.com/bigdra50/unity-cli[interactive]"
 
-# CLIコマンド
+# CLI commands
 unity-cli state
 unity-cli play
 unity-cli console --types error --count 10
 
-# Relay Server 単体起動
+# Run Relay Server standalone
 unity-relay --port 6500
 ```
 
-## CLI コマンド
+## CLI Commands
 
-### プロジェクトを開く
+### Open Project
 
 ```bash
-# プロジェクトを適切なバージョンで開く（ProjectVersion.txt参照）
+# Open project with appropriate version (reads ProjectVersion.txt)
 unity-cli open ./MyUnityProject
 
-# エディタバージョンを指定
+# Specify editor version
 unity-cli open ./MyUnityProject --editor 2022.3.10f1
 
-# 非インタラクティブモード（CI/スクリプト向け）
+# Non-interactive mode (for CI/scripts)
 unity-cli open ./MyUnityProject --non-interactive
 
-# 終了まで待機
+# Wait until exit
 unity-cli open ./MyUnityProject --wait
 ```
 
-### エディタ管理
+### Editor Management
 
 ```bash
-# インストール済みエディタ一覧
+# List installed editors
 unity-cli editor list
 
-# エディタインストール
+# Install editor
 unity-cli editor install 2022.3.10f1
 
-# モジュール付きでインストール
+# Install with modules
 unity-cli editor install 2022.3.10f1 --modules android ios webgl
 ```
 
-### プロジェクト情報（Relay Server不要）
+### Project Information (No Relay Server Required)
 
 ```bash
-# プロジェクト全情報
+# Full project info
 unity-cli project info ./MyUnityProject
 
-# Unityバージョンのみ
+# Unity version only
 unity-cli project version ./MyUnityProject
 
-# パッケージ一覧
+# Package list
 unity-cli project packages ./MyUnityProject
 
-# タグ・レイヤー
+# Tags & layers
 unity-cli project tags ./MyUnityProject
 
-# 品質設定
+# Quality settings
 unity-cli project quality ./MyUnityProject
 
-# Assembly Definition一覧
+# Assembly Definition list
 unity-cli project assemblies ./MyUnityProject
 
-# JSON出力
+# JSON output
 unity-cli --json project info ./MyUnityProject
 ```
 
-### 基本操作（Relay Server経由）
+### Basic Operations (via Relay Server)
 
 ```bash
-# エディタ状態確認
+# Check editor state
 unity-cli state
 
-# Play Mode制御
+# Play Mode control
 unity-cli play
 unity-cli stop
 unity-cli pause
 
-# コンソールログ
+# Console logs
 unity-cli console
 unity-cli console --types error warning --count 20
 
-# アセットリフレッシュ
+# Asset refresh
 unity-cli refresh
 ```
 
-### インスタンス管理
+### Instance Management
 
 ```bash
-# 接続中インスタンス一覧
+# List connected instances
 unity-cli instances
 
-# 特定インスタンスを指定
+# Specify target instance
 unity-cli --instance /Users/dev/MyGame state
 unity-cli --instance /Users/dev/Demo play
 
-# デフォルトインスタンス変更
+# Change default instance
 unity-cli set-default /Users/dev/MyGame
 ```
 
-### テスト実行
+### Test Execution
 
 ```bash
-# EditModeテスト
+# EditMode tests
 unity-cli tests edit
 
-# PlayModeテスト
+# PlayMode tests
 unity-cli tests play
 
-# フィルタリング
+# Filtering
 unity-cli tests edit --test-names "MyTests.SampleTest"
 unity-cli tests edit --category-names "Unit" "Integration"
 unity-cli tests edit --assembly-names "MyGame.Tests"
 ```
 
-### シーン操作
+### Scene Operations
 
 ```bash
-# アクティブシーン情報
+# Active scene info
 unity-cli scene active
 
-# 階層取得
-unity-cli scene hierarchy                    # ルートのみ
-unity-cli scene hierarchy --depth 2          # 2階層まで
-unity-cli scene hierarchy --iterate-all      # 全階層（ページング）
+# Hierarchy
+unity-cli scene hierarchy                    # Root only
+unity-cli scene hierarchy --depth 2          # Up to 2 levels
+unity-cli scene hierarchy --iterate-all      # All levels (paging)
 
-# シーン操作
+# Scene operations
 unity-cli scene load --name MainScene
 unity-cli scene save
 unity-cli scene create --name NewScene --path Assets/Scenes
 ```
 
-### GameObject操作
+### GameObject Operations
 
 ```bash
-# 検索
+# Find
 unity-cli gameobject find "Main Camera"
 unity-cli gameobject find "Player" --iterate-all
 
-# 作成
+# Create
 unity-cli gameobject create --name "MyCube" --primitive Cube --position 0,1,0
 
-# 変更
+# Modify
 unity-cli gameobject modify --name "MyCube" --position 5,0,0 --rotation 0,45,0
 
-# 削除
+# Delete
 unity-cli gameobject delete --name "MyCube"
 ```
 
-### コンポーネント操作
+### Component Operations
 
 ```bash
-# コンポーネント一覧
+# List components
 unity-cli component list -t "Main Camera"
 
-# コンポーネント詳細
+# Inspect component
 unity-cli component inspect -t "Main Camera" -T Camera
 
-# コンポーネント追加
+# Add component
 unity-cli component add -t "Player" -T Rigidbody
 
-# コンポーネント削除
+# Remove component
 unity-cli component remove -t "Player" -T Rigidbody
 ```
 
-### メニュー/ContextMenu
+### Menu / ContextMenu
 
 ```bash
-# メニュー実行
+# Execute menu
 unity-cli menu exec "Edit/Play"
 unity-cli menu exec "Assets/Refresh"
 unity-cli menu exec "Window/General/Console"
 
-# メニュー一覧
-unity-cli menu list                    # 全メニュー
-unity-cli menu list -f "Assets"        # フィルタリング
-unity-cli menu list -f "Play" -l 20    # 件数制限
+# List menus
+unity-cli menu list                    # All menus
+unity-cli menu list -f "Assets"        # Filter
+unity-cli menu list -f "Play" -l 20    # Limit count
 
-# ContextMenu実行（シーン内オブジェクト）
+# Execute ContextMenu (scene objects)
 unity-cli menu context "Reset" -t "/Player"
 
-# ContextMenu実行（ScriptableObject）
+# Execute ContextMenu (ScriptableObject)
 unity-cli menu context "DoSomething" -t "Assets/Data/Config.asset"
 
-# ContextMenu実行（Prefab）
+# Execute ContextMenu (Prefab)
 unity-cli menu context "Initialize" -t "Assets/Prefabs/Enemy.prefab"
 ```
 
-### アセット操作
+### Asset Operations
 
 ```bash
-# Prefab作成
+# Create Prefab
 unity-cli asset prefab -s "Player" -p "Assets/Prefabs/Player.prefab"
 
-# ScriptableObject作成
+# Create ScriptableObject
 unity-cli asset scriptable-object -T "GameConfig" -p "Assets/Data/Config.asset"
 
-# アセット情報
+# Asset info
 unity-cli asset info "Assets/Data/Config.asset"
 ```
 
-### マテリアル操作
+### Material Operations
 
 ```bash
 unity-cli material info --path Assets/Materials/Default.mat
@@ -288,104 +290,104 @@ unity-cli material create --path Assets/Materials/New.mat --shader Standard
 unity-cli material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 ```
 
-## オプション
+## Options
 
-### 共通オプション
+### Common Options
 
-| オプション | 説明 | デフォルト |
-|-----------|------|-----------|
-| `--host` | Relay Serverホスト | 127.0.0.1 |
-| `--port` | Relay Serverポート | 6500 |
-| `--instance` | 対象Unityインスタンス | デフォルト |
-| `--timeout` | タイムアウト（ms） | 30000 |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--host` | Relay Server host | 127.0.0.1 |
+| `--port` | Relay Server port | 6500 |
+| `--instance` | Target Unity instance | default |
+| `--timeout` | Timeout (ms) | 30000 |
 
-### tests専用オプション
+### Tests Options
 
-| オプション | 説明 |
-|-----------|------|
-| `--test-names` | テスト名（完全一致） |
-| `--group-names` | グループ名（正規表現） |
-| `--category-names` | NUnitカテゴリ |
-| `--assembly-names` | アセンブリ名 |
+| Option | Description |
+|--------|-------------|
+| `--test-names` | Test names (exact match) |
+| `--group-names` | Group names (regex) |
+| `--category-names` | NUnit categories |
+| `--assembly-names` | Assembly names |
 
-### scene hierarchy オプション
+### Scene Hierarchy Options
 
-| オプション | 説明 | デフォルト |
-|-----------|------|-----------|
-| `--depth` | 階層の深さ | 0（ルートのみ） |
-| `--iterate-all` | 全ページ自動取得 | false |
-| `--page-size` | ページサイズ | 50 |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--depth` | Hierarchy depth | 0 (root only) |
+| `--iterate-all` | Auto-fetch all pages | false |
+| `--page-size` | Page size | 50 |
 
-## アーキテクチャ
+## Architecture
 
 ```mermaid
 flowchart TB
     subgraph CLI["unity-cli (Python)"]
         direction TB
-        RC[RelayConnection: TCP通信]
+        RC[RelayConnection: TCP communication]
         EB[Exponential Backoff: 500ms → 8s]
-        RID[request_id: 冪等性保証]
+        RID[request_id: idempotency guarantee]
     end
 
     subgraph Relay["Relay Server (Python)"]
         direction TB
-        IR[InstanceRegistry: 複数Unity管理]
-        Cache[RequestCache: 冪等性キャッシュ]
+        IR[InstanceRegistry: multiple Unity management]
+        Cache[RequestCache: idempotency cache]
         HB[Heartbeat: Single Outstanding PING]
         Q[Queue: FIFO max 10]
     end
 
     subgraph Unity["UnityBridge (C#)"]
         direction TB
-        Client[RelayClient: 接続管理]
-        Dispatcher[CommandDispatcher: BridgeTool属性]
-        Reload[BridgeReloadHandler: 再接続]
+        Client[RelayClient: connection management]
+        Dispatcher[CommandDispatcher: BridgeTool attribute]
+        Reload[BridgeReloadHandler: reconnection]
     end
 
     CLI -->|TCP:6500| Relay
     Relay -->|TCP:6500| Unity
 ```
 
-## プロトコル仕様
+## Protocol Specification
 
-詳細は [docs/protocol-spec.md](docs/protocol-spec.md) を参照。
+See [docs/protocol-spec.md](docs/protocol-spec.md) for details.
 
 - Framing: 4-byte big-endian length + JSON
 - State Machine: DISCONNECTED → READY → BUSY → RELOADING
-- Heartbeat: 5秒間隔、15秒タイムアウト（3回リトライ）
-- Retry: Exponential Backoff（500ms → 8s、最大30秒）
+- Heartbeat: 5s interval, 15s timeout (3 retries)
+- Retry: Exponential Backoff (500ms → 8s, max 30s)
 
-## トラブルシューティング
+## Troubleshooting
 
 ```bash
-# Relay Serverが起動しているか確認
+# Check if Relay Server is running
 lsof -i :6500
 
-# 接続中インスタンス確認
+# Check connected instances
 unity-cli instances
 
-# Unityコンソールでエラー確認
+# Check Unity console for errors
 unity-cli console --types error
 ```
 
-## v2.x → v3.0 マイグレーション
+## v2.x → v3.0 Migration
 
-| 変更点 | v2.x | v3.0 |
+| Change | v2.x | v3.0 |
 |--------|------|------|
-| コマンド名 | `unity-mcp` | `unity-cli` |
-| 接続先 | Unity直接 (6400) | Relay Server (6500) |
-| プロトコル | 8-byte framing | 4-byte framing |
-| 複数インスタンス | 非対応 | 対応 |
+| Command name | `unity-mcp` | `unity-cli` |
+| Connection target | Unity direct (6400) | Relay Server (6500) |
+| Protocol | 8-byte framing | 4-byte framing |
+| Multiple instances | Not supported | Supported |
 
 ```bash
 # v2.x
 unity-mcp --port 6400 state
 
 # v3.0
-unity-cli state  # Relay経由
-unity-cli --instance /path/to/project state  # 特定インスタンス
+unity-cli state  # Via Relay
+unity-cli --instance /path/to/project state  # Specific instance
 ```
 
-## ライセンス
+## License
 
 MIT License
