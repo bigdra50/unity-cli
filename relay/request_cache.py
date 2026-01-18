@@ -10,9 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,11 @@ class RequestCache:
     async def _cleanup_expired(self) -> None:
         """Remove expired cache entries"""
         async with self._lock:
-            expired_keys = [key for key, entry in self._cache.items() if entry.is_expired(self._ttl_seconds)]
+            expired_keys = [
+                key
+                for key, entry in self._cache.items()
+                if entry.is_expired(self._ttl_seconds)
+            ]
             for key in expired_keys:
                 del self._cache[key]
 
