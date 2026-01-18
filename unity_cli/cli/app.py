@@ -1550,103 +1550,35 @@ def completion(
         print(scripts[shell_lower])
 
 
+def _get_completion_script(shell: str) -> str:
+    """Generate completion script using Typer's internal completion."""
+    import typer.completion as tc
+
+    return tc.get_completion_script(  # type: ignore[attr-defined]
+        prog_name="unity-cli",
+        complete_var="_UNITY_CLI_COMPLETE",
+        shell=shell,
+    )
+
+
 def _get_zsh_completion() -> str:
     """Generate zsh completion script using Typer's internal completion."""
-    return """#compdef unity-cli
-
-_unity_cli_completion() {
-    local -a completions
-    local -a completions_with_descriptions
-    local -a response
-    (( ! $+commands[unity-cli] )) && return 1
-
-    response=("${(@f)$(env COMP_WORDS="${words[*]}" COMP_CWORD=$((CURRENT-1)) _UNITY_CLI_COMPLETE=complete_zsh unity-cli 2>/dev/null)}")
-
-    for key descr in ${(kv)response}; do
-        if [[ "$descr" == "_" ]]; then
-            completions+=("$key")
-        else
-            completions_with_descriptions+=("$key":"$descr")
-        fi
-    done
-
-    if [ -n "$completions_with_descriptions" ]; then
-        _describe -V unsorted completions_with_descriptions -U
-    fi
-
-    if [ -n "$completions" ]; then
-        compadd -U -V unsorted -a completions
-    fi
-}
-
-if [[ $zsh_eval_context[-1] == loadautofun ]]; then
-    # autoload from fpath, call function directly
-    _unity_cli_completion "$@"
-else
-    # eval, register function for later
-    compdef _unity_cli_completion unity-cli
-fi
-"""
+    return _get_completion_script("zsh")
 
 
 def _get_bash_completion() -> str:
     """Generate bash completion script using Typer's internal completion."""
-    return """_unity_cli_completion() {
-    local IFS=$'\\n'
-    COMPREPLY=( $(env COMP_WORDS="${COMP_WORDS[*]}" COMP_CWORD=$COMP_CWORD _UNITY_CLI_COMPLETE=complete_bash unity-cli 2>/dev/null) )
-    return 0
-}
-
-complete -o default -F _unity_cli_completion unity-cli
-"""
+    return _get_completion_script("bash")
 
 
 def _get_fish_completion() -> str:
     """Generate fish completion script using Typer's internal completion."""
-    return """function _unity_cli_completion
-    set -l response (env _UNITY_CLI_COMPLETE=complete_fish COMP_WORDS=(commandline -cp) COMP_CWORD=(commandline -t) unity-cli 2>/dev/null)
-
-    for completion in $response
-        set -l metadata (string split "," -- $completion)
-
-        if test (count $metadata) -eq 1
-            # No description
-            echo $metadata
-        else
-            echo -e "$metadata[1]\\t$metadata[2]"
-        end
-    end
-end
-
-complete -c unity-cli -f -a "(_unity_cli_completion)"
-"""
+    return _get_completion_script("fish")
 
 
 def _get_powershell_completion() -> str:
     """Generate PowerShell completion script using Typer's internal completion."""
-    return """$scriptblock = {
-    param($wordToComplete, $commandAst, $cursorPosition)
-
-    $env:_UNITY_CLI_COMPLETE = "complete_powershell"
-    $env:COMP_WORDS = $commandAst.ToString()
-    $env:COMP_CWORD = $cursorPosition
-
-    unity-cli 2>$null | ForEach-Object {
-        $parts = $_ -split ","
-        if ($parts.Count -eq 1) {
-            [System.Management.Automation.CompletionResult]::new($parts[0])
-        } else {
-            [System.Management.Automation.CompletionResult]::new($parts[0], $parts[0], 'ParameterValue', $parts[1])
-        }
-    }
-
-    Remove-Item Env:_UNITY_CLI_COMPLETE
-    Remove-Item Env:COMP_WORDS
-    Remove-Item Env:COMP_CWORD
-}
-
-Register-ArgumentCompleter -Native -CommandName unity-cli -ScriptBlock $scriptblock
-"""
+    return _get_completion_script("powershell")
 
 
 # =============================================================================
