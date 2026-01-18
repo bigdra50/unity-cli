@@ -55,6 +55,8 @@ _unity_cli() {
         'config:Configuration commands'
         'project:Project information'
         'editor:Unity Editor management'
+        'selection:Editor selection'
+        'screenshot:Take screenshot'
     )
 
     _arguments -C \\
@@ -79,9 +81,18 @@ _unity_cli() {
                     _describe -t commands 'scene command' scene_cmds
                     ;;
                 tests)
-                    local -a tests_cmds
-                    tests_cmds=('run:Run tests' 'list:List tests' 'status:Test status')
-                    _describe -t commands 'tests command' tests_cmds
+                    case $words[2] in
+                        run|list)
+                            local -a test_modes
+                            test_modes=('edit:Run EditMode tests' 'play:Run PlayMode tests')
+                            _describe -t modes 'test mode' test_modes
+                            ;;
+                        *)
+                            local -a tests_cmds
+                            tests_cmds=('run:Run tests' 'list:List tests' 'status:Test status')
+                            _describe -t commands 'tests command' tests_cmds
+                            ;;
+                    esac
                     ;;
                 gameobject)
                     local -a go_cmds
@@ -133,13 +144,32 @@ compdef _unity_cli unity-cli
 
 BASH_SCRIPT = """\
 _unity_cli() {
-    local cur prev commands
+    local cur prev words cword
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
+    words=("${COMP_WORDS[@]}")
+    cword=$COMP_CWORD
 
-    commands="instances state play stop pause refresh open completion console scene tests gameobject component menu asset config project editor"
+    commands="instances state play stop pause refresh open completion console scene tests gameobject component menu asset config project editor selection screenshot"
 
+    # Handle third level (e.g., tests run <mode>)
+    if [[ $cword -ge 3 ]]; then
+        local cmd="${words[1]}"
+        local subcmd="${words[2]}"
+        case "${cmd}" in
+            tests)
+                case "${subcmd}" in
+                    run|list)
+                        COMPREPLY=( $(compgen -W "edit play" -- ${cur}) )
+                        return 0
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    # Handle second level (subcommands)
     case "${prev}" in
         unity-cli)
             COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
@@ -198,9 +228,56 @@ complete -F _unity_cli unity-cli
 FISH_SCRIPT = """\
 # unity-cli fish completion
 
-set -l commands instances state play stop pause refresh open completion console scene tests gameobject component menu asset config project editor
+set -l commands instances state play stop pause refresh open completion console scene tests gameobject component menu asset config project editor selection screenshot
+
+# Subcommand lists
+set -l tests_subcmds run list status
+set -l console_subcmds get clear
+set -l scene_subcmds active hierarchy load save
+set -l gameobject_subcmds find create modify delete
+set -l component_subcmds list inspect add remove
+set -l menu_subcmds exec list context
+set -l asset_subcmds prefab scriptable-object info
+set -l config_subcmds show init
+set -l project_subcmds info version packages tags quality assemblies
+set -l editor_subcmds list install
+set -l completion_subcmds bash zsh fish powershell
+set -l test_modes edit play
+
+# Helper function: check if we've seen a specific subcommand sequence
+function __fish_unity_cli_using_subcommand
+    set -l cmd (commandline -opc)
+    set -l argc (count $cmd)
+    if test $argc -ge 2
+        if test "$cmd[2]" = "$argv[1]"
+            if test $argc -ge 3; and set -q argv[2]
+                test "$cmd[3]" = "$argv[2]"
+                return $status
+            end
+            return 0
+        end
+    end
+    return 1
+end
+
+# Helper function: check if we need argument for tests run/list
+function __fish_unity_cli_needs_test_mode
+    set -l cmd (commandline -opc)
+    set -l argc (count $cmd)
+    # unity-cli tests run <cursor> -> argc=3
+    if test $argc -eq 3
+        if test "$cmd[2]" = "tests"
+            if test "$cmd[3]" = "run" -o "$cmd[3]" = "list"
+                return 0
+            end
+        end
+    end
+    return 1
+end
 
 complete -c unity-cli -f
+
+# Top-level commands
 complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a instances -d 'List connected Unity instances'
 complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a state -d 'Get editor state'
 complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a play -d 'Enter play mode'
@@ -219,19 +296,71 @@ complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a asset -d
 complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a config -d 'Config commands'
 complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a project -d 'Project commands'
 complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a editor -d 'Editor commands'
+complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a selection -d 'Editor selection'
+complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a screenshot -d 'Take screenshot'
 
-# Subcommands
-complete -c unity-cli -n "__fish_seen_subcommand_from console" -a "get clear"
-complete -c unity-cli -n "__fish_seen_subcommand_from scene" -a "active hierarchy load save"
-complete -c unity-cli -n "__fish_seen_subcommand_from tests" -a "run list status"
-complete -c unity-cli -n "__fish_seen_subcommand_from gameobject" -a "find create modify delete"
-complete -c unity-cli -n "__fish_seen_subcommand_from component" -a "list inspect add remove"
-complete -c unity-cli -n "__fish_seen_subcommand_from menu" -a "exec list context"
-complete -c unity-cli -n "__fish_seen_subcommand_from asset" -a "prefab scriptable-object info"
-complete -c unity-cli -n "__fish_seen_subcommand_from config" -a "show init"
-complete -c unity-cli -n "__fish_seen_subcommand_from project" -a "info version packages tags quality assemblies"
-complete -c unity-cli -n "__fish_seen_subcommand_from editor" -a "list install"
-complete -c unity-cli -n "__fish_seen_subcommand_from completion" -a "bash zsh fish powershell"
+# tests subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -a run -d 'Run tests'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -a list -d 'List tests'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -a status -d 'Test status'
+
+# tests run/list mode argument
+complete -c unity-cli -n "__fish_unity_cli_needs_test_mode" -a edit -d 'EditMode tests'
+complete -c unity-cli -n "__fish_unity_cli_needs_test_mode" -a play -d 'PlayMode tests'
+
+# console subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand console; and not __fish_seen_subcommand_from $console_subcmds" -a get -d 'Get console logs'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand console; and not __fish_seen_subcommand_from $console_subcmds" -a clear -d 'Clear console'
+
+# scene subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a active -d 'Get active scene'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a hierarchy -d 'Scene hierarchy'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a load -d 'Load scene'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a save -d 'Save scene'
+
+# gameobject subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a find -d 'Find GameObjects'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a create -d 'Create GameObject'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a modify -d 'Modify GameObject'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a delete -d 'Delete GameObject'
+
+# component subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a list -d 'List components'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a inspect -d 'Inspect component'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a add -d 'Add component'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a remove -d 'Remove component'
+
+# menu subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -a exec -d 'Execute menu item'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -a list -d 'List menu items'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -a context -d 'Execute ContextMenu'
+
+# asset subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -a prefab -d 'Create prefab'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -a scriptable-object -d 'Create ScriptableObject'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -a info -d 'Asset info'
+
+# config subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand config; and not __fish_seen_subcommand_from $config_subcmds" -a show -d 'Show config'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand config; and not __fish_seen_subcommand_from $config_subcmds" -a init -d 'Initialize config'
+
+# project subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a info -d 'Project info'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a version -d 'Unity version'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a packages -d 'List packages'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a tags -d 'Tags and layers'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a quality -d 'Quality settings'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a assemblies -d 'Assembly definitions'
+
+# editor subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand editor; and not __fish_seen_subcommand_from $editor_subcmds" -a list -d 'List editors'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand editor; and not __fish_seen_subcommand_from $editor_subcmds" -a install -d 'Install editor'
+
+# completion subcommands
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand completion; and not __fish_seen_subcommand_from $completion_subcmds" -a bash -d 'Bash completion'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand completion; and not __fish_seen_subcommand_from $completion_subcmds" -a zsh -d 'Zsh completion'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand completion; and not __fish_seen_subcommand_from $completion_subcmds" -a fish -d 'Fish completion'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand completion; and not __fish_seen_subcommand_from $completion_subcmds" -a powershell -d 'PowerShell completion'
 
 # Global options
 complete -c unity-cli -l relay-host -d 'Relay server host'
@@ -247,10 +376,12 @@ Register-ArgumentCompleter -Native -CommandName unity-cli -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $commands = @{
-        '' = @('instances', 'state', 'play', 'stop', 'pause', 'refresh', 'open', 'completion', 'console', 'scene', 'tests', 'gameobject', 'component', 'menu', 'asset', 'config', 'project', 'editor')
+        '' = @('instances', 'state', 'play', 'stop', 'pause', 'refresh', 'open', 'completion', 'console', 'scene', 'tests', 'gameobject', 'component', 'menu', 'asset', 'config', 'project', 'editor', 'selection', 'screenshot')
         'console' = @('get', 'clear')
         'scene' = @('active', 'hierarchy', 'load', 'save')
         'tests' = @('run', 'list', 'status')
+        'tests run' = @('edit', 'play')
+        'tests list' = @('edit', 'play')
         'gameobject' = @('find', 'create', 'modify', 'delete')
         'component' = @('list', 'inspect', 'add', 'remove')
         'menu' = @('exec', 'list', 'context')
@@ -266,10 +397,19 @@ Register-ArgumentCompleter -Native -CommandName unity-cli -ScriptBlock {
     if ($elements.Count -gt 1) {
         $subcommand = $elements[1].Extent.Text
     }
+    if ($elements.Count -gt 2) {
+        $subcommand = $elements[1].Extent.Text + ' ' + $elements[2].Extent.Text
+    }
 
     $completions = $commands[$subcommand]
     if (-not $completions) {
-        $completions = $commands['']
+        # Try single level subcommand
+        if ($elements.Count -gt 1) {
+            $completions = $commands[$elements[1].Extent.Text]
+        }
+        if (-not $completions) {
+            $completions = $commands['']
+        }
     }
 
     $completions | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
