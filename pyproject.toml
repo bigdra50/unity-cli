@@ -48,6 +48,8 @@ Repository = "https://github.com/bigdra50/unity-cli"
 
 [project.scripts]
 unity-cli = "unity_cli:main"
+unity = "unity_cli:main"
+u = "unity_cli:main"
 unity-relay = "relay.server:main"
 
 [build-system]
