@@ -39,7 +39,7 @@ namespace UnityBridge.Helpers
             {
                 if (IsPortAvailable(port))
                 {
-                    BridgeLog.Debug($"Port {port} is now available (waited {elapsed}ms)");
+                    BridgeLog.Verbose($"Port {port} is now available (waited {elapsed}ms)");
                     return true;
                 }
 
