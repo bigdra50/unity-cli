@@ -393,10 +393,19 @@ tests_app = typer.Typer(help="Test execution commands")
 app.add_typer(tests_app, name="tests")
 
 
+def _complete_test_mode(incomplete: str) -> list[tuple[str, str]]:
+    """Autocompletion for test mode argument."""
+    modes = [
+        ("edit", "Run EditMode tests"),
+        ("play", "Run PlayMode tests"),
+    ]
+    return [(m, h) for m, h in modes if m.startswith(incomplete)]
+
+
 @tests_app.command("run")
 def tests_run(
     ctx: typer.Context,
-    mode: Annotated[str, typer.Argument(help="Test mode (edit or play)")] = "edit",
+    mode: Annotated[str, typer.Argument(help="Test mode (edit or play)", autocompletion=_complete_test_mode)] = "edit",
     test_names: Annotated[
         list[str] | None,
         typer.Option("--test-names", "-n", help="Specific test names"),
@@ -438,7 +447,7 @@ def tests_run(
 @tests_app.command("list")
 def tests_list(
     ctx: typer.Context,
-    mode: Annotated[str, typer.Argument(help="Test mode (edit or play)")] = "edit",
+    mode: Annotated[str, typer.Argument(help="Test mode (edit or play)", autocompletion=_complete_test_mode)] = "edit",
 ) -> None:
     """List available tests."""
     context: CLIContext = ctx.obj
@@ -1551,7 +1560,7 @@ _unity_cli_completion() {
     local -a response
     (( ! $+commands[unity-cli] )) && return 1
 
-    response=("${(@f)$(env COMP_WORDS="${words[*]}" COMP_CWORD=$((CURRENT-1)) _UNITY_CLI_COMPLETE=zsh_complete unity-cli 2>/dev/null)}")
+    response=("${(@f)$(env COMP_WORDS="${words[*]}" COMP_CWORD=$((CURRENT-1)) _UNITY_CLI_COMPLETE=complete_zsh unity-cli 2>/dev/null)}")
 
     for key descr in ${(kv)response}; do
         if [[ "$descr" == "_" ]]; then
@@ -1584,7 +1593,7 @@ def _get_bash_completion() -> str:
     """Generate bash completion script using Typer's internal completion."""
     return """_unity_cli_completion() {
     local IFS=$'\\n'
-    COMPREPLY=( $(env COMP_WORDS="${COMP_WORDS[*]}" COMP_CWORD=$COMP_CWORD _UNITY_CLI_COMPLETE=bash_complete unity-cli 2>/dev/null) )
+    COMPREPLY=( $(env COMP_WORDS="${COMP_WORDS[*]}" COMP_CWORD=$COMP_CWORD _UNITY_CLI_COMPLETE=complete_bash unity-cli 2>/dev/null) )
     return 0
 }
 
@@ -1595,7 +1604,7 @@ complete -o default -F _unity_cli_completion unity-cli
 def _get_fish_completion() -> str:
     """Generate fish completion script using Typer's internal completion."""
     return """function _unity_cli_completion
-    set -l response (env _UNITY_CLI_COMPLETE=fish_complete COMP_WORDS=(commandline -cp) COMP_CWORD=(commandline -t) unity-cli 2>/dev/null)
+    set -l response (env _UNITY_CLI_COMPLETE=complete_fish COMP_WORDS=(commandline -cp) COMP_CWORD=(commandline -t) unity-cli 2>/dev/null)
 
     for completion in $response
         set -l metadata (string split "," -- $completion)
@@ -1618,7 +1627,7 @@ def _get_powershell_completion() -> str:
     return """$scriptblock = {
     param($wordToComplete, $commandAst, $cursorPosition)
 
-    $env:_UNITY_CLI_COMPLETE = "powershell_complete"
+    $env:_UNITY_CLI_COMPLETE = "complete_powershell"
     $env:COMP_WORDS = $commandAst.ToString()
     $env:COMP_CWORD = $cursorPosition
 
