@@ -9,7 +9,13 @@ Hierarchy:
     ├── ConnectionError - Relay server connection failures
     ├── ProtocolError - Protocol/message framing errors
     ├── InstanceError - Unity instance-related errors
-    └── TimeoutError - Command/response timeouts
+    ├── TimeoutError - Command/response timeouts
+    ├── HubError - Unity Hub related errors
+    │   ├── HubNotFoundError - Hub CLI not found
+    │   └── HubInstallError - Installation failed
+    └── ProjectError - Unity project related errors
+        ├── ProjectVersionError - ProjectVersion.txt issues
+        └── EditorNotFoundError - Required editor not installed
 """
 
 from __future__ import annotations
@@ -75,6 +81,62 @@ class TimeoutError(UnityCLIError):
     Raised when:
     - Response not received within timeout period
     - Max retry time exceeded for retryable errors
+    """
+
+    pass
+
+
+class HubError(UnityCLIError):
+    """Unity Hub related error."""
+
+    pass
+
+
+class HubNotFoundError(HubError):
+    """Unity Hub CLI executable not found.
+
+    Raised when:
+    - Hub CLI not found in known locations
+    - UNITY_HUB_PATH environment variable points to invalid path
+    """
+
+    pass
+
+
+class HubInstallError(HubError):
+    """Editor or module installation failed.
+
+    Raised when:
+    - Hub CLI returns non-zero exit code
+    - Installation process fails
+    """
+
+    pass
+
+
+class ProjectError(UnityCLIError):
+    """Unity project related error."""
+
+    pass
+
+
+class ProjectVersionError(ProjectError):
+    """ProjectVersion.txt missing or invalid.
+
+    Raised when:
+    - ProjectSettings/ProjectVersion.txt not found
+    - File format is invalid or unparseable
+    """
+
+    pass
+
+
+class EditorNotFoundError(ProjectError):
+    """Required editor version not installed.
+
+    Raised when:
+    - Project requires a specific Unity version
+    - That version is not installed on the system
     """
 
     pass
