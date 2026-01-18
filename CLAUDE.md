@@ -13,14 +13,63 @@ CLI ←──TCP:6500──→ Relay Server (Python) ←──TCP:6500──→ 
 ## Commands
 
 ```bash
-# Install globally
+# Install globally (provides: unity-cli, u, unity commands)
 uv tool install .
 
-# Run CLI
-unity-cli state
-unity-cli play
-unity-cli console --types error --count 10
-unity-cli instances
+# Run CLI (u and unity are aliases for unity-cli)
+u state                                   # Get editor state
+u play                                    # Enter play mode
+u stop                                    # Exit play mode
+u pause                                   # Toggle pause
+u refresh                                 # Refresh AssetDatabase
+u instances                               # List connected instances
+
+# Editor Selection & Screenshot
+u selection                               # Get current editor selection
+u screenshot --view game --path ./out.png
+
+# Console commands
+u console get --types error --count 10    # Get console logs
+u console clear                           # Clear console
+
+# Scene commands
+u scene active                            # Get active scene info
+u scene hierarchy                         # Get scene hierarchy
+u scene load <path>                       # Load a scene
+u scene save                              # Save current scene
+
+# Test commands
+u tests run edit                          # Run EditMode tests
+u tests run play                          # Run PlayMode tests
+u tests list edit                         # List EditMode tests
+u tests status                            # Check test status
+
+# GameObject commands
+u gameobject find <name>                  # Find GameObjects
+u gameobject create <name>                # Create GameObject
+u gameobject modify <name> --pos 0,1,0    # Modify transform
+u gameobject delete <name>                # Delete GameObject
+
+# Component commands
+u component list <gameobject>             # List components
+u component inspect <gameobject> <type>   # Inspect properties
+u component add <gameobject> <type>       # Add component
+u component remove <gameobject> <type>    # Remove component
+
+# Menu commands
+u menu execute "Window/General/Console"   # Execute menu item
+
+# Asset commands
+u asset prefab <gameobject> <path>        # Create prefab
+u asset scriptable-object <type> <path>   # Create ScriptableObject
+u asset info <path>                       # Get asset info
+
+# Standalone tools (no Relay required)
+u config show                             # Show configuration
+u project info                            # Project info
+u editor list                             # List installed editors
+u editor install <version>                # Install via Hub
+u open                                    # Open project
 
 # Run Relay Server standalone
 unity-relay --port 6500
@@ -30,7 +79,7 @@ python -m unity_cli state
 python -m relay.server --port 6500
 
 # Test with uvx (after pushing to GitHub)
-uvx --from git+https://github.com/bigdra50/unity-cli unity-cli state
+uvx --from git+https://github.com/bigdra50/unity-cli u state
 ```
 
 ## Architecture
@@ -83,18 +132,41 @@ relay/
 ├── instance_registry.py # Unity instance management, queue
 └── request_cache.py    # Idempotency cache (success only)
 
-unity_cli/              # CLI package (Typer + Rich)
+unity_cli/
+├── __init__.py         # Package init
+├── cli/
+│   └── app.py          # CLI entry point (Typer + Rich)
+├── client.py           # Relay client with retry logic
+├── config.py           # Configuration management
+├── models.py           # Data models
+└── exceptions.py       # Custom exceptions
 
 UnityBridge/
 ├── Editor/
-│   ├── RelayClient.cs      # TCP connection to Relay
-│   ├── Protocol.cs         # Framing, message serialization
-│   ├── CommandDispatcher.cs # [BridgeTool] attribute handler
+│   ├── RelayClient.cs        # TCP connection to Relay
+│   ├── Protocol.cs           # Framing, message serialization
+│   ├── CommandDispatcher.cs  # [BridgeTool] attribute handler
 │   ├── BridgeReloadHandler.cs # Domain reload recovery
-│   ├── BridgeManager.cs    # Singleton manager
+│   ├── BridgeManager.cs      # Singleton manager
 │   ├── BridgeEditorWindow.cs # UI
 │   ├── RelayServerLauncher.cs # uvx server launch
-│   └── Tools/              # Command handlers
+│   ├── Helpers/
+│   │   ├── BridgeJobStateStore.cs # Job state persistence
+│   │   ├── BridgeLog.cs      # Logging utility
+│   │   ├── PortManager.cs    # Port management
+│   │   └── Response.cs       # Response builder
+│   └── Tools/                # Command handlers
+│       ├── Asset.cs          # Prefab, ScriptableObject
+│       ├── Component.cs      # Component operations
+│       ├── Console.cs        # Console log retrieval
+│       ├── EditorSelection.cs # Selection state
+│       ├── GameObject.cs     # GameObject operations
+│       ├── MenuItem.cs       # Menu item execution
+│       ├── Playmode.cs       # Play/Stop/Pause
+│       ├── Refresh.cs        # Asset database refresh
+│       ├── Scene.cs          # Scene management
+│       ├── Screenshot.cs     # Screenshot capture
+│       └── Tests.cs          # Test runner
 └── package.json
 ```
 
