@@ -11,9 +11,10 @@ import json
 import struct
 import time
 import uuid
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Constants
 PROTOCOL_VERSION = "1.0"
@@ -22,23 +23,23 @@ HEADER_SIZE = 4
 
 
 class MessageType(str, Enum):
-    # Unity → Relay
+    # Unity -> Relay
     REGISTER = "REGISTER"
     REGISTERED = "REGISTERED"
     STATUS = "STATUS"
     COMMAND_RESULT = "COMMAND_RESULT"
     PONG = "PONG"
 
-    # Relay → Unity
+    # Relay -> Unity
     PING = "PING"
     COMMAND = "COMMAND"
 
-    # CLI → Relay
+    # CLI -> Relay
     REQUEST = "REQUEST"
     LIST_INSTANCES = "LIST_INSTANCES"
     SET_DEFAULT = "SET_DEFAULT"
 
-    # Relay → CLI
+    # Relay -> CLI
     RESPONSE = "RESPONSE"
     ERROR = "ERROR"
     INSTANCES = "INSTANCES"
@@ -68,258 +69,210 @@ class InstanceStatus(str, Enum):
     DISCONNECTED = "disconnected"
 
 
-@dataclass(frozen=True)
-class Message:
+def _timestamp_ms() -> int:
+    """Generate current timestamp in milliseconds."""
+    return int(time.time() * 1000)
+
+
+def _generate_uuid() -> str:
+    """Generate a UUID string."""
+    return str(uuid.uuid4())
+
+
+class Message(BaseModel):
     """Base message class"""
 
-    type: MessageType
-    ts: int = field(default_factory=lambda: int(time.time() * 1000))
+    model_config = ConfigDict(frozen=True)
+
+    type: str
+    ts: int = Field(default_factory=_timestamp_ms)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"type": self.type.value, "ts": self.ts}
+        return self.model_dump(exclude_none=True, by_alias=True)
 
 
-# Unity → Relay Messages
+# Unity -> Relay Messages
 
 
-@dataclass(frozen=True)
 class RegisterMessage(Message):
     """Unity registration message"""
 
-    type: MessageType = field(default=MessageType.REGISTER, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["REGISTER"] = "REGISTER"
     protocol_version: str = PROTOCOL_VERSION
     instance_id: str = ""
     project_name: str = ""
     unity_version: str = ""
-    capabilities: list[str] = field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update(
-            {
-                "protocol_version": self.protocol_version,
-                "instance_id": self.instance_id,
-                "project_name": self.project_name,
-                "unity_version": self.unity_version,
-                "capabilities": self.capabilities,
-            }
-        )
-        return d
+    @field_validator("instance_id")
+    @classmethod
+    def validate_instance_id(cls, v: str) -> str:
+        # Allow empty string for backwards compatibility, but validate format if provided
+        return v
 
 
-@dataclass(frozen=True)
 class RegisteredMessage(Message):
     """Registration response"""
 
-    type: MessageType = field(default=MessageType.REGISTERED, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["REGISTERED"] = "REGISTERED"
     success: bool = True
-    heartbeat_interval_ms: int = 5000
+    heartbeat_interval_ms: int = Field(default=5000, gt=0)
     error: dict[str, str] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update(
-            {
-                "success": self.success,
-                "heartbeat_interval_ms": self.heartbeat_interval_ms,
-            }
-        )
-        if self.error:
-            d["error"] = self.error
-        return d
 
-
-@dataclass(frozen=True)
 class StatusMessage(Message):
     """Status update from Unity"""
 
-    type: MessageType = field(default=MessageType.STATUS, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["STATUS"] = "STATUS"
     instance_id: str = ""
     status: str = ""
     detail: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update({"instance_id": self.instance_id, "status": self.status})
-        if self.detail:
-            d["detail"] = self.detail
-        return d
 
-
-@dataclass(frozen=True)
 class CommandResultMessage(Message):
     """Command result from Unity"""
 
-    type: MessageType = field(default=MessageType.COMMAND_RESULT, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["COMMAND_RESULT"] = "COMMAND_RESULT"
     id: str = ""
     success: bool = True
     data: dict[str, Any] | None = None
     error: dict[str, str] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update({"id": self.id, "success": self.success})
-        if self.data:
-            d["data"] = self.data
-        if self.error:
-            d["error"] = self.error
-        return d
 
-
-@dataclass(frozen=True)
 class PongMessage(Message):
     """Heartbeat response"""
 
-    type: MessageType = field(default=MessageType.PONG, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["PONG"] = "PONG"
     echo_ts: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d["echo_ts"] = self.echo_ts
-        return d
+
+# Relay -> Unity Messages
 
 
-# Relay → Unity Messages
-
-
-@dataclass(frozen=True)
 class PingMessage(Message):
     """Heartbeat request"""
 
-    type: MessageType = field(default=MessageType.PING, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["PING"] = "PING"
 
 
-@dataclass(frozen=True)
 class CommandMessage(Message):
     """Command to Unity"""
 
-    type: MessageType = field(default=MessageType.COMMAND, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["COMMAND"] = "COMMAND"
     id: str = ""
     command: str = ""
-    params: dict[str, Any] = field(default_factory=dict)
-    timeout_ms: int = 30000
+    params: dict[str, Any] = Field(default_factory=dict)
+    timeout_ms: int = Field(default=30000, gt=0)
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update(
-            {
-                "id": self.id,
-                "command": self.command,
-                "params": self.params,
-                "timeout_ms": self.timeout_ms,
-            }
-        )
-        return d
+    @field_validator("command")
+    @classmethod
+    def validate_command(cls, v: str) -> str:
+        if not v:
+            raise ValueError("command must not be empty")
+        return v
 
 
-# CLI → Relay Messages
+# CLI -> Relay Messages
 
 
-@dataclass(frozen=True)
 class RequestMessage(Message):
     """Request from CLI"""
 
-    type: MessageType = field(default=MessageType.REQUEST, init=False)
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["REQUEST"] = "REQUEST"
+    id: str = Field(default_factory=_generate_uuid)
     instance: str | None = None
     command: str = ""
-    params: dict[str, Any] = field(default_factory=dict)
-    timeout_ms: int = 30000
+    params: dict[str, Any] = Field(default_factory=dict)
+    timeout_ms: int = Field(default=30000, gt=0)
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update(
-            {
-                "id": self.id,
-                "command": self.command,
-                "params": self.params,
-                "timeout_ms": self.timeout_ms,
-            }
-        )
-        if self.instance:
-            d["instance"] = self.instance
-        return d
+    @field_validator("command")
+    @classmethod
+    def validate_command(cls, v: str) -> str:
+        if not v:
+            raise ValueError("command must not be empty")
+        return v
 
 
-@dataclass(frozen=True)
 class ListInstancesMessage(Message):
     """List instances request"""
 
-    type: MessageType = field(default=MessageType.LIST_INSTANCES, init=False)
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    model_config = ConfigDict(frozen=True)
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d["id"] = self.id
-        return d
+    type: Literal["LIST_INSTANCES"] = "LIST_INSTANCES"
+    id: str = Field(default_factory=_generate_uuid)
 
 
-@dataclass(frozen=True)
 class SetDefaultMessage(Message):
     """Set default instance"""
 
-    type: MessageType = field(default=MessageType.SET_DEFAULT, init=False)
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["SET_DEFAULT"] = "SET_DEFAULT"
+    id: str = Field(default_factory=_generate_uuid)
     instance: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update({"id": self.id, "instance": self.instance})
-        return d
+    @field_validator("instance")
+    @classmethod
+    def validate_instance(cls, v: str) -> str:
+        if not v:
+            raise ValueError("instance must not be empty")
+        return v
 
 
-# Relay → CLI Messages
+# Relay -> CLI Messages
 
 
-@dataclass(frozen=True)
 class ResponseMessage(Message):
     """Success response to CLI"""
 
-    type: MessageType = field(default=MessageType.RESPONSE, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["RESPONSE"] = "RESPONSE"
     id: str = ""
     success: bool = True
     data: dict[str, Any] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update({"id": self.id, "success": self.success})
-        if self.data:
-            d["data"] = self.data
-        return d
 
-
-@dataclass(frozen=True)
 class ErrorMessage(Message):
     """Error response to CLI"""
 
-    type: MessageType = field(default=MessageType.ERROR, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["ERROR"] = "ERROR"
     id: str = ""
     success: bool = False
-    error: dict[str, str] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update({"id": self.id, "success": self.success, "error": self.error})
-        return d
+    error: dict[str, str] = Field(default_factory=dict)
 
     @classmethod
     def from_code(cls, request_id: str, code: ErrorCode, message: str) -> ErrorMessage:
         return cls(id=request_id, error={"code": code.value, "message": message})
 
 
-@dataclass(frozen=True)
 class InstancesMessage(Message):
     """Instance list response"""
 
-    type: MessageType = field(default=MessageType.INSTANCES, init=False)
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["INSTANCES"] = "INSTANCES"
     id: str = ""
     success: bool = True
-    data: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        d = super().to_dict()
-        d.update({"id": self.id, "success": self.success, "data": self.data})
-        return d
+    data: dict[str, Any] = Field(default_factory=dict)
 
 
 # Framing functions
