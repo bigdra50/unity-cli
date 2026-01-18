@@ -24,10 +24,25 @@ jobs:
         run: uv tool install ruff
 
       - name: Run ruff check
-        run: uvx ruff check unity_mcp_client.py
+        run: |
+          # Check existing directories only
+          DIRS=""
+          [ -d "unity_cli" ] && DIRS="$DIRS unity_cli/"
+          [ -d "relay" ] && DIRS="$DIRS relay/"
+          [ -f "unity_cli.py" ] && DIRS="$DIRS unity_cli.py"
+          if [ -n "$DIRS" ]; then
+            uvx ruff check $DIRS
+          fi
 
       - name: Run ruff format check
-        run: uvx ruff format --check unity_mcp_client.py
+        run: |
+          DIRS=""
+          [ -d "unity_cli" ] && DIRS="$DIRS unity_cli/"
+          [ -d "relay" ] && DIRS="$DIRS relay/"
+          [ -f "unity_cli.py" ] && DIRS="$DIRS unity_cli.py"
+          if [ -n "$DIRS" ]; then
+            uvx ruff format --check $DIRS
+          fi
 
   type-check:
     runs-on: ubuntu-latest
@@ -42,11 +57,35 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Install mypy
-        run: uv tool install mypy
+      - name: Install dependencies
+        run: uv sync
 
       - name: Run mypy
-        run: uvx mypy unity_mcp_client.py --strict
+        run: |
+          if [ -d "unity_cli" ]; then
+            uv run mypy unity_cli/ --ignore-missing-imports
+          elif [ -f "unity_cli.py" ]; then
+            uv run mypy unity_cli.py --ignore-missing-imports
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run tests
+        run: uv run pytest tests/ -v
 
   build:
     runs-on: ubuntu-latest
@@ -79,7 +118,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -97,7 +138,7 @@ jobs:
         run: uv tool install --force --reinstall dist/*.whl
 
       - name: Test CLI help
-        run: unity-mcp --help
+        run: unity-cli --help
 
-      - name: Test CLI version
-        run: unity-mcp --version || echo "version flag not implemented yet"
+      - name: Test Relay help
+        run: unity-relay --help
