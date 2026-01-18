@@ -72,61 +72,61 @@ _unity_cli() {
             case $words[1] in
                 console)
                     local -a console_cmds
-                    console_cmds=('get:Get console logs' 'clear:Clear console logs')
+                    console_cmds=('get:Get console logs' 'clear:Clear console logs' '--help:Show help')
                     _describe -t commands 'console command' console_cmds
                     ;;
                 scene)
                     local -a scene_cmds
-                    scene_cmds=('active:Get active scene' 'hierarchy:Get scene hierarchy' 'load:Load scene' 'save:Save scene')
+                    scene_cmds=('active:Get active scene' 'hierarchy:Get scene hierarchy' 'load:Load scene' 'save:Save scene' '--help:Show help')
                     _describe -t commands 'scene command' scene_cmds
                     ;;
                 tests)
                     case $words[2] in
                         run|list)
                             local -a test_modes
-                            test_modes=('edit:Run EditMode tests' 'play:Run PlayMode tests')
+                            test_modes=('edit:Run EditMode tests' 'play:Run PlayMode tests' '--help:Show help')
                             _describe -t modes 'test mode' test_modes
                             ;;
                         *)
                             local -a tests_cmds
-                            tests_cmds=('run:Run tests' 'list:List tests' 'status:Test status')
+                            tests_cmds=('run:Run tests' 'list:List tests' 'status:Test status' '--help:Show help')
                             _describe -t commands 'tests command' tests_cmds
                             ;;
                     esac
                     ;;
                 gameobject)
                     local -a go_cmds
-                    go_cmds=('find:Find GameObjects' 'create:Create GameObject' 'modify:Modify GameObject' 'delete:Delete GameObject')
+                    go_cmds=('find:Find GameObjects' 'create:Create GameObject' 'modify:Modify GameObject' 'delete:Delete GameObject' '--help:Show help')
                     _describe -t commands 'gameobject command' go_cmds
                     ;;
                 component)
                     local -a comp_cmds
-                    comp_cmds=('list:List components' 'inspect:Inspect component' 'add:Add component' 'remove:Remove component')
+                    comp_cmds=('list:List components' 'inspect:Inspect component' 'add:Add component' 'remove:Remove component' '--help:Show help')
                     _describe -t commands 'component command' comp_cmds
                     ;;
                 menu)
                     local -a menu_cmds
-                    menu_cmds=('exec:Execute menu item' 'list:List menu items' 'context:Execute ContextMenu')
+                    menu_cmds=('exec:Execute menu item' 'list:List menu items' 'context:Execute ContextMenu' '--help:Show help')
                     _describe -t commands 'menu command' menu_cmds
                     ;;
                 asset)
                     local -a asset_cmds
-                    asset_cmds=('prefab:Create prefab' 'scriptable-object:Create ScriptableObject' 'info:Asset info')
+                    asset_cmds=('prefab:Create prefab' 'scriptable-object:Create ScriptableObject' 'info:Asset info' '--help:Show help')
                     _describe -t commands 'asset command' asset_cmds
                     ;;
                 config)
                     local -a config_cmds
-                    config_cmds=('show:Show config' 'init:Initialize config')
+                    config_cmds=('show:Show config' 'init:Initialize config' '--help:Show help')
                     _describe -t commands 'config command' config_cmds
                     ;;
                 project)
                     local -a project_cmds
-                    project_cmds=('info:Project info' 'version:Unity version' 'packages:List packages' 'tags:Tags and layers' 'quality:Quality settings' 'assemblies:Assembly definitions')
+                    project_cmds=('info:Project info' 'version:Unity version' 'packages:List packages' 'tags:Tags and layers' 'quality:Quality settings' 'assemblies:Assembly definitions' '--help:Show help')
                     _describe -t commands 'project command' project_cmds
                     ;;
                 editor)
                     local -a editor_cmds
-                    editor_cmds=('list:List editors' 'install:Install editor')
+                    editor_cmds=('list:List editors' 'install:Install editor' '--help:Show help')
                     _describe -t commands 'editor command' editor_cmds
                     ;;
                 completion)
@@ -169,50 +169,56 @@ _unity_cli() {
         esac
     fi
 
+    # Handle options starting with -
+    if [[ ${cur} == -* ]]; then
+        COMPREPLY=( $(compgen -W "--help --relay-host --relay-port --instance --timeout --json" -- ${cur}) )
+        return 0
+    fi
+
     # Handle second level (subcommands)
     case "${prev}" in
         unity-cli)
-            COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "${commands} --help" -- ${cur}) )
             return 0
             ;;
         console)
-            COMPREPLY=( $(compgen -W "get clear" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "get clear --help" -- ${cur}) )
             return 0
             ;;
         scene)
-            COMPREPLY=( $(compgen -W "active hierarchy load save" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "active hierarchy load save --help" -- ${cur}) )
             return 0
             ;;
         tests)
-            COMPREPLY=( $(compgen -W "run list status" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "run list status --help" -- ${cur}) )
             return 0
             ;;
         gameobject)
-            COMPREPLY=( $(compgen -W "find create modify delete" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "find create modify delete --help" -- ${cur}) )
             return 0
             ;;
         component)
-            COMPREPLY=( $(compgen -W "list inspect add remove" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "list inspect add remove --help" -- ${cur}) )
             return 0
             ;;
         menu)
-            COMPREPLY=( $(compgen -W "exec list context" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "exec list context --help" -- ${cur}) )
             return 0
             ;;
         asset)
-            COMPREPLY=( $(compgen -W "prefab scriptable-object info" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "prefab scriptable-object info --help" -- ${cur}) )
             return 0
             ;;
         config)
-            COMPREPLY=( $(compgen -W "show init" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "show init --help" -- ${cur}) )
             return 0
             ;;
         project)
-            COMPREPLY=( $(compgen -W "info version packages tags quality assemblies" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "info version packages tags quality assemblies --help" -- ${cur}) )
             return 0
             ;;
         editor)
-            COMPREPLY=( $(compgen -W "list install" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "list install --help" -- ${cur}) )
             return 0
             ;;
         completion)
@@ -303,46 +309,55 @@ complete -c unity-cli -n "not __fish_seen_subcommand_from $commands" -a screensh
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -a run -d 'Run tests'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -a list -d 'List tests'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -a status -d 'Test status'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand tests; and not __fish_seen_subcommand_from $tests_subcmds" -l help -d 'Show help'
 
 # tests run/list mode argument
 complete -c unity-cli -n "__fish_unity_cli_needs_test_mode" -a edit -d 'EditMode tests'
 complete -c unity-cli -n "__fish_unity_cli_needs_test_mode" -a play -d 'PlayMode tests'
+complete -c unity-cli -n "__fish_unity_cli_needs_test_mode" -l help -d 'Show help'
 
 # console subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand console; and not __fish_seen_subcommand_from $console_subcmds" -a get -d 'Get console logs'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand console; and not __fish_seen_subcommand_from $console_subcmds" -a clear -d 'Clear console'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand console; and not __fish_seen_subcommand_from $console_subcmds" -l help -d 'Show help'
 
 # scene subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a active -d 'Get active scene'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a hierarchy -d 'Scene hierarchy'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a load -d 'Load scene'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -a save -d 'Save scene'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand scene; and not __fish_seen_subcommand_from $scene_subcmds" -l help -d 'Show help'
 
 # gameobject subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a find -d 'Find GameObjects'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a create -d 'Create GameObject'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a modify -d 'Modify GameObject'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -a delete -d 'Delete GameObject'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand gameobject; and not __fish_seen_subcommand_from $gameobject_subcmds" -l help -d 'Show help'
 
 # component subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a list -d 'List components'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a inspect -d 'Inspect component'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a add -d 'Add component'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -a remove -d 'Remove component'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand component; and not __fish_seen_subcommand_from $component_subcmds" -l help -d 'Show help'
 
 # menu subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -a exec -d 'Execute menu item'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -a list -d 'List menu items'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -a context -d 'Execute ContextMenu'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand menu; and not __fish_seen_subcommand_from $menu_subcmds" -l help -d 'Show help'
 
 # asset subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -a prefab -d 'Create prefab'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -a scriptable-object -d 'Create ScriptableObject'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -a info -d 'Asset info'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand asset; and not __fish_seen_subcommand_from $asset_subcmds" -l help -d 'Show help'
 
 # config subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand config; and not __fish_seen_subcommand_from $config_subcmds" -a show -d 'Show config'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand config; and not __fish_seen_subcommand_from $config_subcmds" -a init -d 'Initialize config'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand config; and not __fish_seen_subcommand_from $config_subcmds" -l help -d 'Show help'
 
 # project subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a info -d 'Project info'
@@ -351,10 +366,12 @@ complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __f
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a tags -d 'Tags and layers'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a quality -d 'Quality settings'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -a assemblies -d 'Assembly definitions'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand project; and not __fish_seen_subcommand_from $project_subcmds" -l help -d 'Show help'
 
 # editor subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand editor; and not __fish_seen_subcommand_from $editor_subcmds" -a list -d 'List editors'
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand editor; and not __fish_seen_subcommand_from $editor_subcmds" -a install -d 'Install editor'
+complete -c unity-cli -n "__fish_unity_cli_using_subcommand editor; and not __fish_seen_subcommand_from $editor_subcmds" -l help -d 'Show help'
 
 # completion subcommands
 complete -c unity-cli -n "__fish_unity_cli_using_subcommand completion; and not __fish_seen_subcommand_from $completion_subcmds" -a bash -d 'Bash completion'
@@ -376,19 +393,19 @@ Register-ArgumentCompleter -Native -CommandName unity-cli -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     $commands = @{
-        '' = @('instances', 'state', 'play', 'stop', 'pause', 'refresh', 'open', 'completion', 'console', 'scene', 'tests', 'gameobject', 'component', 'menu', 'asset', 'config', 'project', 'editor', 'selection', 'screenshot')
-        'console' = @('get', 'clear')
-        'scene' = @('active', 'hierarchy', 'load', 'save')
-        'tests' = @('run', 'list', 'status')
-        'tests run' = @('edit', 'play')
-        'tests list' = @('edit', 'play')
-        'gameobject' = @('find', 'create', 'modify', 'delete')
-        'component' = @('list', 'inspect', 'add', 'remove')
-        'menu' = @('exec', 'list', 'context')
-        'asset' = @('prefab', 'scriptable-object', 'info')
-        'config' = @('show', 'init')
-        'project' = @('info', 'version', 'packages', 'tags', 'quality', 'assemblies')
-        'editor' = @('list', 'install')
+        '' = @('instances', 'state', 'play', 'stop', 'pause', 'refresh', 'open', 'completion', 'console', 'scene', 'tests', 'gameobject', 'component', 'menu', 'asset', 'config', 'project', 'editor', 'selection', 'screenshot', '--help')
+        'console' = @('get', 'clear', '--help')
+        'scene' = @('active', 'hierarchy', 'load', 'save', '--help')
+        'tests' = @('run', 'list', 'status', '--help')
+        'tests run' = @('edit', 'play', '--help')
+        'tests list' = @('edit', 'play', '--help')
+        'gameobject' = @('find', 'create', 'modify', 'delete', '--help')
+        'component' = @('list', 'inspect', 'add', 'remove', '--help')
+        'menu' = @('exec', 'list', 'context', '--help')
+        'asset' = @('prefab', 'scriptable-object', 'info', '--help')
+        'config' = @('show', 'init', '--help')
+        'project' = @('info', 'version', 'packages', 'tags', 'quality', 'assemblies', '--help')
+        'editor' = @('list', 'install', '--help')
         'completion' = @('bash', 'zsh', 'fish', 'powershell')
     }
 
