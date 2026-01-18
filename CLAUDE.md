@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Python client library for [CoplayDev/unity-mcp](https://github.com/CoplayDev/unity-mcp) - controls Unity Editor via TCP protocol. Single-file implementation with zero external dependencies (Python stdlib only).
+Unity CLI + Relay Server for controlling Unity Editor via TCP. Supports multiple Unity instances with domain reload resilience.
+
+```
+CLI ←──TCP:6500──→ Relay Server (Python) ←──TCP:6500──→ Unity Editor(s)
+```
 
 ## Commands
 
@@ -13,59 +17,121 @@ Python client library for [CoplayDev/unity-mcp](https://github.com/CoplayDev/uni
 uv tool install .
 
 # Run CLI
-unity-mcp state --port 6401
-unity-mcp console --types error --count 10
-unity-mcp play --port 6401
+unity-cli state
+unity-cli play
+unity-cli console --types error --count 10
+unity-cli instances
+
+# Run Relay Server standalone
+unity-relay --port 6500
 
 # Run directly without install
-python3 unity_mcp_client.py state --port 6401
+python unity_cli.py state
+python -m relay.server --port 6500
 
 # Test with uvx (after pushing to GitHub)
-uvx --from git+https://github.com/bigdra50/unity-mcp-client unity-mcp state
+uvx --from git+https://github.com/bigdra50/unity-mcp-client unity-cli state
 ```
 
 ## Architecture
 
-### TCP Protocol
-
-Unity MCP uses custom framing: **8-byte big-endian length header + JSON payload**
+### Protocol (4-byte framing)
 
 ```
-[8-byte length][{"type": "command_name", "params": {...}}]
+┌────────────────────────────────────┐
+│ 4-byte Length (big-endian, uint32) │
+├────────────────────────────────────┤
+│ JSON Payload (UTF-8)               │
+└────────────────────────────────────┘
 ```
 
-Handshake: Server sends `WELCOME UNITY-MCP 1 FRAMING=1\n` on connect.
+Max payload: 16 MiB
 
-### API Patterns
+### Message Flow
 
-**Tools** (write operations) - modify Unity state:
-- `send_command("manage_editor", {"action": "play"})`
-- `send_command("manage_gameobject", {"action": "create", ...})`
+**CLI → Relay:**
+```json
+{"type": "REQUEST", "id": "cli-xxx:uuid", "command": "manage_editor", "params": {"action": "play"}}
+```
 
-**Resources** (read-only) - query Unity state:
-- `read_resource("get_editor_state")` → isPlaying, isCompiling, etc.
-- `read_resource("get_tags")` → tag list
-- `read_resource("get_layers")` → layer dict
+**Relay → Unity:**
+```json
+{"type": "COMMAND", "id": "cli-xxx:uuid", "command": "manage_editor", "params": {"action": "play"}}
+```
 
-Both use the same protocol; Resources just have different command names (e.g., `get_editor_state` vs `manage_editor`).
+**Unity → Relay → CLI:**
+```json
+{"type": "RESPONSE", "id": "cli-xxx:uuid", "success": true, "data": {...}}
+```
+
+### State Machine
+
+```
+DISCONNECTED → (REGISTER) → READY → (COMMAND) → BUSY → (COMMAND_RESULT) → READY
+                              ↓                                              ↑
+                        (beforeReload)                              (afterReload)
+                              ↓                                              ↑
+                          RELOADING ─────────────────────────────────────────┘
+```
 
 ### Code Structure
 
 ```
-unity_mcp_client.py
-├── UnityMCPConnection    # TCP framing, send_command(), read_resource()
-├── ConsoleAPI            # read_console operations
-├── EditorAPI             # play/pause/stop + get_state/get_tags (Resources)
-├── GameObjectAPI         # CRUD, find, components
-├── SceneAPI              # load/save/hierarchy
-├── AssetAPI              # create/modify/delete/search
-├── UnityMCPClient        # Main client, aggregates all APIs
-└── main()                # CLI entry point
+relay/
+├── server.py           # Main Relay Server
+├── protocol.py         # Message types, framing, error codes
+├── instance_registry.py # Unity instance management, queue
+└── request_cache.py    # Idempotency cache (success only)
+
+unity_cli.py            # CLI client with exponential backoff
+
+UnityBridge/
+├── Editor/
+│   ├── RelayClient.cs      # TCP connection to Relay
+│   ├── Protocol.cs         # Framing, message serialization
+│   ├── CommandDispatcher.cs # [BridgeTool] attribute handler
+│   ├── BridgeReloadHandler.cs # Domain reload recovery
+│   ├── BridgeManager.cs    # Singleton manager
+│   ├── BridgeEditorWindow.cs # UI
+│   ├── RelayServerLauncher.cs # uvx server launch
+│   └── Tools/              # Command handlers
+└── package.json
 ```
 
 ## Key Implementation Details
 
-- Port default: 6400 (configurable via `--port`)
-- Timeout default: 5 seconds (configurable in UnityMCPClient constructor)
-- Each command creates a new TCP connection (no persistent connections)
-- Response format: `{"success": true, "message": "...", "data": {...}}`
+### Relay Server
+
+- Port: 6500 (default)
+- Heartbeat: 5s interval, 15s timeout, 3 retries
+- RELOADING timeout: 30s (extended)
+- Single Outstanding PING rule
+- Queue: FIFO, max 10, disabled by default
+- Idempotency: cache success responses for 60s
+
+### CLI
+
+- Exponential backoff: 500ms → 1s → 2s → 4s → 8s (max 30s total)
+- Retryable errors: INSTANCE_RELOADING, INSTANCE_BUSY, TIMEOUT
+- request_id format: `{client_id}:{uuid}`
+
+### Unity Bridge
+
+- Instance ID: `Path.GetFullPath(Application.dataPath + "/..")`
+- Domain reload: STATUS "reloading" → reconnect → REGISTER
+- [BridgeTool("command_name")] attribute for auto-discovery
+
+## Protocol Spec
+
+See `docs/protocol-spec.md` for full specification.
+
+## Testing
+
+```bash
+# Run relay tests
+python -m pytest tests/
+
+# Verify Unity compilation
+python unity_cli.py refresh
+python unity_cli.py console --types error
+```
