@@ -1,0 +1,11 @@
+{
+    "name": "Game.Tests.PlayMode",
+    "references": [
+        "Game"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": []
+}
