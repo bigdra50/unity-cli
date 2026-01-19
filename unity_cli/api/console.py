@@ -44,7 +44,7 @@ class ConsoleAPI:
         if count:
             params["count"] = count
         if filter_text:
-            params["filter_text"] = filter_text
+            params["search"] = filter_text
 
         return self._conn.send_request("console", params)
 
