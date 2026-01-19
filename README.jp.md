@@ -18,7 +18,7 @@ Play Mode 制御、コンソールログ取得、テスト実行、シーン/Gam
 u play
 u stop
 
-# コンソールログ取得
+# コンソールログ取得（エラーのみ）
 u console get --types error
 
 # メニュー実行
@@ -71,7 +71,7 @@ uvx --from git+https://github.com/bigdra50/unity-cli u play
 uvx --from git+https://github.com/bigdra50/unity-cli u stop
 
 # コンソールログ取得
-uvx --from git+https://github.com/bigdra50/unity-cli u console --types error
+uvx --from git+https://github.com/bigdra50/unity-cli u console get --types error
 ```
 
 ## インストール
@@ -89,7 +89,7 @@ unity state        # 短縮形
 u state            # 最短形
 
 u play
-u console --types error --count 10
+u console get --types error --count 10
 
 # Relay Server 単体起動
 unity-relay --port 6500
@@ -183,8 +183,9 @@ u stop
 u pause
 
 # コンソールログ
-u console
-u console --types error warning --count 20
+u console get
+u console get --types error warning --count 20
+u console clear
 
 # アセットリフレッシュ
 u refresh
@@ -208,15 +209,22 @@ u set-default /Users/dev/MyGame
 
 ```bash
 # EditModeテスト
-u tests edit
+u tests run edit
 
 # PlayModeテスト
-u tests play
+u tests run play
 
 # フィルタリング
-u tests edit --test-names "MyTests.SampleTest"
-u tests edit --category-names "Unit" "Integration"
-u tests edit --assembly-names "MyGame.Tests"
+u tests run edit --test-names "MyTests.SampleTest"
+u tests run edit --categories "Unit" "Integration"
+u tests run edit --assemblies "MyGame.Tests"
+
+# テスト一覧
+u tests list edit
+u tests list play
+
+# 実行中テストのステータス確認
+u tests status
 ```
 
 ### シーン操作
@@ -226,9 +234,9 @@ u tests edit --assembly-names "MyGame.Tests"
 u scene active
 
 # 階層取得
-u scene hierarchy                    # ルートのみ
+u scene hierarchy                    # ルートのみ（depth 1）
 u scene hierarchy --depth 2          # 2階層まで
-u scene hierarchy --iterate-all      # 全階層（ページング）
+u scene hierarchy --page-size 100    # ページサイズ指定
 
 # シーン操作
 u scene load --name MainScene
@@ -328,18 +336,19 @@ u material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 
 | オプション | 説明 |
 |-----------|------|
-| `--test-names` | テスト名（完全一致） |
-| `--group-names` | グループ名（正規表現） |
-| `--category-names` | NUnitカテゴリ |
-| `--assembly-names` | アセンブリ名 |
+| `--test-names`, `-n` | テスト名（完全一致） |
+| `--group-pattern`, `-g` | テスト名の正規表現パターン |
+| `--categories`, `-c` | NUnitカテゴリ |
+| `--assemblies`, `-a` | アセンブリ名 |
+| `--sync`, `-s` | 同期実行（EditModeのみ） |
 
 ### scene hierarchy オプション
 
 | オプション | 説明 | デフォルト |
 |-----------|------|-----------|
-| `--depth` | 階層の深さ | 0（ルートのみ） |
-| `--iterate-all` | 全ページ自動取得 | false |
+| `--depth`, `-d` | 階層の深さ | 1（ルートのみ） |
 | `--page-size` | ページサイズ | 50 |
+| `--cursor` | ページネーションカーソル | 0 |
 
 ## アーキテクチャ
 
@@ -390,7 +399,7 @@ lsof -i :6500
 u instances
 
 # Unityコンソールでエラー確認
-u console --types error
+u console get --types error
 ```
 
 ## v2.x → v3.0 マイグレーション

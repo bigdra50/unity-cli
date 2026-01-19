@@ -18,7 +18,7 @@ Execute Unity Editor operations from CLI: Play Mode control, console log retriev
 u play
 u stop
 
-# Get console logs
+# Get console logs (error only)
 u console get --types error
 
 # Execute menu items
@@ -71,7 +71,7 @@ uvx --from git+https://github.com/bigdra50/unity-cli u play
 uvx --from git+https://github.com/bigdra50/unity-cli u stop
 
 # Get console logs
-uvx --from git+https://github.com/bigdra50/unity-cli u console --types error
+uvx --from git+https://github.com/bigdra50/unity-cli u console get --types error
 ```
 
 ## Installation
@@ -89,7 +89,7 @@ unity state        # Short alias
 u state            # Shortest alias
 
 u play
-u console --types error --count 10
+u console get --types error --count 10
 
 # Run Relay Server standalone
 unity-relay --port 6500
@@ -183,8 +183,9 @@ u stop
 u pause
 
 # Console logs
-u console
-u console --types error warning --count 20
+u console get
+u console get --types error warning --count 20
+u console clear
 
 # Asset refresh
 u refresh
@@ -208,15 +209,22 @@ u set-default /Users/dev/MyGame
 
 ```bash
 # EditMode tests
-u tests edit
+u tests run edit
 
 # PlayMode tests
-u tests play
+u tests run play
 
 # Filtering
-u tests edit --test-names "MyTests.SampleTest"
-u tests edit --category-names "Unit" "Integration"
-u tests edit --assembly-names "MyGame.Tests"
+u tests run edit --test-names "MyTests.SampleTest"
+u tests run edit --categories "Unit" "Integration"
+u tests run edit --assemblies "MyGame.Tests"
+
+# List available tests
+u tests list edit
+u tests list play
+
+# Check running test status
+u tests status
 ```
 
 ### Scene Operations
@@ -226,9 +234,9 @@ u tests edit --assembly-names "MyGame.Tests"
 u scene active
 
 # Hierarchy
-u scene hierarchy                    # Root only
+u scene hierarchy                    # Root only (depth 1)
 u scene hierarchy --depth 2          # Up to 2 levels
-u scene hierarchy --iterate-all      # All levels (paging)
+u scene hierarchy --page-size 100    # Custom page size
 
 # Scene operations
 u scene load --name MainScene
@@ -328,18 +336,19 @@ u material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 
 | Option | Description |
 |--------|-------------|
-| `--test-names` | Test names (exact match) |
-| `--group-names` | Group names (regex) |
-| `--category-names` | NUnit categories |
-| `--assembly-names` | Assembly names |
+| `--test-names`, `-n` | Test names (exact match) |
+| `--group-pattern`, `-g` | Regex pattern for test names |
+| `--categories`, `-c` | NUnit categories |
+| `--assemblies`, `-a` | Assembly names |
+| `--sync`, `-s` | Run synchronously (EditMode only) |
 
 ### Scene Hierarchy Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--depth` | Hierarchy depth | 0 (root only) |
-| `--iterate-all` | Auto-fetch all pages | false |
+| `--depth`, `-d` | Hierarchy depth | 1 (root only) |
 | `--page-size` | Page size | 50 |
+| `--cursor` | Pagination cursor | 0 |
 
 ## Architecture
 
@@ -390,7 +399,7 @@ lsof -i :6500
 u instances
 
 # Check Unity console for errors
-u console --types error
+u console get --types error
 ```
 
 ## v2.x → v3.0 Migration
