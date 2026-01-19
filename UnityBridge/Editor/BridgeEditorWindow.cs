@@ -78,8 +78,6 @@ namespace UnityBridge
             DrawConnectionSection();
             EditorGUILayout.Space(10);
             DrawStatusSection();
-            EditorGUILayout.Space(10);
-            DrawInfoSection();
 
             EditorGUILayout.EndScrollView();
         }
@@ -279,23 +277,15 @@ namespace UnityBridge
                 EditorGUILayout.LabelField($"Project: {client.ProjectName}");
                 EditorGUILayout.LabelField($"Unity: {client.UnityVersion}");
             }
-        }
 
-        private void DrawInfoSection()
-        {
-            EditorGUILayout.LabelField("Registered Commands", EditorStyles.boldLabel);
+            EditorGUILayout.Space(10);
 
-            var dispatcher = BridgeManager.Instance.Dispatcher;
-            dispatcher.Initialize();
-
-            foreach (var command in dispatcher.RegisteredCommands)
+            // Log toggle
+            var logEnabled = Helpers.BridgeLog.Enabled;
+            var newLogEnabled = EditorGUILayout.Toggle("Console Logging", logEnabled);
+            if (newLogEnabled != logEnabled)
             {
-                EditorGUILayout.LabelField($"  • {command}");
-            }
-
-            if (!dispatcher.RegisteredCommands.GetEnumerator().MoveNext())
-            {
-                EditorGUILayout.LabelField("  (No commands registered)", EditorStyles.miniLabel);
+                Helpers.BridgeLog.Enabled = newLogEnabled;
             }
         }
 

@@ -25,12 +25,24 @@ namespace UnityBridge.Helpers
         private const string WarnColor = "#cc7a00";
         private const string ErrorColor = "#cc3333";
 
+        private const string EnabledKey = "UnityBridge.LogEnabled";
+
+        /// <summary>
+        /// Enable or disable all console logging.
+        /// </summary>
+        public static bool Enabled
+        {
+            get => EditorPrefs.GetBool(EnabledKey, true);
+            set => EditorPrefs.SetBool(EnabledKey, value);
+        }
+
         /// <summary>
         /// Log important events (always shown).
         /// Use for: connection established, server started/stopped, critical state changes.
         /// </summary>
         public static void Info(string message)
         {
+            if (!Enabled) return;
             Debug.Log(Format(Prefix, message, InfoColor));
         }
 
@@ -41,6 +53,7 @@ namespace UnityBridge.Helpers
         [Conditional("UNITY_BRIDGE_VERBOSE")]
         public static void Verbose(string message)
         {
+            if (!Enabled) return;
             Debug.Log(Format(Prefix, message, VerboseColor));
         }
 
@@ -50,6 +63,7 @@ namespace UnityBridge.Helpers
         /// </summary>
         public static void Warn(string message)
         {
+            if (!Enabled) return;
             Debug.LogWarning(Format(Prefix, message, WarnColor));
         }
 
@@ -59,6 +73,7 @@ namespace UnityBridge.Helpers
         /// </summary>
         public static void Error(string message)
         {
+            if (!Enabled) return;
             Debug.LogError(Format(Prefix, message, ErrorColor));
         }
 
@@ -67,6 +82,7 @@ namespace UnityBridge.Helpers
         /// </summary>
         public static void Relay(string message)
         {
+            if (!Enabled) return;
             Debug.Log(Format(RelayPrefix, message, InfoColor));
         }
 
@@ -75,6 +91,7 @@ namespace UnityBridge.Helpers
         /// </summary>
         public static void RelayError(string message)
         {
+            if (!Enabled) return;
             Debug.LogError(Format(RelayPrefix, message, ErrorColor));
         }
 
