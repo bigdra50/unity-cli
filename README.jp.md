@@ -262,10 +262,10 @@ u gameobject find "Main Camera"
 u gameobject find "Player" --iterate-all
 
 # 作成
-u gameobject create --name "MyCube" --primitive Cube --position 0,1,0
+u gameobject create --name "MyCube" --primitive Cube --position 0 1 0
 
 # 変更
-u gameobject modify --name "MyCube" --position 5,0,0 --rotation 0,45,0
+u gameobject modify --name "MyCube" --position 5 0 0 --rotation 0 45 0
 
 # 削除
 u gameobject delete --name "MyCube"
@@ -329,10 +329,11 @@ u asset info "Assets/Data/Config.asset"
 
 | オプション | 説明 | デフォルト |
 |-----------|------|-----------|
-| `--host` | Relay Serverホスト | 127.0.0.1 |
-| `--port` | Relay Serverポート | 6500 |
-| `--instance` | 対象Unityインスタンス | デフォルト |
-| `--timeout` | タイムアウト（ms） | 30000 |
+| `--relay-host` | Relay Serverホスト | 127.0.0.1 |
+| `--relay-port` | Relay Serverポート | 6500 |
+| `--instance`, `-i` | 対象Unityインスタンス | デフォルト |
+| `--timeout`, `-t` | タイムアウト（秒） | 10.0 |
+| `--json`, `-j` | JSON形式で出力 | false |
 
 ### tests専用オプション
 

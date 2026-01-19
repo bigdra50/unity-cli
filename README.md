@@ -262,10 +262,10 @@ u gameobject find "Main Camera"
 u gameobject find "Player" --iterate-all
 
 # Create
-u gameobject create --name "MyCube" --primitive Cube --position 0,1,0
+u gameobject create --name "MyCube" --primitive Cube --position 0 1 0
 
 # Modify
-u gameobject modify --name "MyCube" --position 5,0,0 --rotation 0,45,0
+u gameobject modify --name "MyCube" --position 5 0 0 --rotation 0 45 0
 
 # Delete
 u gameobject delete --name "MyCube"
@@ -329,10 +329,11 @@ u asset info "Assets/Data/Config.asset"
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--host` | Relay Server host | 127.0.0.1 |
-| `--port` | Relay Server port | 6500 |
-| `--instance` | Target Unity instance | default |
-| `--timeout` | Timeout (ms) | 30000 |
+| `--relay-host` | Relay Server host | 127.0.0.1 |
+| `--relay-port` | Relay Server port | 6500 |
+| `--instance`, `-i` | Target Unity instance | default |
+| `--timeout`, `-t` | Timeout (seconds) | 10.0 |
+| `--json`, `-j` | Output JSON format | false |
 
 ### Tests Options
 
