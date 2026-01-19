@@ -13,7 +13,7 @@ namespace UnityBridge
     /// </summary>
     public sealed class RelayServerLauncher : IDisposable
     {
-        private const string PackageSource = "git+https://github.com/bigdra50/unity-mcp-client";
+        private const string PackageSource = "git+https://github.com/bigdra50/unity-cli";
         private const string EditorPrefsKeyCommand = "UnityBridge.RelayServer.CustomCommand";
         private const string SessionStateKeyPid = "UnityBridge.RelayServer.Pid";
         private const string SessionStateKeyPort = "UnityBridge.RelayServer.Port";

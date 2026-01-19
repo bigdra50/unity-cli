@@ -805,11 +805,11 @@ string instanceId = Path.GetFullPath(Application.dataPath + "/..");
 
 ```bash
 # パス補完が効く
-$ unity-mcp --instance /Users/dev/MyGame state
-$ unity-mcp --instance /Users/dev/Demo play
+$ u --instance /Users/dev/MyGame state
+$ u --instance /Users/dev/Demo play
 
 # 省略時はデフォルトインスタンス
-$ unity-mcp state
+$ u state
 ```
 
 ---

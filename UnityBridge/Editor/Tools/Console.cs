@@ -9,7 +9,7 @@ namespace UnityBridge.Tools
     /// <summary>
     /// Handler for console commands.
     /// Reads and clears Unity console log entries.
-    /// Based on Coplay/unity-mcp implementation.
+    /// Based on Coplay/unity-mcp (now CoplayDev/unity-mcp) implementation.
     /// </summary>
     [BridgeTool("console")]
     public static class Console

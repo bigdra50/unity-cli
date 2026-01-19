@@ -1,5 +1,5 @@
-# Unity MCP Client Configuration
-# This file configures the unity-mcp CLI tool.
+# Unity CLI Configuration
+# This file configures the unity-cli tool.
 
 # Connection settings
 port = 6401
