@@ -148,7 +148,7 @@ namespace UnityBridge.Tools
 
                     var message = (string)messageField.GetValue(logEntry);
                     var mode = (int)modeField.GetValue(logEntry);
-                    var entryType = GetEntryType(mode, message);
+                    var entryType = GetEntryType(mode);
 
                     // Filter by type (skip if typeSet is null = no filter)
                     if (typeSet != null && !typeSet.Contains(entryType))
@@ -175,58 +175,52 @@ namespace UnityBridge.Tools
             return entries;
         }
 
-        private static string GetEntryType(int mode, string message)
+        /// <summary>
+        /// Determine log entry type from Unity's internal Mode flags.
+        /// Based on Unity's ConsoleWindow.cs Mode enum from UnityCsReference.
+        /// </summary>
+        private static string GetEntryType(int mode)
         {
-            // Unity 6000.x observed mode values:
-            //   Debug.Log:       0x00804400
-            //   Debug.LogWarning: 0x00804200
-            //   Compiler Warning: 0x00041000
-            //   Error/Exception: typically has bit 0 (kModeLog) not set
-            //
-            // The lower 8 bits often appear to be 0x00, so we cannot rely on LogType mask.
-            // Instead, use bit pattern analysis and message content.
+            // Unity internal Mode enum bit flags (from UnityCsReference ConsoleWindow.cs)
+            const int kError = 1 << 0;              // 1
+            const int kAssert = 1 << 1;             // 2
+            const int kLog = 1 << 2;                // 4
+            const int kFatal = 1 << 4;              // 16
+            const int kAssetImportError = 1 << 6;   // 64
+            const int kAssetImportWarning = 1 << 7; // 128
+            const int kScriptingError = 1 << 8;     // 256
+            const int kScriptingWarning = 1 << 9;   // 512
+            const int kScriptingLog = 1 << 10;      // 1024
+            const int kScriptCompileError = 1 << 11;   // 2048
+            const int kScriptCompileWarning = 1 << 12; // 4096
+            const int kScriptingException = 1 << 17;   // 131072
+            const int kScriptingAssertion = 1 << 21;   // 2097152
+            const int kGraphCompileError = 1 << 20;    // 1048576
+            const int kVisualScriptingError = 1 << 22; // 4194304
 
-            // 1. First check message content (most reliable)
-            if (message != null)
-            {
-                // Check for error indicators
-                if (message.Contains("error CS") ||        // Compiler error
-                    message.Contains("Exception:") ||       // Exception with colon
-                    message.Contains("NullReferenceException") ||
-                    message.Contains("IndexOutOfRangeException") ||
-                    message.Contains("ArgumentException") ||
-                    message.StartsWith("[Error]") ||
-                    (message.Contains("Error") && !message.Contains("[UnityBridge]")))  // Exclude our own logs
-                    return "error";
+            // Exception check (highest priority)
+            if ((mode & kScriptingException) != 0)
+                return "exception";
 
-                // Check for warning indicators
-                if (message.Contains("warning CS") ||      // Compiler warning
-                    message.StartsWith("[Warning]") ||
-                    message.StartsWith("Warning:"))
-                    return "warning";
-            }
+            // Error checks
+            const int kErrorMask = kError | kFatal | kAssetImportError | kScriptingError |
+                                   kScriptCompileError | kGraphCompileError | kVisualScriptingError;
+            if ((mode & kErrorMask) != 0)
+                return "error";
 
-            // 2. Check known mode bit patterns for Unity 6000.x
-            // Compiler warning: 0x00041000 (bits 12, 16 set)
-            // Debug.LogWarning: 0x00804200 (bit 9 set instead of bit 10)
-            // Debug.Log:        0x00804400 (bit 10 set)
-            // Note: bits 9 vs 10 distinguish Warning vs Log in Unity's internal encoding
+            // Assert checks
+            const int kAssertMask = kAssert | kScriptingAssertion;
+            if ((mode & kAssertMask) != 0)
+                return "assert";
 
-            const int kBit9 = 1 << 9;   // 0x200 - Warning indicator
-            const int kBit10 = 1 << 10; // 0x400 - Log indicator
-            const int kBit12 = 1 << 12; // 0x1000 - Compiler message
-            const int kBit16 = 1 << 16; // 0x10000 - Warning class
-
-            // Compiler warnings: bits 12 and 16 set (0x00041000)
-            if ((mode & kBit12) != 0 && (mode & kBit16) != 0)
+            // Warning checks
+            const int kWarningMask = kAssetImportWarning | kScriptingWarning | kScriptCompileWarning;
+            if ((mode & kWarningMask) != 0)
                 return "warning";
 
-            // Debug.LogWarning: bit 9 set but not bit 10
-            if ((mode & kBit9) != 0 && (mode & kBit10) == 0)
-                return "warning";
-
-            // Debug.Log: bit 10 set (0x00804400)
-            if ((mode & kBit10) != 0)
+            // Log checks
+            const int kLogMask = kLog | kScriptingLog;
+            if ((mode & kLogMask) != 0)
                 return "log";
 
             // Default: treat as log
