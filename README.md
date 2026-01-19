@@ -95,27 +95,26 @@ u console get -l E -c 10       # Last 10 error+ logs
 unity-relay --port 6500
 ```
 
-## Shell Completion
+## CLI Commands
 
-Enable tab completion for your shell:
+### Version
 
 ```bash
-# Bash
-u completion bash >> ~/.bashrc
-
-# Zsh
-u completion zsh >> ~/.zshrc
-
-# Fish
-u completion fish > ~/.config/fish/completions/unity-cli.fish
-
-# PowerShell
-u completion powershell >> $PROFILE
+u version                     # Show CLI version
 ```
 
-Restart your shell or source the config file to enable completion.
+### Shell Completion
 
-## CLI Commands
+```bash
+# Zsh
+u completion -s zsh > ~/.zsh/completions/_unity-cli
+
+# Bash
+u completion -s bash >> ~/.bashrc
+
+# Fish
+u completion -s fish > ~/.config/fish/completions/unity-cli.fish
+```
 
 ### Open Project
 
@@ -189,6 +188,7 @@ u console get -l E             # Error and above (error, exception)
 u console get -l +W            # Warning only
 u console get -l +E+X          # Error and exception only
 u console get -c 20            # Last 20 entries
+u console get -f "error"       # Filter by text
 u console clear                # Clear console
 
 # Asset refresh
@@ -204,9 +204,6 @@ u instances
 # Specify target instance
 u --instance /Users/dev/MyGame state
 u --instance /Users/dev/Demo play
-
-# Change default instance
-u set-default /Users/dev/MyGame
 ```
 
 ### Test Execution
@@ -315,14 +312,6 @@ u asset scriptable-object -T "GameConfig" -p "Assets/Data/Config.asset"
 
 # Asset info
 u asset info "Assets/Data/Config.asset"
-```
-
-### Material Operations
-
-```bash
-u material info --path Assets/Materials/Default.mat
-u material create --path Assets/Materials/New.mat --shader Standard
-u material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 ```
 
 ## Options

@@ -210,5 +210,5 @@ python -m pytest tests/
 
 # Verify Unity compilation
 unity-cli refresh
-unity-cli console --types error
+unity-cli console get -l E
 ```

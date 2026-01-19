@@ -95,27 +95,26 @@ u console get -l E -c 10       # 最新10件のエラー以上
 unity-relay --port 6500
 ```
 
-## シェル補完
+## CLI コマンド
 
-タブ補完を有効にする:
+### バージョン
 
 ```bash
-# Bash
-u completion bash >> ~/.bashrc
-
-# Zsh
-u completion zsh >> ~/.zshrc
-
-# Fish
-u completion fish > ~/.config/fish/completions/unity-cli.fish
-
-# PowerShell
-u completion powershell >> $PROFILE
+u version                     # CLIバージョンを表示
 ```
 
-シェルを再起動するか、設定ファイルをsourceして有効化。
+### シェル補完
 
-## CLI コマンド
+```bash
+# Zsh
+u completion -s zsh > ~/.zsh/completions/_unity-cli
+
+# Bash
+u completion -s bash >> ~/.bashrc
+
+# Fish
+u completion -s fish > ~/.config/fish/completions/unity-cli.fish
+```
 
 ### プロジェクトを開く
 
@@ -189,6 +188,7 @@ u console get -l E             # error以上（error, exception）
 u console get -l +W            # warningのみ
 u console get -l +E+X          # errorとexceptionのみ
 u console get -c 20            # 最新20件
+u console get -f "error"       # テキストでフィルタ
 u console clear                # コンソールクリア
 
 # アセットリフレッシュ
@@ -204,9 +204,6 @@ u instances
 # 特定インスタンスを指定
 u --instance /Users/dev/MyGame state
 u --instance /Users/dev/Demo play
-
-# デフォルトインスタンス変更
-u set-default /Users/dev/MyGame
 ```
 
 ### テスト実行
@@ -315,14 +312,6 @@ u asset scriptable-object -T "GameConfig" -p "Assets/Data/Config.asset"
 
 # アセット情報
 u asset info "Assets/Data/Config.asset"
-```
-
-### マテリアル操作
-
-```bash
-u material info --path Assets/Materials/Default.mat
-u material create --path Assets/Materials/New.mat --shader Standard
-u material set-color --path Assets/Materials/New.mat --color 1,0,0,1
 ```
 
 ## オプション
