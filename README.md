@@ -193,6 +193,16 @@ u console clear                # Clear console
 
 # Asset refresh
 u refresh
+
+# Editor selection
+u selection
+
+# Screenshot
+u screenshot                           # GameView (default)
+u screenshot -s scene                  # SceneView
+u screenshot -s camera                 # Camera.Render
+u screenshot -p ./output.png           # Custom path
+u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
 ```
 
 ### Instance Management

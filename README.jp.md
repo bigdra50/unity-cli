@@ -193,6 +193,16 @@ u console clear                # コンソールクリア
 
 # アセットリフレッシュ
 u refresh
+
+# エディタ選択状態
+u selection
+
+# スクリーンショット
+u screenshot                           # GameView（デフォルト）
+u screenshot -s scene                  # SceneView
+u screenshot -s camera                 # Camera.Render
+u screenshot -p ./output.png           # 出力パス指定
+u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
 ```
 
 ### インスタンス管理
