@@ -275,9 +275,9 @@ def console_get(
     """Get console logs."""
     context: CLIContext = ctx.obj
     try:
-        log_types = types if types else context.config.log_types
+        # types未指定時はNoneのままUnityに送信（Unity側で全タイプ対象）
         result = context.client.console.get(
-            types=log_types,
+            types=types,
             count=count,
             filter_text=filter_text,
         )

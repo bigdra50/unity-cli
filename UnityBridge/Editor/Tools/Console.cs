@@ -32,8 +32,9 @@ namespace UnityBridge.Tools
 
         private static JObject HandleRead(JObject parameters)
         {
-            var types = parameters["types"]?.ToObject<string[]>() ?? new[] { "log", "warning", "error" };
-            var count = parameters["count"]?.Value<int?>() ?? int.MaxValue;  // 0 or unspecified = all
+            // types未指定(null)の場合はnullのまま渡す（フィルタなし=全タイプ）
+            var types = parameters["types"]?.ToObject<string[]>();
+            var count = parameters["count"]?.Value<int?>() ?? int.MaxValue;  // unspecified = all
             var search = parameters["search"]?.Value<string>();
 
             var entries = GetConsoleEntries(types, count, search);
@@ -125,15 +126,18 @@ namespace UnityBridge.Tools
 
             BridgeLog.Verbose($"LogEntry fields found: message={messageField.Name}, mode={modeField.Name}");
 
-            // Convert type filters
-            var typeSet = new HashSet<string>(types, StringComparer.OrdinalIgnoreCase);
+            // Convert type filters (null = no filter, all types)
+            HashSet<string> typeSet = types != null
+                ? new HashSet<string>(types, StringComparer.OrdinalIgnoreCase)
+                : null;
 
             try
             {
                 startGettingEntriesMethod.Invoke(null, null);
 
                 var totalCount = (int)getCountMethod.Invoke(null, null);
-                BridgeLog.Verbose($"Console: Total entries={totalCount}, requested types={string.Join(",", types)}, count={count}");
+                var typesDesc = types != null ? string.Join(",", types) : "(all)";
+                BridgeLog.Verbose($"Console: Total entries={totalCount}, requested types={typesDesc}, count={count}");
 
                 var logEntry = Activator.CreateInstance(logEntryType);
 
@@ -146,8 +150,8 @@ namespace UnityBridge.Tools
                     var mode = (int)modeField.GetValue(logEntry);
                     var entryType = GetEntryType(mode, message);
 
-                    // Filter by type
-                    if (!typeSet.Contains(entryType))
+                    // Filter by type (skip if typeSet is null = no filter)
+                    if (typeSet != null && !typeSet.Contains(entryType))
                         continue;
 
                     // Filter by search
