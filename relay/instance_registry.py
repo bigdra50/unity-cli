@@ -165,6 +165,10 @@ class InstanceRegistry:
         self._instances: dict[str, UnityInstance] = {}
         self._default_instance_id: str | None = None
         self._lock = asyncio.Lock()
+        # Track instances in grace period (instance_id -> cancel task)
+        self._grace_period_tasks: dict[str, asyncio.Task[None]] = {}
+        # Remember if instance was default before going into grace period
+        self._was_default: dict[str, bool] = {}
 
     async def register(
         self,
@@ -180,8 +184,18 @@ class InstanceRegistry:
 
         If an instance with the same ID exists, forcefully close the old connection
         and replace it (takeover rule).
+
+        If instance is reconnecting from grace period, restore default status if applicable.
         """
         async with self._lock:
+            # Cancel grace period if reconnecting
+            restore_default = False
+            if instance_id in self._grace_period_tasks:
+                self._grace_period_tasks[instance_id].cancel()
+                del self._grace_period_tasks[instance_id]
+                restore_default = self._was_default.pop(instance_id, False)
+                logger.info(f"Instance {instance_id} reconnected during grace period (was_default={restore_default})")
+
             # Check for existing instance (takeover)
             if instance_id in self._instances:
                 old_instance = self._instances[instance_id]
@@ -202,8 +216,12 @@ class InstanceRegistry:
             )
             self._instances[instance_id] = instance
 
+            # Restore default if it was default before grace period
+            if restore_default:
+                self._default_instance_id = instance_id
+                logger.info(f"Restored default instance: {instance_id}")
             # Set as default if first instance
-            if self._default_instance_id is None:
+            elif self._default_instance_id is None:
                 self._default_instance_id = instance_id
                 logger.info(f"Set default instance: {instance_id}")
 
@@ -229,6 +247,78 @@ class InstanceRegistry:
 
             logger.info(f"Unregistered instance: {instance_id}")
             return True
+
+    async def disconnect_with_grace_period(
+        self,
+        instance_id: str,
+        grace_period_ms: int,
+    ) -> None:
+        """
+        Disconnect an instance with grace period for RELOADING state.
+
+        If the instance was RELOADING when disconnected, wait for grace_period_ms
+        before fully unregistering. During this period:
+        - The instance is removed from active instances
+        - If it was default, default is NOT changed
+        - If it reconnects within grace period, it resumes as default
+
+        Args:
+            instance_id: The instance to disconnect
+            grace_period_ms: Time to wait before full unregister (milliseconds)
+        """
+        instance = self._instances.get(instance_id)
+        if not instance:
+            return
+
+        was_reloading = instance.status == InstanceStatus.RELOADING
+        was_default = self._default_instance_id == instance_id
+
+        # Close connection but keep tracking
+        await instance.close_connection()
+
+        if was_reloading and grace_period_ms > 0:
+            # Enter grace period - remove from instances but track for reconnection
+            async with self._lock:
+                if instance_id in self._instances:
+                    del self._instances[instance_id]
+
+                # Remember default status for restoration
+                self._was_default[instance_id] = was_default
+
+                # Don't change default during grace period
+                logger.info(
+                    f"Instance {instance_id} entering grace period ({grace_period_ms}ms, was_default={was_default})"
+                )
+
+            # Start grace period timer
+            async def grace_period_timeout() -> None:
+                try:
+                    await asyncio.sleep(grace_period_ms / 1000)
+                    # Grace period expired - fully unregister
+                    async with self._lock:
+                        if instance_id in self._grace_period_tasks:
+                            del self._grace_period_tasks[instance_id]
+                        was_default_expired = self._was_default.pop(instance_id, False)
+
+                        # Now update default if needed
+                        if was_default_expired and self._default_instance_id == instance_id:
+                            if self._instances:
+                                self._default_instance_id = next(iter(self._instances))
+                                logger.info(f"Grace period expired. New default: {self._default_instance_id}")
+                            else:
+                                self._default_instance_id = None
+                                logger.info("Grace period expired. No instances remaining.")
+
+                        logger.info(f"Instance {instance_id} grace period expired, fully unregistered")
+                except asyncio.CancelledError:
+                    # Reconnected during grace period
+                    pass
+
+            task = asyncio.create_task(grace_period_timeout())
+            self._grace_period_tasks[instance_id] = task
+        else:
+            # Immediate unregister (not reloading or grace period disabled)
+            await self.unregister(instance_id)
 
     def get(self, instance_id: str) -> UnityInstance | None:
         """Get an instance by ID"""

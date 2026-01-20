@@ -39,6 +39,7 @@ HEARTBEAT_TIMEOUT_MS = 15000
 HEARTBEAT_MAX_RETRIES = 3  # Disconnect after 3 consecutive failures
 RELOAD_TIMEOUT_MS = 30000  # Extended timeout during RELOADING
 COMMAND_TIMEOUT_MS = 30000
+RELOAD_GRACE_PERIOD_MS = 60000  # Grace period before removing reloading instance
 
 
 class RelayServer:
@@ -54,9 +55,11 @@ class RelayServer:
         self,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
+        reload_grace_period_ms: int = RELOAD_GRACE_PERIOD_MS,
     ) -> None:
         self.host = host
         self.port = port
+        self.reload_grace_period_ms = reload_grace_period_ms
         self.registry = InstanceRegistry()
         self.request_cache = RequestCache(ttl_seconds=60.0)
         self._server: asyncio.Server | None = None
@@ -212,7 +215,8 @@ class RelayServer:
                 self._heartbeat_tasks[instance_id].cancel()
                 del self._heartbeat_tasks[instance_id]
 
-            await self.registry.unregister(instance_id)
+            # Use grace period for RELOADING instances
+            await self.registry.disconnect_with_grace_period(instance_id, self.reload_grace_period_ms)
 
     async def _handle_unity_message(
         self,
@@ -600,9 +604,17 @@ class RelayServer:
             await self._process_queue(instance)
 
 
-async def run_server(host: str, port: int) -> None:
+async def run_server(
+    host: str,
+    port: int,
+    reload_grace_period_ms: int = RELOAD_GRACE_PERIOD_MS,
+) -> None:
     """Run the relay server with graceful shutdown"""
-    server = RelayServer(host=host, port=port)
+    server = RelayServer(
+        host=host,
+        port=port,
+        reload_grace_period_ms=reload_grace_period_ms,
+    )
 
     loop = asyncio.get_event_loop()
 
@@ -635,6 +647,13 @@ def main() -> None:
         action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "--reload-grace-period",
+        type=int,
+        default=RELOAD_GRACE_PERIOD_MS,
+        metavar="MS",
+        help=f"Grace period (ms) before removing reloading instance (default: {RELOAD_GRACE_PERIOD_MS})",
+    )
 
     args = parser.parse_args()
 
@@ -647,7 +666,13 @@ def main() -> None:
 
     # Run server
     try:
-        asyncio.run(run_server(args.host, args.port))
+        asyncio.run(
+            run_server(
+                args.host,
+                args.port,
+                reload_grace_period_ms=args.reload_grace_period,
+            )
+        )
     except KeyboardInterrupt:
         pass
 
