@@ -335,13 +335,18 @@ def console_get(
         bool,
         typer.Option("--verbose", "-v", help="Include stack traces in output"),
     ] = False,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Get console logs.
 
     Level hierarchy: L (log) < W (warning) < E (error) < X (exception)
 
     Examples:
-        u console get              # All logs (no stack traces)
+        u console get              # All logs (plain text)
+        u console get -o json      # All logs (JSON format)
         u console get -v           # All logs with stack traces
         u console get -l E         # Error and above (error + exception)
         u console get -l W         # Warning and above
@@ -358,7 +363,20 @@ def console_get(
             filter_text=filter_text,
             include_stacktrace=verbose,
         )
-        print_json(result, None)
+
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            # Plain text output: timestamp type message
+            entries = result.get("entries", [])
+            for entry in entries:
+                ts = entry.get("timestamp", "")
+                log_type = entry.get("type", "log")
+                msg = entry.get("message", "")
+                console.print(f"{ts} {log_type} {msg}")
+                if verbose and entry.get("stackTrace"):
+                    for line in entry["stackTrace"].split("\n"):
+                        console.print(f"  {line}", style="dim")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
