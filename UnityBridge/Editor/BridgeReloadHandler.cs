@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityBridge.Helpers;
 using UnityEditor;
@@ -76,19 +77,31 @@ namespace UnityBridge
                 LastHost = manager.Host;
                 LastPort = manager.Port;
 
-                // Fire-and-forget: send reloading status without waiting
-                // Waiting would freeze Unity during domain reload
-                _ = Task.Run(async () =>
+                // Synchronous STATUS send with 500ms timeout
+                try
                 {
-                    try
-                    {
-                        await manager.Client.SendReloadingStatusAsync().ConfigureAwait(false);
-                    }
-                    catch
-                    {
-                        // Ignore - connection may be lost during reload anyway
-                    }
-                });
+                    using var cts = new CancellationTokenSource(500);
+                    var task = manager.Client.SendReloadingStatusAsync();
+                    task.Wait(cts.Token);
+                    BridgeLog.Verbose("STATUS reloading sent successfully");
+                }
+                catch (OperationCanceledException)
+                {
+                    BridgeLog.Warn("STATUS send timed out, relying on status file");
+                }
+                catch (Exception ex)
+                {
+                    BridgeLog.Warn($"STATUS send failed: {ex.Message}, relying on status file");
+                }
+
+                // File fallback: write status file for relay server to detect
+                BridgeStatusFile.WriteStatus(
+                    manager.Client.InstanceId,
+                    UnityEngine.Application.productName,
+                    UnityEngine.Application.unityVersion,
+                    "reloading",
+                    manager.Host,
+                    manager.Port);
             }
         }
 
@@ -138,6 +151,15 @@ namespace UnityBridge
                 if (manager.Client != null && manager.Client.IsConnected)
                 {
                     await manager.Client.SendReadyStatusAsync();
+
+                    // Update status file to ready
+                    BridgeStatusFile.WriteStatus(
+                        manager.Client.InstanceId,
+                        UnityEngine.Application.productName,
+                        UnityEngine.Application.unityVersion,
+                        "ready",
+                        host,
+                        port);
                 }
             }
             catch (Exception ex)
@@ -153,6 +175,12 @@ namespace UnityBridge
             var manager = BridgeManager.Instance;
             if (manager != null)
             {
+                // Delete status file before quitting
+                if (manager.Client != null)
+                {
+                    BridgeStatusFile.DeleteStatus(manager.Client.InstanceId);
+                }
+
                 // Fire-and-forget disconnect - don't block editor quit
                 _ = Task.Run(async () =>
                 {

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from .protocol import InstanceStatus
+from .status_file import is_instance_reloading
 
 if TYPE_CHECKING:
     pass
@@ -271,6 +272,10 @@ class InstanceRegistry:
             return
 
         was_reloading = instance.status == InstanceStatus.RELOADING
+        if not was_reloading:
+            was_reloading = is_instance_reloading(instance_id)
+            if was_reloading:
+                logger.info(f"Instance {instance_id} detected as reloading via status file")
         was_default = self._default_instance_id == instance_id
 
         # Close connection but keep tracking

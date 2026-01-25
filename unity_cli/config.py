@@ -64,14 +64,14 @@ class UnityCLIConfig(BaseModel):
 
     relay_host: str = DEFAULT_RELAY_HOST
     relay_port: Annotated[int, Field(gt=0, le=65535)] = DEFAULT_RELAY_PORT
-    timeout: Annotated[float, Field(gt=0)] = 5.0
+    timeout: Annotated[float, Field(gt=0)] = 15.0
     timeout_ms: Annotated[int, Field(gt=0)] = DEFAULT_TIMEOUT_MS
     instance: str | None = None
     log_types: list[str] = Field(default_factory=lambda: ["log", "warning", "error"])
     log_count: Annotated[int, Field(gt=0)] = 20
     retry_initial_ms: Annotated[int, Field(gt=0)] = 500
     retry_max_ms: Annotated[int, Field(gt=0)] = 8000
-    retry_max_time_ms: Annotated[int, Field(gt=0)] = 30000
+    retry_max_time_ms: Annotated[int, Field(gt=0)] = 45000
 
     @field_validator("log_types", mode="before")
     @classmethod

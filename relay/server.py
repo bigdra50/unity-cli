@@ -28,6 +28,7 @@ from .protocol import (
     write_frame,
 )
 from .request_cache import RequestCache
+from .status_file import is_instance_reloading
 
 logger = logging.getLogger(__name__)
 
@@ -432,8 +433,8 @@ class RelayServer:
         timeout_ms: int,
     ) -> dict[str, Any]:
         """Execute a command on a Unity instance"""
-        # Coplay-style: wait for instance to become ready (max 10 seconds)
-        max_wait_ms = 10000
+        # Coplay-style: wait for instance to become ready (max 15 seconds)
+        max_wait_ms = 15000
         poll_interval_ms = 250
         waited_ms = 0
 
@@ -442,6 +443,14 @@ class RelayServer:
             instance = self.registry.get_instance_for_request(instance_id)
 
             if not instance:
+                # ファイルベースでリロード中かチェック
+                if instance_id and is_instance_reloading(instance_id):
+                    if waited_ms == 0:
+                        logger.info(f"[{request_id}] Instance {instance_id} is reloading (via status file), waiting...")
+                    await asyncio.sleep(poll_interval_ms / 1000)
+                    waited_ms += poll_interval_ms
+                    continue
+
                 if instance_id:
                     return ErrorMessage.from_code(
                         request_id,
