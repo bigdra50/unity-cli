@@ -22,9 +22,11 @@ namespace UnityBridge.Tools
                 "create_prefab" => CreatePrefab(parameters),
                 "create_scriptable_object" => CreateScriptableObject(parameters),
                 "info" => GetAssetInfo(parameters),
+                "deps" => GetDependencies(parameters),
+                "refs" => GetReferencers(parameters),
                 _ => throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"Unknown action: {action}. Valid: create_prefab, create_scriptable_object, info")
+                    $"Unknown action: {action}. Valid: create_prefab, create_scriptable_object, info, deps, refs")
             };
         }
 
@@ -169,6 +171,84 @@ namespace UnityBridge.Tools
                 ["type"] = asset.GetType().FullName,
                 ["instanceID"] = asset.GetInstanceID(),
                 ["guid"] = AssetDatabase.AssetPathToGUID(path)
+            };
+        }
+
+        private static JObject GetDependencies(JObject parameters)
+        {
+            var path = parameters["path"]?.Value<string>();
+            var recursive = parameters["recursive"]?.Value<bool>() ?? true;
+
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "'path' is required");
+            }
+
+            if (!AssetDatabase.AssetPathExists(path))
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"Asset not found: {path}");
+            }
+
+            var deps = AssetDatabase.GetDependencies(path, recursive)
+                .Where(p => p != path)
+                .Select(BuildAssetInfo)
+                .ToArray();
+
+            return new JObject
+            {
+                ["path"] = path,
+                ["recursive"] = recursive,
+                ["count"] = deps.Length,
+                ["dependencies"] = new JArray(deps)
+            };
+        }
+
+        private static JObject GetReferencers(JObject parameters)
+        {
+            var path = parameters["path"]?.Value<string>();
+
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "'path' is required");
+            }
+
+            if (!AssetDatabase.AssetPathExists(path))
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"Asset not found: {path}");
+            }
+
+            var allAssets = AssetDatabase.GetAllAssetPaths();
+
+            var referencers = allAssets
+                .Where(assetPath => assetPath != path)
+                .Where(assetPath => AssetDatabase.GetDependencies(assetPath, false).Contains(path))
+                .Select(BuildAssetInfo)
+                .ToArray();
+
+            return new JObject
+            {
+                ["path"] = path,
+                ["count"] = referencers.Length,
+                ["referencers"] = new JArray(referencers)
+            };
+        }
+
+        private static JObject BuildAssetInfo(string assetPath)
+        {
+            var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            return new JObject
+            {
+                ["path"] = assetPath,
+                ["guid"] = AssetDatabase.AssetPathToGUID(assetPath),
+                ["type"] = asset?.GetType().FullName ?? "Unknown"
             };
         }
 

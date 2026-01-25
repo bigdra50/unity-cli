@@ -76,3 +76,39 @@ class AssetAPI:
                 "path": path,
             },
         )
+
+    def deps(self, path: str, *, recursive: bool = True) -> dict[str, Any]:
+        """Get asset dependencies (what this asset depends on).
+
+        Args:
+            path: Asset path
+            recursive: Include indirect dependencies (default: True)
+
+        Returns:
+            Dictionary with dependencies list
+        """
+        return self._conn.send_request(
+            "asset",
+            {
+                "action": "deps",
+                "path": path,
+                "recursive": recursive,
+            },
+        )
+
+    def refs(self, path: str) -> dict[str, Any]:
+        """Get asset referencers (what depends on this asset).
+
+        Args:
+            path: Asset path
+
+        Returns:
+            Dictionary with referencers list
+        """
+        return self._conn.send_request(
+            "asset",
+            {
+                "action": "refs",
+                "path": path,
+            },
+        )

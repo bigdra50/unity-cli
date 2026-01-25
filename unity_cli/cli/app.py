@@ -940,6 +940,63 @@ def asset_info(
         raise typer.Exit(1) from None
 
 
+@asset_app.command("deps")
+def asset_deps(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Asset path")],
+    recursive: Annotated[
+        bool,
+        typer.Option("--recursive/--no-recursive", "-r/-R", help="Include indirect dependencies"),
+    ] = True,
+) -> None:
+    """Get asset dependencies (what this asset depends on)."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.asset.deps(path=path, recursive=recursive)
+        if context.json_mode:
+            print_json(result)
+        else:
+            deps = result.get("dependencies", [])
+            count = result.get("count", len(deps))
+            console.print(f"[bold]Dependencies for {path}[/bold] ({count})")
+            if result.get("recursive"):
+                console.print("[dim](recursive)[/dim]")
+            console.print()
+            for dep in deps:
+                console.print(f"  {dep.get('path')}")
+                console.print(f"    [dim]type: {dep.get('type')}[/dim]")
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@asset_app.command("refs")
+def asset_refs(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Asset path")],
+) -> None:
+    """Get asset referencers (what depends on this asset)."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.asset.refs(path=path)
+        if context.json_mode:
+            print_json(result)
+        else:
+            refs = result.get("referencers", [])
+            count = result.get("count", len(refs))
+            console.print(f"[bold]Referencers of {path}[/bold] ({count})")
+            console.print()
+            if count == 0:
+                console.print("[dim]No references found[/dim]")
+            else:
+                for ref in refs:
+                    console.print(f"  {ref.get('path')}")
+                    console.print(f"    [dim]type: {ref.get('type')}[/dim]")
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
 # =============================================================================
 # Config Commands
 # =============================================================================
