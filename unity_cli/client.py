@@ -37,12 +37,15 @@ from unity_cli.exceptions import (
 if TYPE_CHECKING:
     from unity_cli.api import (
         AssetAPI,
+        BuildAPI,
         ComponentAPI,
         ConsoleAPI,
         EditorAPI,
         GameObjectAPI,
         MaterialAPI,
         MenuAPI,
+        PackageAPI,
+        ProfilerAPI,
         SceneAPI,
         ScreenshotAPI,
         SelectionAPI,
@@ -385,7 +388,10 @@ class RelayConnection:
 
         if msg_type == "RESPONSE":
             if not response.get("success", False):
-                raise UnityCLIError(f"{command} failed", "COMMAND_FAILED")
+                error_info = response.get("error", {})
+                error_msg = error_info.get("message", f"{command} failed") if error_info else f"{command} failed"
+                error_code = error_info.get("code", "COMMAND_FAILED") if error_info else "COMMAND_FAILED"
+                raise UnityCLIError(error_msg, error_code)
             data: dict[str, Any] = response.get("data", {})
             return data
 
@@ -578,12 +584,15 @@ class UnityClient:
         # Lazy import to avoid circular dependencies
         from unity_cli.api import (
             AssetAPI,
+            BuildAPI,
             ComponentAPI,
             ConsoleAPI,
             EditorAPI,
             GameObjectAPI,
             MaterialAPI,
             MenuAPI,
+            PackageAPI,
+            ProfilerAPI,
             SceneAPI,
             ScreenshotAPI,
             SelectionAPI,
@@ -593,12 +602,15 @@ class UnityClient:
 
         # API objects
         self.asset: AssetAPI = AssetAPI(self._conn)
+        self.build: BuildAPI = BuildAPI(self._conn)
         self.console: ConsoleAPI = ConsoleAPI(self._conn)
         self.editor: EditorAPI = EditorAPI(self._conn)
         self.gameobject: GameObjectAPI = GameObjectAPI(self._conn)
         self.scene: SceneAPI = SceneAPI(self._conn)
         self.component: ComponentAPI = ComponentAPI(self._conn)
         self.material: MaterialAPI = MaterialAPI(self._conn)
+        self.package: PackageAPI = PackageAPI(self._conn)
+        self.profiler: ProfilerAPI = ProfilerAPI(self._conn)
         self.tests: TestAPI = TestAPI(self._conn)
         self.menu: MenuAPI = MenuAPI(self._conn)
         self.selection: SelectionAPI = SelectionAPI(self._conn)

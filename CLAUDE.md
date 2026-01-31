@@ -55,12 +55,15 @@ u tests status                            # Check test status
 u gameobject find <name>                  # Find GameObjects
 u gameobject create <name>                # Create GameObject
 u gameobject modify -n <name> --position 0 1 0  # Modify transform
+u gameobject active -n <name> --active    # Activate GameObject
+u gameobject active -n <name> --no-active # Deactivate GameObject
 u gameobject delete <name>                # Delete GameObject
 
 # Component commands
 u component list <gameobject>             # List components
 u component inspect <gameobject> <type>   # Inspect properties
 u component add <gameobject> <type>       # Add component
+u component modify -t <go> -T <type> --prop <name> --value <val>  # Modify property
 u component remove <gameobject> <type>    # Remove component
 
 # Menu commands
@@ -70,6 +73,27 @@ u menu exec "Window/General/Console"      # Execute menu item
 u asset prefab <gameobject> <path>        # Create prefab
 u asset scriptable-object <type> <path>   # Create ScriptableObject
 u asset info <path>                       # Get asset info
+u asset deps <path>                       # Get dependencies
+u asset deps <path> --no-recursive        # Direct dependencies only
+u asset refs <path>                       # Get referencers
+
+# Package commands (via Relay)
+u package list                            # List installed packages
+u package add <name>@<version>            # Add package
+u package remove <name>                   # Remove package
+
+# Build commands
+u build settings                          # Show build settings
+u build run                               # Build with current settings
+u build run --target Android --output ./Builds/Android
+u build scenes                            # List build scenes
+
+# Profiler commands
+u profiler status                         # Profiler state
+u profiler start                          # Start profiling
+u profiler stop                           # Stop profiling
+u profiler snapshot                       # Current frame data
+u profiler frames -c 30                   # Last 30 frames summary
 
 # UI Toolkit tree commands (Playwright MCP-like ref ID system)
 u uitree dump                            # List all panels

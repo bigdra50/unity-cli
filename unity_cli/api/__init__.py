@@ -5,12 +5,15 @@ Re-exports all API classes for convenient imports:
 """
 
 from unity_cli.api.asset import AssetAPI
+from unity_cli.api.build import BuildAPI
 from unity_cli.api.component import ComponentAPI
 from unity_cli.api.console import ConsoleAPI
 from unity_cli.api.editor import EditorAPI
 from unity_cli.api.gameobject import GameObjectAPI
 from unity_cli.api.material import MaterialAPI
 from unity_cli.api.menu import MenuAPI
+from unity_cli.api.package import PackageAPI
+from unity_cli.api.profiler import ProfilerAPI
 from unity_cli.api.scene import SceneAPI
 from unity_cli.api.screenshot import ScreenshotAPI
 from unity_cli.api.selection import SelectionAPI
@@ -19,12 +22,15 @@ from unity_cli.api.uitree import UITreeAPI
 
 __all__ = [
     "AssetAPI",
+    "BuildAPI",
     "ComponentAPI",
     "ConsoleAPI",
     "EditorAPI",
     "GameObjectAPI",
     "MaterialAPI",
     "MenuAPI",
+    "PackageAPI",
+    "ProfilerAPI",
     "SceneAPI",
     "ScreenshotAPI",
     "SelectionAPI",

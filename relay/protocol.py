@@ -247,6 +247,7 @@ class ResponseMessage(Message):
     id: str = ""
     success: bool = True
     data: dict[str, Any] | None = None
+    error: dict[str, str] | None = None
 
 
 class ErrorMessage(Message):

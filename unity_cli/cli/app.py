@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -253,6 +253,43 @@ def refresh(ctx: typer.Context) -> None:
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
+
+
+# =============================================================================
+# Value Parser
+# =============================================================================
+
+
+def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any] | str:
+    """Parse a CLI string value into an appropriate Python type.
+
+    Handles: int, float, bool, JSON array, JSON object, or plain string.
+    """
+    import json
+
+    if raw.lower() == "true":
+        return True
+    if raw.lower() == "false":
+        return False
+
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+
+    try:
+        return float(raw)
+    except ValueError:
+        pass
+
+    if raw.startswith(("[", "{")):
+        try:
+            parsed: list[Any] | dict[str, Any] = json.loads(raw)
+            return parsed
+        except json.JSONDecodeError:
+            pass
+
+    return raw
 
 
 # =============================================================================
@@ -676,6 +713,38 @@ def gameobject_modify(
         raise typer.Exit(1) from None
 
 
+@gameobject_app.command("active")
+def gameobject_active(
+    ctx: typer.Context,
+    name: Annotated[str | None, typer.Option("--name", "-n", help="GameObject name")] = None,
+    id: Annotated[int | None, typer.Option("--id", help="Instance ID")] = None,
+    active: Annotated[
+        bool,
+        typer.Option("--active/--no-active", help="Set active (true) or inactive (false)"),
+    ] = True,
+) -> None:
+    """Set GameObject active state."""
+    context: CLIContext = ctx.obj
+
+    if not name and id is None:
+        print_error("--name or --id required")
+        raise typer.Exit(1) from None
+
+    try:
+        result = context.client.gameobject.set_active(
+            active=active,
+            name=name,
+            instance_id=id,
+        )
+        if context.json_mode:
+            print_json(result)
+        else:
+            print_success(result.get("message", f"Active set to {active}"))
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
 @gameobject_app.command("delete")
 def gameobject_delete(
     ctx: typer.Context,
@@ -781,6 +850,53 @@ def component_add(
             print_json(result)
         else:
             print_success(result.get("message", "Component added"))
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@component_app.command("modify")
+def component_modify(
+    ctx: typer.Context,
+    component_type: Annotated[str, typer.Option("--type", "-T", help="Component type name")],
+    prop: Annotated[str, typer.Option("--prop", "-p", help="Property name to modify")],
+    value: Annotated[
+        str,
+        typer.Option("--value", "-v", help="New value (auto-parsed: numbers, booleans, JSON arrays/objects)"),
+    ],
+    target: Annotated[str | None, typer.Option("--target", "-t", help="Target GameObject name")] = None,
+    target_id: Annotated[int | None, typer.Option("--target-id", help="Target GameObject ID")] = None,
+) -> None:
+    """Modify a component property.
+
+    Values are auto-parsed: integers, floats, booleans (true/false),
+    JSON arrays ([1,2,3]), and JSON objects ({"r":1,"g":0,"b":0}) are
+    converted to their appropriate types. Everything else is sent as a string.
+
+    Examples:
+        u component modify -t "Main Camera" -T Camera --prop fieldOfView --value 90
+        u component modify -t "Cube" -T Transform --prop m_LocalPosition --value "[1,2,3]"
+    """
+    context: CLIContext = ctx.obj
+
+    if not target and target_id is None:
+        print_error("--target or --target-id required")
+        raise typer.Exit(1) from None
+
+    parsed_value = _parse_cli_value(value)
+
+    try:
+        result = context.client.component.modify(
+            target=target,
+            target_id=target_id,
+            component_type=component_type,
+            prop=prop,
+            value=parsed_value,
+        )
+        if context.json_mode:
+            print_json(result)
+        else:
+            print_success(result.get("message", "Property modified"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1016,6 +1132,353 @@ def asset_refs(
                 for ref in refs:
                     console.print(f"  {ref.get('path')}")
                     console.print(f"    [dim]type: {ref.get('type')}[/dim]")
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+# =============================================================================
+# Build Commands
+# =============================================================================
+
+build_app = typer.Typer(help="Build pipeline commands")
+app.add_typer(build_app, name="build")
+
+
+@build_app.command("settings")
+def build_settings(ctx: typer.Context) -> None:
+    """Show current build settings."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.build.settings()
+        if context.json_mode:
+            print_json(result)
+        else:
+            from rich.table import Table
+
+            table = Table(title="Build Settings")
+            table.add_column("Key", style="cyan")
+            table.add_column("Value")
+            table.add_row("Target", result.get("target", ""))
+            table.add_row("Target Group", result.get("targetGroup", ""))
+            table.add_row("Product Name", result.get("productName", ""))
+            table.add_row("Company Name", result.get("companyName", ""))
+            table.add_row("Bundle Version", result.get("bundleVersion", ""))
+            table.add_row("Scripting Backend", result.get("scriptingBackend", ""))
+            scenes = result.get("scenes", [])
+            table.add_row("Scenes", str(len(scenes)))
+            console.print(table)
+
+            if scenes:
+                console.print()
+                for i, s in enumerate(scenes):
+                    console.print(f"  {i}: {s}")
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@build_app.command("run")
+def build_run(
+    ctx: typer.Context,
+    target: Annotated[
+        str | None,
+        typer.Option("--target", "-t", help="BuildTarget (e.g., StandaloneWindows64, Android, WebGL)"),
+    ] = None,
+    output: Annotated[
+        str | None,
+        typer.Option("--output", "-o", help="Output path"),
+    ] = None,
+    scenes: Annotated[
+        list[str] | None,
+        typer.Option("--scene", "-s", help="Scene paths to include (repeatable)"),
+    ] = None,
+) -> None:
+    """Run a build."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.build.build(
+            target=target,
+            output_path=output,
+            scenes=scenes,
+        )
+        if context.json_mode:
+            print_json(result)
+        else:
+            build_result = result.get("result", "Unknown")
+            if build_result == "Succeeded":
+                print_success(f"Build succeeded: {result.get('outputPath', '')}")
+            else:
+                print_error(f"Build {build_result}", "BUILD_FAILED")
+
+            total_time = result.get("totalTime", 0)
+            total_size = result.get("totalSize", 0)
+            console.print(f"  Time: {total_time:.1f}s")
+            console.print(f"  Size: {total_size} bytes")
+            console.print(f"  Target: {result.get('target', '')}")
+            console.print(f"  Errors: {result.get('totalErrors', 0)}")
+            console.print(f"  Warnings: {result.get('totalWarnings', 0)}")
+
+            messages = result.get("messages", [])
+            if messages:
+                console.print()
+                for msg in messages:
+                    style = "red" if msg.get("type") == "Error" else "yellow"
+                    console.print(f"  [{style}]{msg.get('type')}: {msg.get('content')}[/{style}]")
+
+            if build_result != "Succeeded":
+                raise typer.Exit(1) from None
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@build_app.command("scenes")
+def build_scenes(ctx: typer.Context) -> None:
+    """List build scenes."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.build.scenes()
+        if context.json_mode:
+            print_json(result)
+        else:
+            from rich.table import Table
+
+            scenes_list = result.get("scenes", [])
+            table = Table(title=f"Build Scenes ({len(scenes_list)})")
+            table.add_column("#", style="dim", width=3)
+            table.add_column("Path", style="cyan")
+            table.add_column("Enabled")
+            table.add_column("GUID", style="dim")
+            for i, s in enumerate(scenes_list):
+                enabled = "[green]yes[/green]" if s.get("enabled") else "[red]no[/red]"
+                table.add_row(str(i), s.get("path", ""), enabled, s.get("guid", ""))
+            console.print(table)
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+# =============================================================================
+# Package Commands (via Relay)
+# =============================================================================
+
+package_app = typer.Typer(help="Package Manager commands (via Relay)")
+app.add_typer(package_app, name="package")
+
+
+@package_app.command("list")
+def package_list(
+    ctx: typer.Context,
+) -> None:
+    """List installed packages."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.package.list()
+        if context.json_mode:
+            print_json(result)
+        else:
+            from rich.table import Table
+
+            packages = result.get("packages", [])
+            table = Table(title=f"Packages ({len(packages)})")
+            table.add_column("Name", style="cyan")
+            table.add_column("Version")
+            table.add_column("Display Name")
+            table.add_column("Source")
+            for pkg in packages:
+                table.add_row(
+                    pkg.get("name", ""),
+                    pkg.get("version", ""),
+                    pkg.get("displayName", ""),
+                    pkg.get("source", ""),
+                )
+            console.print(table)
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@package_app.command("add")
+def package_add(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Package ID (e.g., com.unity.textmeshpro@3.0.6)")],
+) -> None:
+    """Add a package."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.package.add(name)
+        if context.json_mode:
+            print_json(result)
+        else:
+            print_success(result.get("message", f"Package added: {name}"))
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@package_app.command("remove")
+def package_remove(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Package name (e.g., com.unity.textmeshpro)")],
+) -> None:
+    """Remove a package."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.package.remove(name)
+        if context.json_mode:
+            print_json(result)
+        else:
+            print_success(result.get("message", f"Package removed: {name}"))
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+# =============================================================================
+# Profiler Commands
+# =============================================================================
+
+profiler_app = typer.Typer(help="Profiler commands")
+app.add_typer(profiler_app, name="profiler")
+
+
+@profiler_app.command("status")
+def profiler_status(ctx: typer.Context) -> None:
+    """Get profiler status."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.profiler.status()
+        if context.json_mode:
+            print_json(result)
+        else:
+            enabled = result.get("enabled", False)
+            status_text = "[green]running[/green]" if enabled else "[dim]stopped[/dim]"
+            console.print(f"Profiler: {status_text}")
+            console.print(f"Frame range: {result.get('firstFrameIndex', -1)} - {result.get('lastFrameIndex', -1)}")
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@profiler_app.command("start")
+def profiler_start(ctx: typer.Context) -> None:
+    """Start profiling."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.profiler.start()
+        if context.json_mode:
+            print_json(result)
+        else:
+            print_success(result.get("message", "Profiler started"))
+            warning = result.get("warning")
+            if warning:
+                err_console.print(f"[yellow]{warning}[/yellow]")
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@profiler_app.command("stop")
+def profiler_stop(ctx: typer.Context) -> None:
+    """Stop profiling."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.profiler.stop()
+        if context.json_mode:
+            print_json(result)
+        else:
+            print_success(result.get("message", "Profiler stopped"))
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@profiler_app.command("snapshot")
+def profiler_snapshot(ctx: typer.Context) -> None:
+    """Get current frame profiler data."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.profiler.snapshot()
+        if context.json_mode:
+            print_json(result)
+        else:
+            from rich.table import Table
+
+            table = Table(title=f"Frame {result.get('frameIndex', '?')}")
+            table.add_column("Metric")
+            table.add_column("Value", justify="right")
+
+            display_keys = [
+                ("fps", "FPS"),
+                ("cpuFrameTimeMs", "CPU Frame Time"),
+                ("cpuRenderThreadTimeMs", "CPU Render Thread"),
+                ("gpuFrameTimeMs", "GPU Frame Time"),
+                ("batches", "Batches"),
+                ("drawCalls", "Draw Calls"),
+                ("triangles", "Triangles"),
+                ("vertices", "Vertices"),
+                ("setPassCalls", "SetPass Calls"),
+                ("gcAllocCount", "GC Alloc Count"),
+                ("gcAllocBytes", "GC Alloc Bytes"),
+            ]
+
+            for key, label in display_keys:
+                value = result.get(key)
+                if value is not None:
+                    table.add_row(label, str(value))
+
+            console.print(table)
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@profiler_app.command("frames")
+def profiler_frames(
+    ctx: typer.Context,
+    count: Annotated[
+        int,
+        typer.Option("--count", "-c", help="Number of frames to retrieve"),
+    ] = 10,
+) -> None:
+    """Get recent N frames summary."""
+    context: CLIContext = ctx.obj
+    try:
+        result = context.client.profiler.frames(count=count)
+        if context.json_mode:
+            print_json(result)
+        else:
+            frames = result.get("frames", [])
+            if not frames:
+                console.print("[dim]No profiler frames available[/dim]")
+                return
+
+            from rich.table import Table
+
+            table = Table(
+                title=f"Profiler Frames ({result.get('firstFrameIndex', '?')}-{result.get('lastFrameIndex', '?')})"
+            )
+            table.add_column("Frame", justify="right")
+            table.add_column("FPS", justify="right")
+            table.add_column("CPU (ms)", justify="right")
+            table.add_column("GPU (ms)", justify="right")
+            table.add_column("Batches", justify="right")
+            table.add_column("Draw Calls", justify="right")
+            table.add_column("GC Alloc", justify="right")
+
+            for frame in frames:
+                table.add_row(
+                    str(frame.get("frameIndex", "")),
+                    str(frame.get("fps", "-")),
+                    str(frame.get("cpuFrameTimeMs", "-")),
+                    str(frame.get("gpuFrameTimeMs", "-")),
+                    str(frame.get("batches", "-")),
+                    str(frame.get("drawCalls", "-")),
+                    str(frame.get("gcAllocBytes", "-")),
+                )
+
+            console.print(table)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None

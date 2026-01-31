@@ -585,6 +585,7 @@ class RelayServer:
                 id=request_id,
                 success=result.get("success", False),
                 data=result.get("data"),
+                error=result.get("error"),
             ).to_dict()
 
         except TimeoutError:
