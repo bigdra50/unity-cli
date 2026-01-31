@@ -606,7 +606,6 @@ namespace UnityBridge.Tools
                 ["flexDirection"] = style.flexDirection.ToString(),
                 ["opacity"] = style.opacity,
                 ["visibility"] = style.visibility.ToString(),
-                ["overflow"] = style.overflow.ToString(),
                 ["marginTop"] = style.marginTop,
                 ["marginBottom"] = style.marginBottom,
                 ["marginLeft"] = style.marginLeft,
