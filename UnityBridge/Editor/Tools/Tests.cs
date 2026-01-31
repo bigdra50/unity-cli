@@ -66,7 +66,7 @@ namespace UnityBridge.Tools
             }
         }
 
-        private static async Task<JObject> RunTestsAsync(JObject parameters)
+        private static Task<JObject> RunTestsAsync(JObject parameters)
         {
             if (_activeCollector != null && !_activeCollector.IsComplete)
             {
@@ -161,7 +161,7 @@ namespace UnityBridge.Tools
                     var result = BuildResultJson(_activeCollector);
                     Api.UnregisterCallbacks(_activeCollector);
                     _activeCollector = null;
-                    return result;
+                    return Task.FromResult(result);
                 }
 
                 // Async execution - wait for completion using TaskCompletionSource
@@ -178,12 +178,12 @@ namespace UnityBridge.Tools
 
                 // Return immediately with async hint for non-blocking behavior
                 // The caller can use 'status' action to poll for results
-                return new JObject
+                return Task.FromResult(new JObject
                 {
                     ["message"] = $"Test run started ({mode} mode)",
                     ["async"] = true,
                     ["hint"] = "Use 'status' action to check progress and get results"
-                };
+                });
             }
             catch
             {

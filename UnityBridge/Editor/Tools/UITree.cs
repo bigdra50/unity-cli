@@ -393,7 +393,7 @@ namespace UnityBridge.Tools
         {
             var results = new List<PanelInfo>();
 
-            var uiDocuments = UnityEngine.Object.FindObjectsOfType<UIDocument>();
+            var uiDocuments = UnityEngine.Object.FindObjectsByType<UIDocument>(FindObjectsSortMode.None);
 
             foreach (var doc in uiDocuments)
             {

@@ -161,7 +161,9 @@ namespace UnityBridge.Tools
                 try
                 {
                     var id = ProfilerDriver.GetStatisticsIdentifierForArea(area, name);
+#pragma warning disable CS0618 // GetFormattedCounterValue signature differs across Unity versions
                     var value = ProfilerDriver.GetFormattedStatisticsValue(frameIndex, id);
+#pragma warning restore CS0618
                     if (!string.IsNullOrEmpty(value))
                         result[key] = value;
                 }
