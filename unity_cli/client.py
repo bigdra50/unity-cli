@@ -385,7 +385,10 @@ class RelayConnection:
 
         if msg_type == "RESPONSE":
             if not response.get("success", False):
-                raise UnityCLIError(f"{command} failed", "COMMAND_FAILED")
+                error_info = response.get("error", {})
+                error_msg = error_info.get("message", f"{command} failed") if error_info else f"{command} failed"
+                error_code = error_info.get("code", "COMMAND_FAILED") if error_info else "COMMAND_FAILED"
+                raise UnityCLIError(error_msg, error_code)
             data: dict[str, Any] = response.get("data", {})
             return data
 
