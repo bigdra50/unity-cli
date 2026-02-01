@@ -414,7 +414,7 @@ A Claude Code plugin is available for Unity development workflow automation. Add
 claude plugin add /marketplace/unity-cli
 ```
 
-Provides skills (`/preflight`, `/debug`, `/ui`, etc.) and agents for Unity development with Claude Code.
+Provides skills (`/unity-preflight`, `/unity-debug`, `/unity-ui`, etc.) and agents for Unity development with Claude Code.
 
 ## Architecture
 

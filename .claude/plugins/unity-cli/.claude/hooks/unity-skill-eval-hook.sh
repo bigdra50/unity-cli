@@ -20,22 +20,22 @@ cat << 'EOF'
 
 | キーワード | スキル | 用途 |
 |-----------|--------|------|
-| コンパイル, テスト, 検証, verify | /preflight | Refresh→Compile→EditModeTest |
-| エラー, バグ, 調査, debug, 例外 | /debug | ErrorCapture→Classification→Analysis |
-| ビルド, build, apk, aab | /build | Build実行 |
-| シーン, scene, GameObject配置 | /scene | シーン構築（YAML フォールバック対応） |
-| アセット, asset, 依存関係, prefab | /asset | アセット管理（YAML フォールバック対応） |
-| パフォーマンス, 最適化, profiler | /perf | Profiler実行→分析 |
-| UI, VisualElement, Canvas, uGUI | /ui | UI 検査（UI Toolkit + uGUI 対応） |
+| コンパイル, テスト, 検証, verify | /unity-preflight | Refresh→Compile→EditModeTest |
+| エラー, バグ, 調査, debug, 例外 | /unity-debug | ErrorCapture→Classification→Analysis |
+| ビルド, build, apk, aab | /unity-build | Build実行 |
+| シーン, scene, GameObject配置 | /unity-scene | シーン構築（YAML フォールバック対応） |
+| アセット, asset, 依存関係, prefab | /unity-asset | アセット管理（YAML フォールバック対応） |
+| パフォーマンス, 最適化, profiler | /unity-perf | Profiler実行→分析 |
+| UI, VisualElement, Canvas, uGUI | /unity-ui | UI 検査（UI Toolkit + uGUI 対応） |
 
 ### Layer 1 シグナル（API 操作 - エラーコード）
 
 | パターン | 対応 |
 |---------|------|
-| CS0029, CS0030, CS0266 | 型変換エラー → /debug |
-| CS0103, CS0246, CS0234 | 名前解決エラー → /debug |
-| NullReferenceException | Null参照 → /debug |
-| MissingReferenceException | 破棄オブジェクト参照 → /debug |
+| CS0029, CS0030, CS0266 | 型変換エラー → /unity-debug |
+| CS0103, CS0246, CS0234 | 名前解決エラー → /unity-debug |
+| NullReferenceException | Null参照 → /unity-debug |
+| MissingReferenceException | 破棄オブジェクト参照 → /unity-debug |
 
 ## STEP 2: スキル読み込み
 

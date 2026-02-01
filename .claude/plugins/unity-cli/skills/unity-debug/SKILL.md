@@ -1,5 +1,5 @@
 ---
-name: debug
+name: unity-debug
 description: |
   Unityランタイムエラーのデバッグ調査ワークフロー。コンソールログ分析→シーン階層確認→GameObject/Component検査→スクリーンショット記録の手順でエラー原因を特定する。
   Use for: "バグ調べて", "エラー原因を特定", "ランタイムエラー", "NullReference", "デバッグ", "debug"
@@ -77,11 +77,11 @@ u console get -l +E+X -f "MissingReference"        # Missing のみ
 | NullReferenceException | `NullReference` | 該当オブジェクトの存在確認 (Step 3) |
 | MissingReferenceException | `MissingReference` | 破棄済みオブジェクトの参照調査 |
 | MissingComponentException | `MissingComponent` | コンポーネント有無の確認 |
-| コンパイルエラー (CS####) | `error CS` | ソースコード修正 → /preflight |
+| コンパイルエラー (CS####) | `error CS` | ソースコード修正 → /unity-preflight |
 | Assembly参照エラー | `.asmdef` | asmdef 設定確認 |
 | アセット依存エラー | `Failed to load` | asset deps/refs で依存調査 |
 
-コンパイルエラーの場合は /preflight に切り替える。
+コンパイルエラーの場合は /unity-preflight に切り替える。
 
 ### Step 3: Context Gathering
 
@@ -134,7 +134,7 @@ u console get -l +W -c 5     # 直近の Warning も確認
 ## Investigation Rules
 
 - 1回の調査で解決しない場合、収集した情報をまとめてユーザーに報告する
-- コード修正が必要な場合は修正後 /preflight を実行
+- コード修正が必要な場合は修正後 /unity-preflight を実行
 - 推測による修正は避け、エビデンスに基づく
 - `console get` のトークンコストに注意: `-c` で件数制限、`-f` でフィルタ
 

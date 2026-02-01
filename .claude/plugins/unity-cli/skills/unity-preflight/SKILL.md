@@ -1,5 +1,5 @@
 ---
-name: preflight
+name: unity-preflight
 description: |
   C#スクリプト編集後のpreflight検証。refresh→コンパイル待機→エラーチェック→EditModeテスト→ランタイムチェックを一連で実行し、エラー時は修正ループを回す。
   Use for: "ビルド検証", "スクリプト変更を検証", "コンパイル確認してテストして", "実装を検証", "preflight"

@@ -6,5 +6,5 @@
     "name": "bigdra50"
   },
   "repository": "https://github.com/bigdra50/unity-cli",
-  "hooks": "../hooks/hooks.json"
+  "hooks": "./hooks/hooks.json"
 }
