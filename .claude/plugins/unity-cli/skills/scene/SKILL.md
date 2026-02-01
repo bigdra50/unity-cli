@@ -1,5 +1,5 @@
 ---
-name: uscene
+name: scene
 description: |
   Unityシーン構築・管理ワークフロー。オブジェクト配置→コンポーネント設定→Transform調整→Prefab化→シーン保存を一連で実行する。
   Use for: "シーンに配置して", "オブジェクト作って", "Prefab化して", "コンポーネント設定して", "シーン構築"
@@ -295,7 +295,7 @@ GameObject:
 
 | スキル | 関係 |
 |--------|------|
-| uverify | シーン構築中に C# を編集した場合のビルド検証 |
-| udebug | シーン実行時のランタイムエラー調査 |
-| uui | UI Toolkit 要素の配置・検査 |
-| uasset | アセット依存関係・YAML フォールバック共通 |
+| preflight | シーン構築中に C# を編集した場合のビルド検証 |
+| debug | シーン実行時のランタイムエラー調査 |
+| ui | UI Toolkit 要素の配置・検査 |
+| asset | アセット依存関係・YAML フォールバック共通 |

@@ -19,25 +19,25 @@ Unity 開発に関する質問を分析し、適切なスキルまたはエー�
 
 | キーワード | スキル | 用途 |
 |-----------|--------|------|
-| コンパイル, テスト, 検証, verify, test | /uverify | Refresh→Compile→Test 実行 |
-| エラー, バグ, 調査, debug, exception | /udebug | エラー調査・分類・分析 |
-| ビルド, build, apk, aab, player | /ubuild | ビルドパイプライン |
-| シーン, scene, hierarchy, gameobject配置 | /uscene | シーン構築・編集 |
-| アセット, asset, prefab, 依存関係, deps | /uasset | アセット管理・依存調査 |
-| パフォーマンス, 最適化, profiler, fps | /uperf | プロファイラ実行・分析 |
-| UI, VisualElement, Canvas, uGUI, UXML | /uui | UI 検査・開発 |
+| コンパイル, テスト, 検証, verify, test | /preflight | Refresh→Compile→Test 実行 |
+| エラー, バグ, 調査, debug, exception | /debug | エラー調査・分類・分析 |
+| ビルド, build, apk, aab, player | /build | ビルドパイプライン |
+| シーン, scene, hierarchy, gameobject配置 | /scene | シーン構築・編集 |
+| アセット, asset, prefab, 依存関係, deps | /asset | アセット管理・依存調査 |
+| パフォーマンス, 最適化, profiler, fps | /perf | プロファイラ実行・分析 |
+| UI, VisualElement, Canvas, uGUI, UXML | /ui | UI 検査・開発 |
 
 ### エラーコード → スキルマッピング
 
 | エラーパターン | スキル |
 |--------------|--------|
-| CS0029, CS0030, CS0266 (型変換) | /udebug |
-| CS0103, CS0246, CS0234 (名前解決) | /udebug |
-| CS1061, CS0117 (メンバー不明) | /udebug |
-| CS0120, CS0176 (static/instance混同) | /udebug |
-| NullReferenceException | /udebug |
-| MissingReferenceException | /udebug |
-| MissingComponentException | /udebug |
+| CS0029, CS0030, CS0266 (型変換) | /debug |
+| CS0103, CS0246, CS0234 (名前解決) | /debug |
+| CS1061, CS0117 (メンバー不明) | /debug |
+| CS0120, CS0176 (static/instance混同) | /debug |
+| NullReferenceException | /debug |
+| MissingReferenceException | /debug |
+| MissingComponentException | /debug |
 
 ### エージェント
 
@@ -64,32 +64,32 @@ Unity 開発に関する質問を分析し、適切なスキルまたはエー�
 
 ## 優先順位
 
-1. エラー調査 (/udebug) - CS コード、例外名がある場合
-2. 検証 (/uverify) - テスト・コンパイル確認が必要な場合
-3. ビルド (/ubuild) - ビルド関連の場合
-4. シーン (/uscene) - シーン構築・GameObject 操作の場合
-5. アセット (/uasset) - アセット管理・依存関係の場合
-6. UI (/uui) - UI 開発の場合
-7. パフォーマンス (/uperf) - 最適化・プロファイリングの場合
+1. エラー調査 (/debug) - CS コード、例外名がある場合
+2. 検証 (/preflight) - テスト・コンパイル確認が必要な場合
+3. ビルド (/build) - ビルド関連の場合
+4. シーン (/scene) - シーン構築・GameObject 操作の場合
+5. アセット (/asset) - アセット管理・依存関係の場合
+6. UI (/ui) - UI 開発の場合
+7. パフォーマンス (/perf) - 最適化・プロファイリングの場合
 
 ## 使用例
 
 ```
 Q: "CS0246 エラーが出ています"
-→ Layer 1 シグナル検出 → /udebug
+→ Layer 1 シグナル検出 → /debug
 
 Q: "ビルドが通らない"
-→ ビルド + エラー → /udebug 優先 (エラー調査が先)
-→ 解決後 → /ubuild
+→ ビルド + エラー → /debug 優先 (エラー調査が先)
+→ 解決後 → /build
 
 Q: "シーンにオブジェクトを配置したい"
-→ /uscene
+→ /scene
 
 Q: "Transform の使い方を教えて"
 → API 詳細 → unity-guide エージェント
 
 Q: "FPS が低い、重い"
-→ /uperf
+→ /perf
 ```
 
 ## 複合ケース
@@ -102,7 +102,7 @@ Q: "FPS が低い、重い"
 
 ```
 Q: "ビルドエラーを直してテストを通したい"
-→ 1. /udebug (エラー調査・修正)
-→ 2. /uverify (テスト実行)
-→ 3. /ubuild (ビルド実行)
+→ 1. /debug (エラー調査・修正)
+→ 2. /preflight (テスト実行)
+→ 3. /build (ビルド実行)
 ```

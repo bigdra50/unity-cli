@@ -45,13 +45,13 @@ rust-skills の設計パターンを参考に、unity-cli の skills を再設�
 
 | スキル | 用途 | 主要機能 |
 |--------|------|---------|
-| ubuild | ビルドパイプライン | Refresh→Compile→Build実行 |
-| uverify | コード検証 | Refresh→Compile→EditModeTest→RuntimeCheck |
-| udebug | エラー調査 | ErrorCapture→Classification→ContextGathering |
-| uscene | シーン構築 | GameObject配置→Component設定→Prefab化 |
-| uasset | アセット管理 | 依存関係調査→参照確認→問題検出 |
-| uui | UI Toolkit | VisualElement検査→開発イテレーション |
-| uperf | パフォーマンス | Profiler実行→フレームデータ取得→分析 |
+| build | ビルドパイプライン | Refresh→Compile→Build実行 |
+| preflight | コード検証 | Refresh→Compile→EditModeTest→RuntimeCheck |
+| debug | エラー調査 | ErrorCapture→Classification→ContextGathering |
+| scene | シーン構築 | GameObject配置→Component設定→Prefab化 |
+| asset | アセット管理 | 依存関係調査→参照確認→問題検出 |
+| ui | UI Toolkit | VisualElement検査→開発イテレーション |
+| perf | パフォーマンス | Profiler実行→フレームデータ取得→分析 |
 
 ※ unity-csharp は削除（コーディング規約はユーザーの rules/ で定義）
 
@@ -205,13 +205,13 @@ STEP 4: OUTPUT FORMAT
 
 ```
 Layer 2: Workflow (WHAT) - 既存スキル（そのまま活用）
-├── ubuild              # ビルドパイプライン
-├── uscene              # シーン構築 (YAML直接編集フォールバック付き)
-├── udebug              # エラー調査
-├── uverify             # コード検証（コンパイル・テスト）
-├── uperf               # パフォーマンス最適化
-├── uui                 # UI Toolkit ※uGUI 対応を追加検討
-└── uasset              # アセット管理 (YAML直接編集フォールバック付き)
+├── build              # ビルドパイプライン
+├── scene              # シーン構築 (YAML直接編集フォールバック付き)
+├── debug              # エラー調査
+├── preflight             # コード検証（コンパイル・テスト）
+├── perf               # パフォーマンス最適化
+├── ui                 # UI Toolkit ※uGUI 対応を追加検討
+└── asset              # アセット管理 (YAML直接編集フォールバック付き)
 
 Layer 3: Domain (プロジェクト固有 - ユーザーが追加)
 └── (ユーザーがプロジェクトの .claude/plugins/ に追加)
@@ -223,7 +223,7 @@ Layer 1: なし（削除）
 
 #### YAML 直接編集フォールバック
 
-uscene、uasset スキルは以下の方針で YAML を扱う:
+scene、asset スキルは以下の方針で YAML を扱う:
 
 1. 通常は unity-cli 経由で Unity エディタを操作
 2. unity-cli が対応していない操作の場合は YAML を直接編集
@@ -366,7 +366,7 @@ Claude が注入された指令に従って動作
 #### 実装ファイル
 
 ```
-.claude/plugins/unity-workflow/
+.claude/plugins/unity-cli/
 ├── hooks/
 │   └── hooks.json                    # キーワードマッチング設定
 ├── .claude/hooks/
@@ -417,13 +417,13 @@ cat << 'EOF'
 
 | キーワード | スキル | 用途 |
 |-----------|--------|------|
-| コンパイル, テスト, 検証 | uverify | Refresh→Compile→Test |
-| エラー, バグ, 調査 | udebug | ErrorCapture→Analysis |
-| ビルド | ubuild | Build実行 |
-| シーン, GameObject | uscene | シーン構築 |
-| アセット, 依存関係 | uasset | アセット管理 |
-| パフォーマンス, 最適化 | uperf | Profiler実行 |
-| UI, VisualElement | uui | UI Toolkit検査 |
+| コンパイル, テスト, 検証 | preflight | Refresh→Compile→Test |
+| エラー, バグ, 調査 | debug | ErrorCapture→Analysis |
+| ビルド | build | Build実行 |
+| シーン, GameObject | scene | シーン構築 |
+| アセット, 依存関係 | asset | アセット管理 |
+| パフォーマンス, 最適化 | perf | Profiler実行 |
+| UI, VisualElement | ui | UI Toolkit検査 |
 
 API詳細が必要な場合は unity-guide エージェントを使用。
 EOF
@@ -442,8 +442,8 @@ EOF
 - [ ] `rules/unity-router.md` にルーター優先ルール追加（プラグイン内、自動読み込み）
 
 ### Step 2: 既存スキルの強化
-- [ ] uui に uGUI 対応を追加（または分割検討）
-- [ ] uscene, uasset に YAML フォールバックを追加
+- [ ] ui に uGUI 対応を追加（または分割検討）
+- [ ] scene, asset に YAML フォールバックを追加
 - [ ] 各スキルに unity-guide エージェント連携を追加
 
 ### Step 3: unity-csharp の削除
@@ -457,7 +457,7 @@ EOF
 
 ```
 /Users/bigdra/dev/github.com/bigdra50/unity-cli/
-└── .claude/plugins/unity-workflow/
+└── .claude/plugins/unity-cli/
     ├── hooks/
     │   └── hooks.json           # キーワードマッチング設定
     ├── .claude/hooks/
@@ -501,16 +501,16 @@ nowsprinting/claude-code-settings-for-unity は、Unity プロジェクト用の
 ### ワークフローテスト（ユーザーの使い方に沿った検証）
 
 1. **実装 → 検証サイクル**
-   - C# ファイル編集 → Hook が uverify をトリガー
-   - uverify: Refresh → Compile → EditModeTest → 結果確認
+   - C# ファイル編集 → Hook が preflight をトリガー
+   - preflight: Refresh → Compile → EditModeTest → 結果確認
 
 2. **エラー調査サイクル**
-   - エラー報告 → Hook が udebug をトリガー
-   - udebug: ErrorCapture → Classification → ContextGathering → 分析
+   - エラー報告 → Hook が debug をトリガー
+   - debug: ErrorCapture → Classification → ContextGathering → 分析
 
 3. **シーン構築サイクル**
-   - シーン構築依頼 → Hook が uscene をトリガー
-   - uscene: Survey → Create → Configure → Save
+   - シーン構築依頼 → Hook が scene をトリガー
+   - scene: Survey → Create → Configure → Save
 
 ### Hook・Router 検証
 

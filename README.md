@@ -406,6 +406,16 @@ u config init --force                  # Overwrite existing
 | `--page-size` | Page size | 50 |
 | `--cursor` | Pagination cursor | 0 |
 
+## Claude Code Plugin (Experimental)
+
+A Claude Code plugin is available for Unity development workflow automation. Add it with:
+
+```bash
+claude plugin add /marketplace/unity-cli
+```
+
+Provides skills (`/preflight`, `/debug`, `/ui`, etc.) and agents for Unity development with Claude Code.
+
 ## Architecture
 
 ```mermaid

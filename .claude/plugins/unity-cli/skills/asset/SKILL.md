@@ -1,5 +1,5 @@
 ---
-name: uasset
+name: asset
 description: |
   Unityアセット管理ワークフロー。依存関係の把握、不要アセット検出、参照整合性チェックを行う。パッケージの追加・削除も対応。
   Use for: "依存関係を調べて", "不要アセット", "参照確認", "パッケージ追加", "アセット管理"
@@ -31,7 +31,7 @@ uvx --from git+https://github.com/bigdra50/unity-cli u <command>
 | 不要アセットを探したい | Investigation Flow → 全体スキャン |
 | パッケージを追加・削除したい | Package Management |
 | ビルドサイズを調べたい | Investigation Flow → Dependency Analysis |
-| 参照切れを修復したい | Reference Check → 修正 → /uverify |
+| 参照切れを修復したい | Reference Check → 修正 → /preflight |
 
 ## Investigation Flow
 
@@ -197,13 +197,13 @@ u package remove com.unity.textmeshpro
 
 ### パッケージ操作後の検証
 
-パッケージ変更後は /uverify で検証する:
+パッケージ変更後は /preflight で検証する:
 
 ```
 u package add/remove ...
   │
   ▼
-/uverify (コンパイル確認 → テスト)
+/preflight (コンパイル確認 → テスト)
 ```
 
 ## Result Report Format
@@ -237,7 +237,7 @@ u package add/remove ...
 |----|------|------|
 | refs を確認せずアセット削除 | 参照元がある場合に参照切れが発生 | 必ず `refs` で参照元を確認 |
 | deps を再帰で全取得 | ツリーが大きいとトークンを大量消費 | まず `--no-recursive` で直接依存を確認 |
-| package add 後に検証しない | コンパイルエラーに気付かない | 追加後は /uverify を実行 |
+| package add 後に検証しない | コンパイルエラーに気付かない | 追加後は /preflight を実行 |
 | 未使用判定を refs だけで行う | Resources/Addressables 経由の動的参照を見逃す | ユーザーに動的参照の有無を確認 |
 | 大量アセットを一括調査 | トークン消費が膨大になる | 対象を絞って段階的に調査 |
 
@@ -368,5 +368,5 @@ m_Script: {fileID: 11500000, guid: abcd1234, type: 3}
 
 | スキル | 関係 |
 |--------|------|
-| uverify | パッケージ変更後・参照切れ修正後のビルド検証 |
-| uscene | シーン内オブジェクトのアセット参照確認・YAML フォールバック共通 |
+| preflight | パッケージ変更後・参照切れ修正後のビルド検証 |
+| scene | シーン内オブジェクトのアセット参照確認・YAML フォールバック共通 |

@@ -1,5 +1,5 @@
 ---
-name: uui
+name: ui
 description: |
   UI 開発ドメインスキル。UI Toolkit と uGUI の両方に対応。ビジュアルツリー検査と開発イテレーション（作成→Play確認→修正ループ）を提供する。
   Use for: "UI確認", "UIツリー", "UI Toolkit検査", "UI作って", "UI修正して", "UIレイアウト", "VisualElement調べて", "Canvas", "uGUI", "Image", "Text", "Button"
@@ -372,6 +372,6 @@ Edit UI (Script / Inspector)
 
 | スキル | 使い分け |
 |--------|---------|
-| /uverify | UIコード修正後のコンパイルエラーが解決しない場合 |
-| /udebug | UI操作時のランタイムエラー（NullRef等）を調査する場合 |
-| /uscene | UI オブジェクトの配置・Transform 調整 |
+| /preflight | UIコード修正後のコンパイルエラーが解決しない場合 |
+| /debug | UI操作時のランタイムエラー（NullRef等）を調査する場合 |
+| /scene | UI オブジェクトの配置・Transform 調整 |

@@ -1,12 +1,12 @@
 ---
-name: uverify
+name: preflight
 description: |
-  C#スクリプト編集後のビルド検証ワークフロー。refresh→コンパイル待機→エラーチェック→EditModeテスト→ランタイムチェックを一連で実行し、エラー時は修正ループを回す。
-  Use for: "ビルド検証", "スクリプト変更を検証", "コンパイル確認してテストして", "実装を検証", "verify"
+  C#スクリプト編集後のpreflight検証。refresh→コンパイル待機→エラーチェック→EditModeテスト→ランタイムチェックを一連で実行し、エラー時は修正ループを回す。
+  Use for: "ビルド検証", "スクリプト変更を検証", "コンパイル確認してテストして", "実装を検証", "preflight"
 user-invocable: true
 ---
 
-# Unity Verification Workflow
+# Unity Preflight Check
 
 C#スクリプト編集後の検証を一連で実行するワークフロー。
 
