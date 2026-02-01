@@ -1,5 +1,5 @@
 ---
-name: uasset
+name: unity-asset
 description: |
   Unityアセット管理ワークフロー。依存関係の把握、不要アセット検出、参照整合性チェックを行う。パッケージの追加・削除も対応。
   Use for: "依存関係を調べて", "不要アセット", "参照確認", "パッケージ追加", "アセット管理"
@@ -31,7 +31,7 @@ uvx --from git+https://github.com/bigdra50/unity-cli u <command>
 | 不要アセットを探したい | Investigation Flow → 全体スキャン |
 | パッケージを追加・削除したい | Package Management |
 | ビルドサイズを調べたい | Investigation Flow → Dependency Analysis |
-| 参照切れを修復したい | Reference Check → 修正 → /uverify |
+| 参照切れを修復したい | Reference Check → 修正 → /unity-preflight |
 
 ## Investigation Flow
 
@@ -197,13 +197,13 @@ u package remove com.unity.textmeshpro
 
 ### パッケージ操作後の検証
 
-パッケージ変更後は /uverify で検証する:
+パッケージ変更後は /unity-preflight で検証する:
 
 ```
 u package add/remove ...
   │
   ▼
-/uverify (コンパイル確認 → テスト)
+/unity-preflight (コンパイル確認 → テスト)
 ```
 
 ## Result Report Format
@@ -237,7 +237,7 @@ u package add/remove ...
 |----|------|------|
 | refs を確認せずアセット削除 | 参照元がある場合に参照切れが発生 | 必ず `refs` で参照元を確認 |
 | deps を再帰で全取得 | ツリーが大きいとトークンを大量消費 | まず `--no-recursive` で直接依存を確認 |
-| package add 後に検証しない | コンパイルエラーに気付かない | 追加後は /uverify を実行 |
+| package add 後に検証しない | コンパイルエラーに気付かない | 追加後は /unity-preflight を実行 |
 | 未使用判定を refs だけで行う | Resources/Addressables 経由の動的参照を見逃す | ユーザーに動的参照の有無を確認 |
 | 大量アセットを一括調査 | トークン消費が膨大になる | 対象を絞って段階的に調査 |
 
@@ -250,9 +250,123 @@ u package add/remove ...
 | refs の結果が膨大 | 参照元の種類（Scene/Prefab/Material）で分類して報告 |
 | package list が長い | `project packages` でファイルベースの確認に切り替え |
 
+---
+
+## YAML Fallback
+
+unity-cli が対応していないアセット操作は YAML 直接編集で対応する。
+
+### 対象ファイル
+
+| 拡張子 | 内容 | 用途例 |
+|--------|------|--------|
+| `.meta` | アセットメタデータ | インポート設定変更 |
+| `.asset` | ScriptableObject | 設定値変更 |
+| `.prefab` | プレハブ | コンポーネント設定変更 |
+
+### YAML 編集フロー
+
+```
+CLI 非対応操作の検出
+  │
+  ▼
+┌─────────────────────────────┐
+│ Step 1: YAML 形式確認        │
+│ unity-guide エージェントで   │
+│ ドキュメント参照             │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 2: 現在値確認           │
+│ Read ツールで対象ファイル読み │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 3: 編集                 │
+│ Edit ツールで YAML を修正    │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 4: 検証                 │
+│ u refresh で再読み込み       │
+│ u console get -l E           │
+└─────────────────────────────┘
+```
+
+### .meta ファイル例
+
+テクスチャのインポート設定:
+
+```yaml
+fileFormatVersion: 2
+guid: abc123def456
+TextureImporter:
+  maxTextureSize: 2048
+  compressionQuality: 50
+  textureType: 0
+  textureShape: 1
+  sRGBTexture: 1
+  mipmaps:
+    enableMipMap: 1
+    sRGBTexture: 1
+```
+
+### .asset ファイル例 (ScriptableObject)
+
+```yaml
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abcd1234, type: 3}
+  m_Name: GameSettings
+  m_EditorClassIdentifier:
+  playerSpeed: 5.0
+  maxHealth: 100
+```
+
+### よく編集するインポート設定
+
+| ファイル種類 | プロパティ | 説明 |
+|-------------|-----------|------|
+| Texture | `maxTextureSize` | 最大解像度 |
+| Texture | `compressionQuality` | 圧縮品質 (0-100) |
+| Texture | `textureType` | テクスチャタイプ |
+| Model | `meshCompression` | メッシュ圧縮 |
+| Model | `importAnimation` | アニメーションインポート |
+| Audio | `compressionFormat` | 圧縮形式 |
+
+### GUID と fileID
+
+- `guid`: アセットの一意識別子（.meta ファイルで定義）
+- `fileID`: ファイル内オブジェクトの識別子
+
+参照の形式:
+```yaml
+m_Script: {fileID: 11500000, guid: abcd1234, type: 3}
+```
+
+- `fileID: 0` = null 参照
+- `fileID: 11500000` = MonoScript
+- `type: 3` = .cs スクリプト参照
+
+### 注意事項
+
+- guid は変更しない（参照が壊れる）
+- fileID は Unity が自動生成するため、新規追加時は注意
+- 編集後は `u refresh` で Unity に再読み込み
+- 形式不明な場合は unity-guide エージェントでドキュメント参照
+
 ## Related Skills
 
 | スキル | 関係 |
 |--------|------|
-| uverify | パッケージ変更後・参照切れ修正後のビルド検証 |
-| uscene | シーン内オブジェクトのアセット参照確認 |
+| unity-preflight | パッケージ変更後・参照切れ修正後のビルド検証 |
+| unity-scene | シーン内オブジェクトのアセット参照確認・YAML フォールバック共通 |

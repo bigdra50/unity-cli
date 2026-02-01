@@ -1,0 +1,10 @@
+{
+  "name": "unity-cli",
+  "version": "0.0.1",
+  "description": "Unity development workflow automation via unity-cli with meta-cognition routing",
+  "author": {
+    "name": "bigdra50"
+  },
+  "repository": "https://github.com/bigdra50/unity-cli",
+  "hooks": "./hooks/hooks.json"
+}

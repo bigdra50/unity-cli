@@ -1,5 +1,5 @@
 ---
-name: ubuild
+name: unity-build
 description: |
   Unityビルドパイプラインワークフロー。ビルド実行、プラットフォーム設定確認、ビルドエラー対応を行う。
   Use for: "ビルド", "ビルド実行", "build", "ビルド設定", "プラットフォーム"
@@ -236,4 +236,4 @@ Build Failed
 
 | スキル | 関係 |
 |--------|------|
-| uverify | ビルド前のコンパイル検証・テスト実行 |
+| unity-preflight | ビルド前のコンパイル検証・テスト実行 |

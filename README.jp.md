@@ -404,6 +404,16 @@ u config init --force                  # 既存を上書き
 | `--page-size` | ページサイズ | 50 |
 | `--cursor` | ページネーションカーソル | 0 |
 
+## Claude Code プラグイン（試験的）
+
+Unity開発ワークフローを自動化する Claude Code プラグインを提供しています。以下で追加できます:
+
+```bash
+claude plugin add /marketplace/unity-cli
+```
+
+スキル (`/unity-preflight`, `/unity-debug`, `/unity-ui` 等) とエージェントを利用した Unity 開発が可能です。
+
 ## アーキテクチャ
 
 ```mermaid

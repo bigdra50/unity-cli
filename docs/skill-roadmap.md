@@ -11,7 +11,7 @@ Agent ──(コード編集)──► ファイルシステム
 Agent ──(unity-cli)──► Relay Server ──► Unity Editor
 ```
 
-unity-workflow プラグインは、unity-cli のコマンドを Unity 開発のワークフローとして組み立て、エージェントに「いつ・何を・どの順序で」実行すべきかの判断基準を提供する。
+unity-cli プラグインは、unity-cli のコマンドを Unity 開発のワークフローとして組み立て、エージェントに「いつ・何を・どの順序で」実行すべきかの判断基準を提供する。
 
 ## 設計原則
 
@@ -80,15 +80,15 @@ Unity 開発でエージェントが必要とする能力領域:
 
 | スキル | ドメイン | 責務 |
 |--------|---------|------|
-| uverify | ビルド検証 | コンパイル→エラーチェック→テスト→ランタイムチェック。修正ループ付き |
-| udebug | ランタイムデバッグ | エラー分類→コンテキスト収集→状態記録→原因分析 |
-| uui | UI Toolkit 開発 | ツリー検査 + 開発イテレーション（作成→確認→修正ループ） |
+| preflight | ビルド検証 | コンパイル→エラーチェック→テスト→ランタイムチェック。修正ループ付き |
+| debug | ランタイムデバッグ | エラー分類→コンテキスト収集→状態記録→原因分析 |
+| ui | UI Toolkit 開発 | ツリー検査 + 開発イテレーション（作成→確認→修正ループ） |
 
 ### Phase 2: シーン操作（v1.1）
 
 | スキル | ドメイン | 責務 |
 |--------|---------|------|
-| uscene | シーン構築・管理 | オブジェクト配置→コンポーネント設定→Prefab化→シーン保存 |
+| scene | シーン構築・管理 | オブジェクト配置→コンポーネント設定→Prefab化→シーン保存 |
 
 前提: unity-cli に `component modify`（プロパティ変更）と `gameobject active`（SetActive）を追加。
 
@@ -96,7 +96,7 @@ Unity 開発でエージェントが必要とする能力領域:
 
 | スキル | ドメイン | 責務 |
 |--------|---------|------|
-| uasset | アセット管理 | 依存関係の把握、不要アセット検出、参照整合性チェック |
+| asset | アセット管理 | 依存関係の把握、不要アセット検出、参照整合性チェック |
 | unity-csharp | C# コーディング | Unity API パターン、ライフサイクル、アンチパターン（unity-cli 不要） |
 
 前提: unity-cli に `package list/add/remove` を追加。
@@ -105,14 +105,14 @@ Unity 開発でエージェントが必要とする能力領域:
 
 | スキル | ドメイン | 責務 |
 |--------|---------|------|
-| ubuild | ビルドパイプライン | ビルド実行、プラットフォーム設定、Addressables |
-| uperf | パフォーマンス | プロファイリング、GC 分析、バッチング最適化 |
+| build | ビルドパイプライン | ビルド実行、プラットフォーム設定、Addressables |
+| perf | パフォーマンス | プロファイリング、GC 分析、バッチング最適化 |
 
 前提: unity-cli に `build` と `profiler` コマンドを追加（BridgeTool の大規模拡充）。
 
 ## 各スキル詳細設計
 
-### uverify（Phase 1）
+### preflight（Phase 1）
 
 | 項目 | 内容 |
 |------|------|
@@ -122,17 +122,17 @@ Unity 開発でエージェントが必要とする能力領域:
 | 判断分岐 | エラー有→修正ループ(max 3)、テスト失敗→修正ループ(max 3) |
 | 出力 | Verification Result（Compilation/Tests/Runtime の OK/NG） |
 
-### udebug（Phase 1）
+### debug（Phase 1）
 
 | 項目 | 内容 |
 |------|------|
 | トリガー | ランタイムエラー発生、"バグ調べて"、"エラー原因を特定" |
 | Auto-trigger | なし（ユーザー指示またはエラー検出時） |
 | 主要コマンド | console get -v, scene hierarchy, gameobject find, component inspect, screenshot, asset deps/refs |
-| 判断分岐 | エラー種別（NullRef→オブジェクト探索、Missing→アセット依存、CS→uverifyへ） |
+| 判断分岐 | エラー種別（NullRef→オブジェクト探索、Missing→アセット依存、CS→preflightへ） |
 | 出力 | Debug Report（Error Type/Location/Root Cause/Fix Suggestion） |
 
-### uui（Phase 1）
+### ui（Phase 1）
 
 | 項目 | 内容 |
 |------|------|
@@ -143,7 +143,7 @@ Unity 開発でエージェントが必要とする能力領域:
 | フロー2 | Iteration: 編集→refresh→play→uitree確認→フィードバック→stop→修正→繰り返し |
 | 出力 | UI Inspection Report / イテレーション中は都度フィードバック |
 
-### uscene（Phase 2）
+### scene（Phase 2）
 
 | 項目 | 内容 |
 |------|------|
@@ -153,7 +153,7 @@ Unity 開発でエージェントが必要とする能力領域:
 | フロー | 現状確認→オブジェクト作成→コンポーネント追加→Transform設定→Prefab化→シーン保存 |
 | 必要CLI拡張 | component modify, gameobject active |
 
-### uasset（Phase 3）
+### asset（Phase 3）
 
 | 項目 | 内容 |
 |------|------|
@@ -240,12 +240,12 @@ user-invocable: true/false
 
 ## 現在の進捗
 
-- [x] Phase 1: uverify 実装済み
-- [x] Phase 1: udebug 実装済み
-- [x] Phase 1: uui 実装済み
-- [x] Phase 2: uscene
+- [x] Phase 1: preflight 実装済み
+- [x] Phase 1: debug 実装済み
+- [x] Phase 1: ui 実装済み
+- [x] Phase 2: scene
 - [x] Phase 2: unity-cli に component modify, gameobject active 追加
-- [x] Phase 3: uasset
+- [x] Phase 3: asset
 - [x] Phase 3: unity-csharp
 - [x] Phase 3: unity-cli に package コマンド追加
-- [x] Phase 4: ubuild, uperf + build/profiler コマンド
+- [x] Phase 4: build, perf + build/profiler コマンド

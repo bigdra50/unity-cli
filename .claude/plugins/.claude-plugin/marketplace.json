@@ -6,9 +6,9 @@
   "description": "Local plugins for unity-cli",
   "plugins": [
     {
-      "name": "unity-workflow",
+      "name": "unity-cli",
       "description": "Unity development workflow automation: build verification, debug investigation, UI Toolkit inspection",
-      "source": "./unity-workflow"
+      "source": "./unity-cli"
     }
   ]
 }
