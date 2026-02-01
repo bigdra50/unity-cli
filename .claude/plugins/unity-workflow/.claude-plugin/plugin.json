@@ -1,6 +1,6 @@
 {
   "name": "unity-workflow",
-  "version": "2.0.0",
+  "version": "0.0.1",
   "description": "Unity development workflow automation via unity-cli with meta-cognition routing",
   "author": {
     "name": "bigdra50"
