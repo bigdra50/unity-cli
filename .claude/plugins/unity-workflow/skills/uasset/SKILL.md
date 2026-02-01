@@ -250,9 +250,123 @@ u package add/remove ...
 | refs の結果が膨大 | 参照元の種類（Scene/Prefab/Material）で分類して報告 |
 | package list が長い | `project packages` でファイルベースの確認に切り替え |
 
+---
+
+## YAML Fallback
+
+unity-cli が対応していないアセット操作は YAML 直接編集で対応する。
+
+### 対象ファイル
+
+| 拡張子 | 内容 | 用途例 |
+|--------|------|--------|
+| `.meta` | アセットメタデータ | インポート設定変更 |
+| `.asset` | ScriptableObject | 設定値変更 |
+| `.prefab` | プレハブ | コンポーネント設定変更 |
+
+### YAML 編集フロー
+
+```
+CLI 非対応操作の検出
+  │
+  ▼
+┌─────────────────────────────┐
+│ Step 1: YAML 形式確認        │
+│ unity-guide エージェントで   │
+│ ドキュメント参照             │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 2: 現在値確認           │
+│ Read ツールで対象ファイル読み │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 3: 編集                 │
+│ Edit ツールで YAML を修正    │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 4: 検証                 │
+│ u refresh で再読み込み       │
+│ u console get -l E           │
+└─────────────────────────────┘
+```
+
+### .meta ファイル例
+
+テクスチャのインポート設定:
+
+```yaml
+fileFormatVersion: 2
+guid: abc123def456
+TextureImporter:
+  maxTextureSize: 2048
+  compressionQuality: 50
+  textureType: 0
+  textureShape: 1
+  sRGBTexture: 1
+  mipmaps:
+    enableMipMap: 1
+    sRGBTexture: 1
+```
+
+### .asset ファイル例 (ScriptableObject)
+
+```yaml
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abcd1234, type: 3}
+  m_Name: GameSettings
+  m_EditorClassIdentifier:
+  playerSpeed: 5.0
+  maxHealth: 100
+```
+
+### よく編集するインポート設定
+
+| ファイル種類 | プロパティ | 説明 |
+|-------------|-----------|------|
+| Texture | `maxTextureSize` | 最大解像度 |
+| Texture | `compressionQuality` | 圧縮品質 (0-100) |
+| Texture | `textureType` | テクスチャタイプ |
+| Model | `meshCompression` | メッシュ圧縮 |
+| Model | `importAnimation` | アニメーションインポート |
+| Audio | `compressionFormat` | 圧縮形式 |
+
+### GUID と fileID
+
+- `guid`: アセットの一意識別子（.meta ファイルで定義）
+- `fileID`: ファイル内オブジェクトの識別子
+
+参照の形式:
+```yaml
+m_Script: {fileID: 11500000, guid: abcd1234, type: 3}
+```
+
+- `fileID: 0` = null 参照
+- `fileID: 11500000` = MonoScript
+- `type: 3` = .cs スクリプト参照
+
+### 注意事項
+
+- guid は変更しない（参照が壊れる）
+- fileID は Unity が自動生成するため、新規追加時は注意
+- 編集後は `u refresh` で Unity に再読み込み
+- 形式不明な場合は unity-guide エージェントでドキュメント参照
+
 ## Related Skills
 
 | スキル | 関係 |
 |--------|------|
 | uverify | パッケージ変更後・参照切れ修正後のビルド検証 |
-| uscene | シーン内オブジェクトのアセット参照確認 |
+| uscene | シーン内オブジェクトのアセット参照確認・YAML フォールバック共通 |

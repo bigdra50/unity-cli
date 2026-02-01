@@ -1,14 +1,28 @@
 ---
 name: uui
 description: |
-  UI Toolkit ドメインスキル。ビジュアルツリー検査と開発イテレーション（作成→Play確認→修正ループ）を提供する。UXML/USS/C# によるUI構築からランタイム確認まで。
-  Use for: "UI確認", "UIツリー", "UI Toolkit検査", "UI作って", "UI修正して", "UIレイアウト", "VisualElement調べて"
+  UI 開発ドメインスキル。UI Toolkit と uGUI の両方に対応。ビジュアルツリー検査と開発イテレーション（作成→Play確認→修正ループ）を提供する。
+  Use for: "UI確認", "UIツリー", "UI Toolkit検査", "UI作って", "UI修正して", "UIレイアウト", "VisualElement調べて", "Canvas", "uGUI", "Image", "Text", "Button"
 user-invocable: true
 ---
 
-# Unity UI Toolkit
+# Unity UI Development
 
-UI Toolkit によるUI開発を支援する。ツリー検査と開発イテレーションの2つのフローを提供。
+UI Toolkit および uGUI によるUI開発を支援する。ツリー検査と開発イテレーションの2つのフローを提供。
+
+## UI システム判定
+
+| 特徴 | UI Toolkit | uGUI |
+|------|-----------|------|
+| ルート要素 | UIDocument | Canvas |
+| スタイル | USS | RectTransform + 各コンポーネント |
+| 要素 | VisualElement | Image, Text, Button 等 |
+| 検査コマンド | u uitree | u component inspect |
+| 推奨用途 | エディタ拡張、新規UI | 既存プロジェクト、レガシーUI |
+
+質問内容から UI システムを判定:
+- `VisualElement`, `UXML`, `USS`, `UIDocument` → UI Toolkit
+- `Canvas`, `Image`, `Text`, `Button`, `RectTransform` → uGUI
 
 ## CLI Setup
 
@@ -227,9 +241,137 @@ u uitree inspect ref_sibling --style         # 兄弟
 | query結果が多い | 複合条件 (-t + -c) で絞り込む |
 | イテレーション中 | 前回と差分がある部分だけ再検査 |
 
+---
+
+# uGUI (Canvas-based UI)
+
+uGUI は Canvas をルートとするレガシーUI システム。unity-cli の component コマンドで検査・操作する。
+
+## uGUI Inspection Flow
+
+```
+UI Issue / Layout Question (uGUI)
+  │
+  ▼
+┌─────────────────────────────┐
+│ Step 1: Find Canvas         │
+│ u gameobject find "Canvas"  │
+│ u scene hierarchy -d 3      │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 2: List Components     │
+│ u component list -t <obj>   │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 3: Inspect Properties  │
+│ u component inspect -t <obj>│
+│   -T Image / Text / Button  │
+└──────────┬──────────────────┘
+           ▼
+      Analyze & Report
+```
+
+### Step 1: Canvas の発見
+
+```bash
+u gameobject find "Canvas"           # Canvas を検索
+u scene hierarchy -d 3               # 上位3階層で UI 構造を把握
+```
+
+### Step 2: コンポーネント一覧
+
+```bash
+u component list -t "StartButton"    # オブジェクトのコンポーネント一覧
+```
+
+典型的な uGUI コンポーネント:
+- `RectTransform`: 位置・サイズ
+- `CanvasRenderer`: 描画
+- `Image`: 画像表示
+- `Text` / `TextMeshProUGUI`: テキスト表示
+- `Button`: ボタン
+- `Toggle`, `Slider`, `Dropdown`, `InputField`: 入力系
+
+### Step 3: プロパティ検査
+
+```bash
+u component inspect -t "StartButton" -T Button
+u component inspect -t "Title" -T Text
+u component inspect -t "Background" -T Image
+```
+
+### uGUI プロパティ変更
+
+```bash
+# Image の色変更
+u component modify -t "Background" -T Image --prop m_Color --value '{"r":1,"g":0,"b":0,"a":1}'
+
+# Text の内容変更
+u component modify -t "Title" -T Text --prop m_Text --value "New Title"
+
+# RectTransform の位置変更
+u component modify -t "Panel" -T RectTransform --prop m_AnchoredPosition --value '{"x":100,"y":50}'
+```
+
+### uGUI レイアウト問題の調査
+
+```bash
+# RectTransform を確認
+u component inspect -t "Panel" -T RectTransform
+
+# 確認ポイント
+# - sizeDelta: サイズ
+# - anchoredPosition: アンカー基準の位置
+# - anchorMin / anchorMax: アンカー設定
+# - pivot: ピボット
+```
+
+## uGUI Development Iteration Flow
+
+```
+Edit UI (Script / Inspector)
+  │
+  ▼
+┌─────────────────────────────┐
+│ Step 1: Compile & Play      │
+│ u refresh                   │
+│ u play                      │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 2: Visual Check        │
+│ u scene hierarchy           │
+│ u component inspect ...     │
+│ u screenshot -s game        │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 3: User Feedback       │
+│ スクリーンショット提示       │
+└──────────┬──────────────────┘
+           ▼
+      OK? → u stop → Done
+           ↓ no
+      u stop → Edit → Step 1
+```
+
+## UI Toolkit vs uGUI 選択ガイド
+
+| 条件 | 推奨 |
+|------|------|
+| 新規プロジェクト | UI Toolkit |
+| エディタ拡張 | UI Toolkit |
+| 既存 uGUI プロジェクト | uGUI 継続 |
+| TextMeshPro 使用中 | uGUI |
+| 複雑なレイアウト | UI Toolkit (Flexbox) |
+| ランタイム性能重視 | uGUI (成熟度) |
+
 ## Related Skills
 
 | スキル | 使い分け |
 |--------|---------|
 | /uverify | UIコード修正後のコンパイルエラーが解決しない場合 |
 | /udebug | UI操作時のランタイムエラー（NullRef等）を調査する場合 |
+| /uscene | UI オブジェクトの配置・Transform 調整 |

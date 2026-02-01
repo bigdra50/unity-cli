@@ -195,6 +195,102 @@ u asset info PATH                           # アセット情報
 | component inspect の出力が大きい | 必要なプロパティ名だけメモして modify |
 | 同種オブジェクトを複数作成 | パターンが決まったら C# スクリプト化を提案 |
 
+---
+
+## YAML Fallback
+
+unity-cli が対応していない操作は YAML 直接編集で対応する。
+
+### 対象ファイル
+
+| 拡張子 | 内容 |
+|--------|------|
+| `.unity` | シーンファイル |
+| `.prefab` | プレハブ |
+| `.asset` | ScriptableObject、設定ファイル |
+| `.meta` | アセットメタデータ |
+
+### YAML 編集の判断基準
+
+| 状況 | 対応 |
+|------|------|
+| unity-cli コマンドがある | CLI を使用（推奨） |
+| CLI 非対応だが単純な変更 | YAML 直接編集 |
+| 複雑な変更 | Unity エディタで手動操作 |
+
+### YAML 編集フロー
+
+```
+CLI 非対応操作の検出
+  │
+  ▼
+┌─────────────────────────────┐
+│ Step 1: YAML 形式確認        │
+│ unity-guide エージェントで   │
+│ ドキュメント参照             │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 2: 現在値確認           │
+│ Read ツールで対象ファイル読み │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 3: 編集                 │
+│ Edit ツールで YAML を修正    │
+└──────────┬──────────────────┘
+           ▼
+┌─────────────────────────────┐
+│ Step 4: 検証                 │
+│ u refresh で再読み込み       │
+│ u console get -l E           │
+└─────────────────────────────┘
+```
+
+### YAML 構造の参考
+
+Unity YAML は %YAML 1.1 + %TAG !u! で始まる。
+
+```yaml
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &123456789
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 987654321}
+  m_Layer: 0
+  m_Name: MyObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+```
+
+### よく編集するプロパティ
+
+| プロパティ | 説明 |
+|-----------|------|
+| `m_Name` | オブジェクト名 |
+| `m_IsActive` | アクティブ状態 (0/1) |
+| `m_Layer` | レイヤー番号 |
+| `m_TagString` | タグ文字列 |
+| `m_LocalPosition` | ローカル位置 |
+| `m_LocalRotation` | ローカル回転 (Quaternion) |
+| `m_LocalScale` | ローカルスケール |
+
+### 注意事項
+
+- fileID は Unity が生成するユニークID。手動で変更しない
+- GUID 参照は .meta ファイルで確認
+- 編集後は必ず `u refresh` で Unity に再読み込みさせる
+- 形式不明な場合は unity-guide エージェントでドキュメント参照
+
 ## Related Skills
 
 | スキル | 関係 |
@@ -202,3 +298,4 @@ u asset info PATH                           # アセット情報
 | uverify | シーン構築中に C# を編集した場合のビルド検証 |
 | udebug | シーン実行時のランタイムエラー調査 |
 | uui | UI Toolkit 要素の配置・検査 |
+| uasset | アセット依存関係・YAML フォールバック共通 |
