@@ -1838,6 +1838,191 @@ def uitree_inspect(
         raise typer.Exit(1) from None
 
 
+@uitree_app.command("click")
+def uitree_click(
+    ctx: typer.Context,
+    ref: Annotated[
+        str | None,
+        typer.Argument(help="Element reference ID (e.g., ref_3)"),
+    ] = None,
+    panel: Annotated[
+        str | None,
+        typer.Option("--panel", "-p", help="Panel name"),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", "-n", help="Element name"),
+    ] = None,
+    button: Annotated[
+        int,
+        typer.Option("--button", "-b", help="Mouse button (0=left, 1=right, 2=middle)"),
+    ] = 0,
+    count: Annotated[
+        int,
+        typer.Option("--count", "-c", help="Click count (2=double click)"),
+    ] = 1,
+) -> None:
+    """Click a UI element.
+
+    Specify element by ref ID or by panel + name.
+
+    Examples:
+        u uitree click ref_3                          # Left click
+        u uitree click ref_3 --button 1               # Right click
+        u uitree click ref_3 --count 2                # Double click
+        u uitree click -p "GameView" -n "StartBtn"    # By panel + name
+    """
+    context: CLIContext = ctx.obj
+
+    if not ref and not (panel and name):
+        print_error("ref argument or --panel + --name required")
+        raise typer.Exit(1) from None
+
+    try:
+        result = context.client.uitree.click(
+            ref=ref,
+            panel=panel,
+            name=name,
+            button=button,
+            click_count=count,
+        )
+
+        if context.json_mode:
+            print_json(result, None)
+        else:
+            elem_ref = result.get("ref", "")
+            elem_type = result.get("type", "")
+            msg = result.get("message", "")
+            console.print(f"{elem_ref} {elem_type}: {msg}")
+
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@uitree_app.command("scroll")
+def uitree_scroll(
+    ctx: typer.Context,
+    ref: Annotated[
+        str | None,
+        typer.Argument(help="Element reference ID (e.g., ref_5)"),
+    ] = None,
+    panel: Annotated[
+        str | None,
+        typer.Option("--panel", "-p", help="Panel name"),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", "-n", help="Element name"),
+    ] = None,
+    x: Annotated[
+        float | None,
+        typer.Option("--x", help="Scroll offset X (absolute)"),
+    ] = None,
+    y: Annotated[
+        float | None,
+        typer.Option("--y", help="Scroll offset Y (absolute)"),
+    ] = None,
+    to: Annotated[
+        str | None,
+        typer.Option("--to", help="Ref ID of child element to scroll into view"),
+    ] = None,
+) -> None:
+    """Scroll a ScrollView element.
+
+    Two modes:
+      Offset mode: --x and/or --y to set absolute scroll position.
+      ScrollTo mode: --to <ref_id> to scroll a child element into view.
+
+    Examples:
+        u uitree scroll ref_5 --y 0                   # Scroll to top
+        u uitree scroll ref_5 --y 500                  # Scroll to y=500
+        u uitree scroll ref_5 --to ref_12              # Scroll child into view
+    """
+    context: CLIContext = ctx.obj
+
+    if not ref and not (panel and name):
+        print_error("ref argument or --panel + --name required")
+        raise typer.Exit(1) from None
+
+    if to is None and x is None and y is None:
+        print_error("--x/--y or --to parameter required")
+        raise typer.Exit(1) from None
+
+    try:
+        result = context.client.uitree.scroll(
+            ref=ref,
+            panel=panel,
+            name=name,
+            x=x,
+            y=y,
+            to_child=to,
+        )
+
+        if context.json_mode:
+            print_json(result, None)
+        else:
+            elem_ref = result.get("ref", "")
+            offset = result.get("scrollOffset", {})
+            ox = offset.get("x", 0)
+            oy = offset.get("y", 0)
+            console.print(f"{elem_ref} ScrollView: scrollOffset=({ox}, {oy})")
+
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
+@uitree_app.command("text")
+def uitree_text(
+    ctx: typer.Context,
+    ref: Annotated[
+        str | None,
+        typer.Argument(help="Element reference ID (e.g., ref_7)"),
+    ] = None,
+    panel: Annotated[
+        str | None,
+        typer.Option("--panel", "-p", help="Panel name"),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", "-n", help="Element name"),
+    ] = None,
+) -> None:
+    """Get text content of a UI element.
+
+    Specify element by ref ID or by panel + name.
+
+    Examples:
+        u uitree text ref_7                           # Get text by ref
+        u uitree text -p "GameView" -n "TitleLabel"   # By panel + name
+    """
+    context: CLIContext = ctx.obj
+
+    if not ref and not (panel and name):
+        print_error("ref argument or --panel + --name required")
+        raise typer.Exit(1) from None
+
+    try:
+        result = context.client.uitree.text(
+            ref=ref,
+            panel=panel,
+            name=name,
+        )
+
+        if context.json_mode:
+            print_json(result, None)
+        else:
+            elem_ref = result.get("ref", "")
+            elem_type = result.get("type", "")
+            text = result.get("text", "")
+            console.print(f"{elem_ref} {elem_type}: {text}")
+
+    except UnityCLIError as e:
+        print_error(e.message, e.code)
+        raise typer.Exit(1) from None
+
+
 # =============================================================================
 # Config Commands
 # =============================================================================

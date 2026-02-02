@@ -107,6 +107,16 @@ u uitree inspect ref_3                   # Inspect by ref ID
 u uitree inspect ref_3 --style           # Include resolvedStyle
 u uitree inspect ref_3 --children        # Include children
 
+# UI Toolkit interaction commands
+u uitree click ref_3                     # Click element
+u uitree click ref_3 --button 1          # Right click
+u uitree click ref_3 --count 2           # Double click
+u uitree click -p "GameView" -n "StartBtn"  # Click by panel + name
+u uitree scroll ref_5 --y 0              # Scroll to top
+u uitree scroll ref_5 --y 500            # Scroll to y=500
+u uitree scroll ref_5 --to ref_12        # Scroll child into view
+u uitree text ref_7                      # Get element text
+
 # Standalone tools (no Relay required)
 u config show                             # Show configuration
 u project info                            # Project info
