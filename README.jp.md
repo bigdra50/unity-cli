@@ -4,6 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com/)
+[![openupm](https://img.shields.io/npm/v/com.bigdra50.unity-bridge?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.bigdra50.unity-bridge/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bigdra50/unity-cli)
 
 [English](README.md)
@@ -51,9 +52,13 @@ u menu context "DoSomething" -t "/Player"
 
 UnityプロジェクトにUnityBridgeパッケージを追加:
 
-```
-Window > Package Manager > + > Add package from git URL...
-https://github.com/bigdra50/unity-cli.git?path=UnityBridge
+```bash
+# OpenUPM経由（推奨）
+openupm add com.bigdra50.unity-bridge
+
+# または git URL で追加
+# Window > Package Manager > + > Add package from git URL...
+# https://github.com/bigdra50/unity-cli.git?path=UnityBridge
 ```
 
 ### 2. 接続
@@ -406,13 +411,25 @@ u config init --force                  # 既存を上書き
 
 ## Claude Code プラグイン（試験的）
 
-Unity開発ワークフローを自動化する Claude Code プラグインを提供しています。以下で追加できます:
+Claude Code を使った Unity 開発に unity-cli を組み込みやすくするための補助プラグインです。ルーティング、検証、デバッグなどのスキルを提供します。
 
 ```bash
-claude plugin add /marketplace/unity-cli
+# マーケットプレイスから追加
+/plugin marketplace add bigdra50/unity-cli
+
+# インストール
+/plugin install unity-cli@unity-tools
 ```
 
-スキル (`/unity-preflight`, `/unity-debug`, `/unity-ui` 等) とエージェントを利用した Unity 開発が可能です。
+| スキル | 内容 |
+|-------|------|
+| `/unity-preflight` | コンパイル・テスト検証 |
+| `/unity-debug` | エラー調査 |
+| `/unity-build` | ビルドパイプライン |
+| `/unity-scene` | シーン構築 |
+| `/unity-asset` | アセット・依存関係管理 |
+| `/unity-perf` | プロファイラ分析 |
+| `/unity-ui` | UI Toolkit / uGUI 検査 |
 
 ## アーキテクチャ
 

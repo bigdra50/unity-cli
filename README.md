@@ -4,6 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com/)
+[![openupm](https://img.shields.io/npm/v/com.bigdra50.unity-bridge?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.bigdra50.unity-bridge/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bigdra50/unity-cli)
 
 [日本語版](README.jp.md)
@@ -51,9 +52,13 @@ Key features:
 
 Add the UnityBridge package to your Unity project:
 
-```
-Window > Package Manager > + > Add package from git URL...
-https://github.com/bigdra50/unity-cli.git?path=UnityBridge
+```bash
+# Via OpenUPM (recommended)
+openupm add com.bigdra50.unity-bridge
+
+# Or via git URL
+# Window > Package Manager > + > Add package from git URL...
+# https://github.com/bigdra50/unity-cli.git?path=UnityBridge
 ```
 
 ### 2. Connection
@@ -408,13 +413,25 @@ u config init --force                  # Overwrite existing
 
 ## Claude Code Plugin (Experimental)
 
-A Claude Code plugin is available for Unity development workflow automation. Add it with:
+A Claude Code plugin that helps integrate unity-cli into your Unity development workflow with Claude Code. Provides routing, validation, debugging, and other skills to assist CLI-based Unity operations.
 
 ```bash
-claude plugin add /marketplace/unity-cli
+# Add from marketplace
+/plugin marketplace add bigdra50/unity-cli
+
+# Install
+/plugin install unity-cli@unity-tools
 ```
 
-Provides skills (`/unity-preflight`, `/unity-debug`, `/unity-ui`, etc.) and agents for Unity development with Claude Code.
+| Skill | Description |
+|-------|-------------|
+| `/unity-preflight` | Compile & test validation |
+| `/unity-debug` | Error investigation |
+| `/unity-build` | Build pipeline |
+| `/unity-scene` | Scene construction |
+| `/unity-asset` | Asset & dependency management |
+| `/unity-perf` | Profiler analysis |
+| `/unity-ui` | UI Toolkit / uGUI inspection |
 
 ## Architecture
 
