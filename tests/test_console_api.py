@@ -11,11 +11,13 @@ from unity_cli.api.console import ConsoleAPI
 
 @pytest.fixture
 def mock_conn() -> MagicMock:
+    """Create a mock relay connection."""
     return MagicMock()
 
 
 @pytest.fixture
 def sut(mock_conn: MagicMock) -> ConsoleAPI:
+    """Create a ConsoleAPI instance with mock connection."""
     return ConsoleAPI(mock_conn)
 
 
@@ -23,6 +25,7 @@ class TestGet:
     """get() メソッドのテスト"""
 
     def test_get_sends_console_command(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Send 'console' as the command name."""
         mock_conn.send_request.return_value = {}
 
         sut.get()
@@ -30,6 +33,7 @@ class TestGet:
         assert mock_conn.send_request.call_args[0][0] == "console"
 
     def test_get_sends_read_action_with_defaults(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Send action='read' with format='detailed' and include_stacktrace=False."""
         mock_conn.send_request.return_value = {}
 
         sut.get()
@@ -40,6 +44,7 @@ class TestGet:
         assert params["include_stacktrace"] is False
 
     def test_get_with_types(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Include types key when types list is provided."""
         mock_conn.send_request.return_value = {}
 
         sut.get(types=["error", "warning"])
@@ -48,6 +53,7 @@ class TestGet:
         assert params["types"] == ["error", "warning"]
 
     def test_get_without_types_excludes_types_key(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Exclude types key when types is not provided."""
         mock_conn.send_request.return_value = {}
 
         sut.get()
@@ -56,6 +62,7 @@ class TestGet:
         assert "types" not in params
 
     def test_get_with_count(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Include count key when count is provided."""
         mock_conn.send_request.return_value = {}
 
         sut.get(count=10)
@@ -64,6 +71,7 @@ class TestGet:
         assert params["count"] == 10
 
     def test_get_without_count_excludes_count_key(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Exclude count key when count is None."""
         mock_conn.send_request.return_value = {}
 
         sut.get()
@@ -72,6 +80,7 @@ class TestGet:
         assert "count" not in params
 
     def test_get_with_filter_text(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Map filter_text to 'search' key in params."""
         mock_conn.send_request.return_value = {}
 
         sut.get(filter_text="NullReference")
@@ -80,6 +89,7 @@ class TestGet:
         assert params["search"] == "NullReference"
 
     def test_get_with_stacktrace(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Set include_stacktrace to True when requested."""
         mock_conn.send_request.return_value = {}
 
         sut.get(include_stacktrace=True)
@@ -88,6 +98,7 @@ class TestGet:
         assert params["include_stacktrace"] is True
 
     def test_get_with_simple_format(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Send format='simple' when specified."""
         mock_conn.send_request.return_value = {}
 
         sut.get(format="simple")
@@ -100,6 +111,7 @@ class TestClear:
     """clear() メソッドのテスト"""
 
     def test_clear_sends_console_command(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Send 'console' as the command name."""
         mock_conn.send_request.return_value = {}
 
         sut.clear()
@@ -107,6 +119,7 @@ class TestClear:
         assert mock_conn.send_request.call_args[0][0] == "console"
 
     def test_clear_sends_clear_action(self, sut: ConsoleAPI, mock_conn: MagicMock) -> None:
+        """Send action='clear' to clear console logs."""
         mock_conn.send_request.return_value = {}
 
         sut.clear()
