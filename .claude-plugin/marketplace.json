@@ -1,0 +1,19 @@
+{
+  "name": "unity-tools",
+  "owner": {
+    "name": "bigdra50"
+  },
+  "description": "Unity CLI plugins for editor automation",
+  "plugins": [
+    {
+      "name": "unity-cli",
+      "source": {
+        "source": "github",
+        "repo": "bigdra50/unity-cli"
+      },
+      "description": "Unity development workflow automation: build verification, debug investigation, UI Toolkit inspection",
+      "version": "0.0.1",
+      "repository": "https://github.com/bigdra50/unity-cli"
+    }
+  ]
+}
