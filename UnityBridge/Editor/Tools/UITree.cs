@@ -21,6 +21,14 @@ namespace UnityBridge.Tools
         private static Dictionary<string, WeakReference<VisualElement>> s_RefMap = new();
         private static int s_NextRefId = 1;
 
+        /// <summary>
+        /// Dispatches a UITree command described by the provided parameters to the appropriate action handler.
+        /// </summary>
+        /// <param name="parameters">JSON object containing at minimum an "action" string (case-insensitive). Additional keys depend on the action: 
+        /// "dump" (panel, depth, format), "query" (panel, type, name, class_name), "inspect" (ref or panel/name, include_style, include_children),
+        /// "click" (ref or panel/name, button, click_count), "scroll" (ref or panel/name, x, y, to_child), and "text" (ref or panel/name).</param>
+        /// <returns>Action-specific result as a JSON object (structure varies by action).</returns>
+        /// <exception cref="ProtocolException">Thrown when the "action" value is unknown or invalid.</exception>
         public static JObject HandleCommand(JObject parameters)
         {
             var action = parameters["action"]?.Value<string>() ?? "";
@@ -96,6 +104,26 @@ namespace UnityBridge.Tools
             }
         }
 
+        /// <summary>
+        /// Query the specified UI panel for VisualElements matching optional type, name, and class filters.
+        /// </summary>
+        /// <param name="parameters">
+        /// A JSON object containing query options:
+        /// - "panel" (required): panel name to search.
+        /// - "type" (optional): substring filter against element type name (case-insensitive).
+        /// - "name" (optional): element name to match; a leading '#' is stripped if present.
+        /// - "class_name" (optional): class name to match; a leading '.' is stripped if present.
+        /// </param>
+        /// <returns>
+        /// A JObject with:
+        /// - "matches": an array of match objects (each includes ref, type, name, classes, path, layout),
+        /// - "count": the number of matches,
+        /// - "panel": the resolved panel name.
+        /// </returns>
+        /// <exception cref="ProtocolException">
+        /// Thrown with ErrorCode.InvalidParams if "panel" is missing or the named panel cannot be found.
+        /// Other exceptions thrown during traversal are wrapped in a ProtocolException with ErrorCode.InternalError.
+        /// </exception>
         private static JObject HandleQuery(JObject parameters)
         {
             var panelName = parameters["panel"]?.Value<string>();
@@ -146,6 +174,14 @@ namespace UnityBridge.Tools
             }
         }
 
+        /// <summary>
+        /// Builds an inspection result for the specified UI element.
+        /// </summary>
+        /// <param name="parameters">A JSON object that identifies the target element and modifies output. Supported keys:
+        /// "ref" — element reference id; or "panel" with optional "name" to locate an element by name within that panel;
+        /// "include_style" (bool) — include the element's resolved style when true;
+        /// "include_children" (bool) — include basic data for immediate children when true.</param>
+        /// <returns>A JObject containing the inspected element's properties (ref, type, name, classes, layout, world bounds, etc.), and optionally a "resolvedStyle" object and a "children" array when requested.</returns>
         private static JObject HandleInspect(JObject parameters)
         {
             var includeStyle = parameters["include_style"]?.Value<bool>() ?? false;
@@ -156,6 +192,12 @@ namespace UnityBridge.Tools
             return result;
         }
 
+        /// <summary>
+        /// Locate a VisualElement based on the provided command parameters and return it with an assigned reference id.
+        /// </summary>
+        /// <param name="parameters">A JObject containing either a "ref" string or both "panel" and "name" (name may be prefixed with '#').</param>
+        /// <returns>A tuple where the first item is the resolved VisualElement and the second item is its assigned reference id string.</returns>
+        /// <exception cref="ProtocolException">Thrown when the specified ref does not exist or its element was garbage-collected, when the named panel cannot be found, when the named element is not found in the panel, or when neither a valid "ref" nor "panel" + "name" pair is provided.</exception>
         private static (VisualElement element, string refId) ResolveTarget(JObject parameters)
         {
             var refId = parameters["ref"]?.Value<string>();
@@ -206,6 +248,13 @@ namespace UnityBridge.Tools
             return (target, elementRefId);
         }
 
+        /// <summary>
+        /// Simulates a mouse click on a resolved VisualElement and returns a summary of the interaction.
+        /// </summary>
+        /// <param name="parameters">JSON object used to locate the target and configure the click. Expected fields:
+        /// "button" (int, optional, default 0) and "click_count" (int, optional, default 1). Target resolution uses the same lookup parameters supported by the command (ref or panel/name).</param>
+        /// <returns>JSON object containing "ref" (element reference id), "type" (element type name), "action" ("click"), and "message".</returns>
+        /// <exception cref="ProtocolException">Thrown when the target element is disabled or not attached to a panel.</exception>
         private static JObject HandleClick(JObject parameters)
         {
             var (target, refId) = ResolveTarget(parameters);
@@ -257,6 +306,22 @@ namespace UnityBridge.Tools
             };
         }
 
+        /// <summary>
+        /// Scrolls a ScrollView associated with the resolved target either to a child element or by adjusting its scroll offset.
+        /// </summary>
+        /// <param name="parameters">
+        /// JSON object containing target resolution keys (e.g. "ref" or panel/name identifiers) and one of:
+        /// - "to_child": string ref of a child element to scroll to, or
+        /// - "x" and/or "y": numeric offset values to set on the ScrollView's scrollOffset.
+        /// </param>
+        /// <returns>
+        /// A JObject describing the resulting ScrollView state: contains "ref", "type" ("ScrollView"), "action" ("scroll"),
+        /// "scrollOffset" (object with "x" and "y"), and "message".
+        /// </returns>
+        /// <exception cref="ProtocolException">
+        /// Thrown if no ScrollView is found at or above the target, if the provided "to_child" ref does not resolve,
+        /// or if neither "to_child" nor at least one of "x"/"y" is provided.
+        /// </exception>
         private static JObject HandleScroll(JObject parameters)
         {
             var (target, refId) = ResolveTarget(parameters);
@@ -307,6 +372,12 @@ namespace UnityBridge.Tools
             };
         }
 
+        /// <summary>
+        /// Extracts textual content from a resolved UI element.
+        /// </summary>
+        /// <param name="parameters">A JSON object specifying the target element (may contain a `ref` or panel/name selection used by ResolveTarget).</param>
+        /// <returns>A JObject containing `ref`, `type`, `action` (set to "text"), and `text` with the element's textual content.</returns>
+        /// <exception cref="ProtocolException">Thrown when the resolved element has no text content.</exception>
         private static JObject HandleText(JObject parameters)
         {
             var (target, refId) = ResolveTarget(parameters);
@@ -840,6 +911,11 @@ namespace UnityBridge.Tools
 
         #region Helpers
 
+        /// <summary>
+        /// Finds the nearest ScrollView in the visual tree starting at the specified element and walking up through its ancestors.
+        /// </summary>
+        /// <param name="element">The element to start the search from.</param>
+        /// <returns>The nearest ScrollView that is the element or one of its ancestors, or <c>null</c> if none is found.</returns>
         private static ScrollView FindScrollView(VisualElement element)
         {
             var current = element;
@@ -851,6 +927,12 @@ namespace UnityBridge.Tools
             return null;
         }
 
+        /// <summary>
+        /// Finds the first VisualElement with the specified name in the subtree rooted at <paramref name="root"/>.
+        /// </summary>
+        /// <param name="root">The root VisualElement to begin the search from.</param>
+        /// <param name="name">The element name to match (case-insensitive).</param>
+        /// <returns>The first matching VisualElement, or null if no match is found.</returns>
         private static VisualElement FindElementByName(VisualElement root, string name)
         {
             if (!string.IsNullOrEmpty(root.name) &&

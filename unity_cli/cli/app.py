@@ -1726,15 +1726,17 @@ def uitree_inspect(
         typer.Option("--children", help="Include children info"),
     ] = False,
 ) -> None:
-    """Inspect a specific UI element.
-
-    Specify element by ref ID or by panel + name.
-
-    Examples:
-        u uitree inspect ref_3
-        u uitree inspect -p "GameView" -n "StartBtn"
-        u uitree inspect ref_3 --style
-        u uitree inspect ref_3 --children
+    """
+    Show detailed information about a UI element.
+    
+    When invoked with JSON mode enabled, prints the raw inspection result as JSON; otherwise pretty-prints the element's reference, type, name, classes, visibility/enabled/focusable flags, layout/world bounds, child count, path, resolved style (if requested), and child summaries (if requested). The element must be specified by `ref` or by both `--panel` and `--name`.
+    
+    Parameters:
+        ref (str | None): Element reference ID (e.g., "ref_3"). Optional if `--panel` and `--name` are provided.
+        panel (str | None): Panel name used together with `--name` to identify the element.
+        name (str | None): Element name used together with `--panel` to identify the element.
+        style (bool): Include resolved style information in the output when not in JSON mode.
+        children (bool): Include direct children summaries in the output when not in JSON mode.
     """
     context: CLIContext = ctx.obj
 
@@ -1936,16 +1938,18 @@ def uitree_scroll(
         typer.Option("--to", help="Ref ID of child element to scroll into view"),
     ] = None,
 ) -> None:
-    """Scroll a ScrollView element.
-
-    Two modes:
-      Offset mode: --x and/or --y to set absolute scroll position.
-      ScrollTo mode: --to <ref_id> to scroll a child element into view.
-
-    Examples:
-        u uitree scroll ref_5 --y 0                   # Scroll to top
-        u uitree scroll ref_5 --y 500                  # Scroll to y=500
-        u uitree scroll ref_5 --to ref_12              # Scroll child into view
+    """
+    Scroll a UI ScrollView element either to an absolute offset or to make a child element visible.
+    
+    Either provide `ref` or both `panel` and `name`. Use `x` and/or `y` to set absolute scroll offsets, or use `to` with a child element ref to scroll that child into view. Outputs command result as JSON when running in JSON mode, otherwise prints the element ref and resulting scroll offset.
+    
+    Parameters:
+        ref (str | None): Element reference ID (e.g., "ref_5"). Required if `panel` and `name` are not provided.
+        panel (str | None): Panel name; used together with `name` to identify the element when `ref` is not supplied.
+        name (str | None): Element name; used together with `panel` to identify the element when `ref` is not supplied.
+        x (float | None): Absolute horizontal scroll offset.
+        y (float | None): Absolute vertical scroll offset.
+        to (str | None): Child element ref ID to scroll into view.
     """
     context: CLIContext = ctx.obj
 

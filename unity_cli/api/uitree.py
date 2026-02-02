@@ -72,17 +72,20 @@ class UITreeAPI:
         include_style: bool = False,
         include_children: bool = False,
     ) -> dict[str, Any]:
-        """Inspect a specific UI element.
-
-        Args:
-            ref: Element reference ID (e.g., "ref_3").
-            panel: Panel name (used with name).
-            name: Element name (used with panel).
-            include_style: Include resolvedStyle info.
-            include_children: Include children info.
-
+        """
+        Retrieve detailed information for a UI element.
+        
+        Targets an element by `ref`, or by `panel` and `name` when `ref` is not provided. Optionally include resolved style and child data.
+        
+        Parameters:
+            ref (str | None): Element reference ID (e.g., "ref_3").
+            panel (str | None): Panel name to locate the element when using `name`.
+            name (str | None): Element name within the specified panel.
+            include_style (bool): Include resolved style information when True.
+            include_children (bool): Include children information when True.
+        
         Returns:
-            Dictionary containing element details.
+            dict[str, Any]: Dictionary containing the element details.
         """
         params: dict[str, Any] = {
             "action": "inspect",
@@ -105,17 +108,18 @@ class UITreeAPI:
         button: int = 0,
         click_count: int = 1,
     ) -> dict[str, Any]:
-        """Click a UI element.
-
-        Args:
-            ref: Element reference ID (e.g., "ref_3").
-            panel: Panel name (used with name).
-            name: Element name (used with panel).
-            button: Mouse button (0=left, 1=right, 2=middle).
-            click_count: Click count (2=double click).
-
+        """
+        Click a UI element.
+        
+        Parameters:
+            ref (str | None): Element reference ID (e.g., "ref_3").
+            panel (str | None): Panel name used together with `name` to locate the element.
+            name (str | None): Element name used together with `panel` to locate the element.
+            button (int): Mouse button to use: 0 = left, 1 = right, 2 = middle.
+            click_count (int): Number of clicks (e.g., 2 for double click).
+        
         Returns:
-            Dictionary containing click result.
+            dict[str, Any]: Result dictionary describing the outcome of the click.
         """
         params: dict[str, Any] = {"action": "click"}
         if ref:
@@ -139,18 +143,19 @@ class UITreeAPI:
         y: float | None = None,
         to_child: str | None = None,
     ) -> dict[str, Any]:
-        """Scroll a ScrollView element.
-
-        Args:
-            ref: Element reference ID (e.g., "ref_5").
-            panel: Panel name (used with name).
-            name: Element name (used with panel).
-            x: Absolute scroll offset X.
-            y: Absolute scroll offset Y.
-            to_child: Ref ID of child element to scroll into view.
-
+        """
+        Scroll a ScrollView element to specific coordinates or bring a child element into view.
+        
+        Parameters:
+            ref (str | None): Element reference ID (e.g., "ref_5").
+            panel (str | None): Panel name used together with `name`.
+            name (str | None): Element name used together with `panel`.
+            x (float | None): Absolute horizontal scroll offset.
+            y (float | None): Absolute vertical scroll offset.
+            to_child (str | None): Ref ID of a child element to scroll into view.
+        
         Returns:
-            Dictionary containing scroll result with scrollOffset.
+            dict[str, Any]: Response containing the scroll result, including `scrollOffset`.
         """
         params: dict[str, Any] = {"action": "scroll"}
         if ref:
@@ -173,15 +178,16 @@ class UITreeAPI:
         panel: str | None = None,
         name: str | None = None,
     ) -> dict[str, Any]:
-        """Get text content of a UI element.
-
-        Args:
-            ref: Element reference ID (e.g., "ref_7").
-            panel: Panel name (used with name).
-            name: Element name (used with panel).
-
+        """
+        Retrieve the text content of a UI element.
+        
+        Parameters:
+            ref (str | None): Element reference ID (e.g., "ref_7").
+            panel (str | None): Panel name to scope the lookup.
+            name (str | None): Element name within the panel.
+        
         Returns:
-            Dictionary containing element text.
+            dict[str, Any]: Response dictionary containing the element text.
         """
         params: dict[str, Any] = {"action": "text"}
         if ref:
