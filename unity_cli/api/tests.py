@@ -22,7 +22,6 @@ class TestAPI:
         categories: list[str] | None = None,
         assemblies: list[str] | None = None,
         group_pattern: str | None = None,
-        synchronous: bool = False,
     ) -> dict[str, Any]:
         """Run Unity tests with optional filtering.
 
@@ -32,7 +31,6 @@ class TestAPI:
             categories: Test categories to run
             assemblies: Assembly names to run tests from
             group_pattern: Regex pattern for test names/namespaces
-            synchronous: Run synchronously (EditMode only)
 
         Returns:
             Dictionary with test run results
@@ -47,8 +45,6 @@ class TestAPI:
             params["assemblies"] = assemblies
         if group_pattern:
             params["groupPattern"] = group_pattern
-        if synchronous:
-            params["synchronous"] = synchronous
 
         return self._conn.send_request("tests", params)
 
