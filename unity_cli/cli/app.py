@@ -535,6 +535,56 @@ def _complete_test_mode(incomplete: str) -> list[tuple[str, str]]:
     return [(m, h) for m, h in modes if m.startswith(incomplete)]
 
 
+def _poll_test_results(context: CLIContext, interval: float = 1.5) -> dict[str, Any]:
+    """Poll test status until completion, showing progress on stderr.
+
+    Args:
+        context: CLI context with client
+        interval: Polling interval in seconds
+
+    Returns:
+        Final test results dict
+
+    Raises:
+        typer.Exit: On KeyboardInterrupt (code 130) or test failure (code 1)
+    """
+    import time
+
+    from rich.live import Live
+    from rich.text import Text as RichText
+
+    try:
+        with Live(RichText("Waiting for tests...", style="dim"), console=err_console, refresh_per_second=2) as live:
+            while True:
+                time.sleep(interval)
+                status = context.client.tests.status()
+
+                if status.get("running"):
+                    passed = status.get("passed", 0)
+                    failed = status.get("failed", 0)
+                    skipped = status.get("skipped", 0)
+                    started = status.get("testsStarted", 0)
+                    finished = status.get("testsFinished", 0)
+
+                    progress = RichText()
+                    progress.append("Running tests ", style="bold")
+                    progress.append(f"({finished}/{started}) ", style="dim")
+                    progress.append(f"Pass:{passed}", style="green")
+                    progress.append(" ")
+                    progress.append(f"Fail:{failed}", style="red" if failed else "dim")
+                    progress.append(" ")
+                    progress.append(f"Skip:{skipped}", style="yellow" if skipped else "dim")
+                    live.update(progress)
+                    continue
+
+                # Test run complete or no active run
+                return status
+    except KeyboardInterrupt:
+        err_console.print("\nPolling interrupted. Tests may still be running in Unity.", style="yellow")
+        err_console.print("Use 'u tests status' to check progress.", style="dim")
+        raise typer.Exit(130) from None
+
+
 @tests_app.command("run")
 def tests_run(
     ctx: typer.Context,
@@ -555,9 +605,9 @@ def tests_run(
         str | None,
         typer.Option("--group-pattern", "-g", help="Regex pattern for test names"),
     ] = None,
-    sync: Annotated[
+    no_wait: Annotated[
         bool,
-        typer.Option("--sync", "-s", help="Run synchronously (EditMode only)"),
+        typer.Option("--no-wait", help="Return immediately without waiting for results"),
     ] = False,
 ) -> None:
     """Run Unity tests."""
@@ -569,9 +619,24 @@ def tests_run(
             categories=categories,
             assemblies=assemblies,
             group_pattern=group_pattern,
-            synchronous=sync,
         )
-        print_json(result, None)
+
+        if no_wait:
+            print_json(result, None)
+            return
+
+        # Auto-poll for results
+        from unity_cli.cli.output import print_test_results_table
+
+        final = _poll_test_results(context)
+
+        if "tests" in final:
+            print_test_results_table(final["tests"])
+        else:
+            print_json(final, None)
+
+        if final.get("failed", 0) > 0:
+            raise typer.Exit(1)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None

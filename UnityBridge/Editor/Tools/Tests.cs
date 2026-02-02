@@ -148,21 +148,7 @@ namespace UnityBridge.Tools
                 };
                 Api.RegisterCallbacks(_activeCollector, 1);
 
-                // Check for synchronous execution (EditMode only)
-                var sync = parameters["synchronous"]?.Value<bool>() ?? false;
                 var executionSettings = new ExecutionSettings(filter);
-
-                if (sync && testMode == TestMode.EditMode)
-                {
-                    executionSettings.runSynchronously = true;
-                    Api.Execute(executionSettings);
-
-                    // Synchronous execution completes immediately
-                    var result = BuildResultJson(_activeCollector);
-                    Api.UnregisterCallbacks(_activeCollector);
-                    _activeCollector = null;
-                    return Task.FromResult(result);
-                }
 
                 // Async execution - wait for completion using TaskCompletionSource
                 var tcs = new TaskCompletionSource<JObject>(TaskCreationOptions.RunContinuationsAsynchronously);
