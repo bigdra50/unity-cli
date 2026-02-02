@@ -5,6 +5,5 @@
   "author": {
     "name": "bigdra50"
   },
-  "repository": "https://github.com/bigdra50/unity-cli",
-  "hooks": "./hooks/hooks.json"
+  "repository": "https://github.com/bigdra50/unity-cli"
 }
