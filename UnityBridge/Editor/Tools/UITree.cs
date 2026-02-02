@@ -216,6 +216,10 @@ namespace UnityBridge.Tools
                 throw new ProtocolException(ErrorCode.InvalidParams,
                     $"Element is disabled: {refId}");
 
+            if (target.panel == null)
+                throw new ProtocolException(ErrorCode.InvalidParams,
+                    $"Element not connected to a panel: {refId}");
+
             var center = target.worldBound.center;
 
             var down = new Event

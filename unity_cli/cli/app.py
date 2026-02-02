@@ -1878,6 +1878,14 @@ def uitree_click(
         print_error("ref argument or --panel + --name required")
         raise typer.Exit(1) from None
 
+    if button not in (0, 1, 2):
+        print_error("--button must be 0 (left), 1 (right), or 2 (middle)")
+        raise typer.Exit(1) from None
+
+    if count < 1:
+        print_error("--count must be a positive integer (>= 1)")
+        raise typer.Exit(1) from None
+
     try:
         result = context.client.uitree.click(
             ref=ref,
