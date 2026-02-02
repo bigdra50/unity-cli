@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -13,7 +14,9 @@ namespace UnityBridge.Tools
     [BridgeTool("screenshot")]
     public static class Screenshot
     {
-        public static JObject HandleCommand(JObject parameters)
+        private static readonly Type GameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+
+        public static Task<JObject> HandleCommand(JObject parameters)
         {
             var action = parameters["action"]?.Value<string>() ?? "capture";
 
@@ -26,7 +29,7 @@ namespace UnityBridge.Tools
             };
         }
 
-        private static JObject Capture(JObject parameters)
+        private static Task<JObject> Capture(JObject parameters)
         {
             var source = parameters["source"]?.Value<string>() ?? "game";
             var path = parameters["path"]?.Value<string>();
@@ -47,29 +50,97 @@ namespace UnityBridge.Tools
 
             return source.ToLowerInvariant() switch
             {
-                "game" => CaptureGameView(path, superSize),
-                "scene" => CaptureSceneView(path),
-                "camera" => CaptureCamera(parameters),
+                "game" => CaptureGameViewAsync(path, superSize),
+                "scene" => Task.FromResult(CaptureSceneView(path)),
+                "camera" => Task.FromResult(CaptureCamera(parameters)),
                 _ => throw new ProtocolException(
                     ErrorCode.InvalidParams,
                     $"Unknown source: {source}. Valid sources: game, scene, camera")
             };
         }
 
-        private static JObject CaptureGameView(string path, int superSize)
+        private static Task<JObject> CaptureGameViewAsync(string path, int superSize)
         {
             superSize = Mathf.Clamp(superSize, 1, 4);
 
-            ScreenCapture.CaptureScreenshot(path, superSize);
-
-            return new JObject
+            if (GameViewType == null)
             {
-                ["message"] = $"GameView screenshot captured",
-                ["path"] = path,
-                ["source"] = "game",
-                ["superSize"] = superSize,
-                ["note"] = "Screenshot will be saved after the current frame renders. Editor focus required."
-            };
+                throw new ProtocolException(
+                    ErrorCode.InternalError,
+                    "GameView type not found via reflection");
+            }
+
+            var gameView = EditorWindow.GetWindow(GameViewType, false, null, true);
+            if (gameView == null)
+            {
+                throw new ProtocolException(
+                    ErrorCode.InternalError,
+                    "Failed to get GameView window");
+            }
+
+            gameView.Focus();
+            gameView.Repaint();
+
+            var tcs = new TaskCompletionSource<JObject>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var framesToWait = 2;
+            var captured = false;
+            var startTime = DateTime.UtcNow;
+            const int timeoutSeconds = 10;
+
+            void OnUpdate()
+            {
+                try
+                {
+                    if ((DateTime.UtcNow - startTime).TotalSeconds > timeoutSeconds)
+                    {
+                        EditorApplication.update -= OnUpdate;
+                        tcs.TrySetException(new ProtocolException(
+                            ErrorCode.InternalError,
+                            "GameView screenshot capture timed out"));
+                        return;
+                    }
+
+                    // Wait frames for GameView to render after Focus + Repaint
+                    if (framesToWait > 0)
+                    {
+                        framesToWait--;
+                        return;
+                    }
+
+                    // Trigger capture once
+                    if (!captured)
+                    {
+                        ScreenCapture.CaptureScreenshot(path, superSize);
+                        captured = true;
+                        return;
+                    }
+
+                    // Poll for file save completion
+                    if (File.Exists(path) && new FileInfo(path).Length > 0)
+                    {
+                        EditorApplication.update -= OnUpdate;
+                        tcs.TrySetResult(new JObject
+                        {
+                            ["message"] = "GameView screenshot captured",
+                            ["path"] = path,
+                            ["source"] = "game",
+                            ["superSize"] = superSize
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    EditorApplication.update -= OnUpdate;
+                    tcs.TrySetException(ex is ProtocolException ? ex :
+                        new ProtocolException(ErrorCode.InternalError,
+                            $"GameView screenshot failed: {ex.Message}"));
+                }
+            }
+
+            EditorApplication.update += OnUpdate;
+            EditorApplication.QueuePlayerLoopUpdate();
+
+            return tcs.Task;
         }
 
         private static JObject CaptureCamera(JObject parameters)
