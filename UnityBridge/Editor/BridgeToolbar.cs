@@ -4,17 +4,14 @@ using UnityBridge.Helpers;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
-#if UNITY_6000_3_OR_NEWER
-using UnityEditor.Toolbars;
-#endif
 
 namespace UnityBridge
 {
     internal static class BridgeToolbarHelper
     {
-        static readonly Color DisconnectedColor = new(0.5f, 0.5f, 0.5f);
-        static readonly Color ConnectingColor = new(0.9f, 0.7f, 0.2f);
-        static readonly Color ConnectedColor = new(0.3f, 0.8f, 0.3f);
+        internal static readonly Color DisconnectedColor = new(0.5f, 0.5f, 0.5f);
+        internal static readonly Color ConnectingColor = new(0.9f, 0.7f, 0.2f);
+        internal static readonly Color ConnectedColor = new(0.3f, 0.8f, 0.3f);
 
         static VisualElement s_button;
         static ConnectionStatus s_lastStatus = ConnectionStatus.Disconnected;
@@ -142,19 +139,6 @@ namespace UnityBridge
         }
     }
 
-#if UNITY_6000_3_OR_NEWER
-    [EditorToolbarElement("UnityBridge/Connection", typeof(EditorWindow))]
-    sealed class BridgeToolbarElement : VisualElement
-    {
-        public BridgeToolbarElement()
-        {
-            var button = BridgeToolbarHelper.CreateButton();
-            button.RegisterCallback<ClickEvent>(_ => BridgeToolbarHelper.ToggleConnection());
-            Add(button);
-            BridgeToolbarHelper.Register(button);
-        }
-    }
-#else
     [InitializeOnLoad]
     static class BridgeToolbarInjector
     {
@@ -168,8 +152,10 @@ namespace UnityBridge
             s_toolbarType = editorAssembly.GetType("UnityEditor.Toolbar");
             var guiViewType = editorAssembly.GetType("UnityEditor.GUIView");
 
-            s_getField = s_toolbarType?.GetField("get",
-                BindingFlags.Public | BindingFlags.Static);
+            // Unity 6000.3+ changed "get" field - try multiple approaches
+            s_getField = s_toolbarType?.GetField("get", BindingFlags.Public | BindingFlags.Static)
+                      ?? s_toolbarType?.GetField("get", BindingFlags.NonPublic | BindingFlags.Static);
+
             s_visualTreeProp = guiViewType?.GetProperty("visualTree",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -189,12 +175,25 @@ namespace UnityBridge
 
             EditorApplication.update -= WaitForToolbar;
 
-            if (s_visualTreeProp.GetValue(toolbar) is not VisualElement root) return;
+            if (s_visualTreeProp?.GetValue(toolbar) is not VisualElement root) return;
 
-            var rightZone = root.Q("ToolbarZoneRightAlign");
+            // Unity 6000.3+: find the main toolbar container
+            var overlayContainer = root.Query<VisualElement>().Where(e => e.GetType().Name == "MainToolbarOverlayContainer").First();
+
+            // Find the right-most ContainerSection (after Account/Services)
+            VisualElement rightZone = null;
+            if (overlayContainer != null)
+            {
+                var sections = overlayContainer.Query<VisualElement>().Where(e => e.GetType().Name == "ContainerSection").ToList();
+                rightZone = sections.Count > 0 ? sections[sections.Count - 1] : null;
+            }
+
+            // Fallback for older Unity versions
+            rightZone ??= root.Q("ToolbarZoneRightAlign");
+
             if (rightZone == null)
             {
-                BridgeLog.Warn("Toolbar injection: ToolbarZoneRightAlign not found");
+                BridgeLog.Warn("Toolbar injection: right zone not found");
                 return;
             }
 
@@ -203,6 +202,6 @@ namespace UnityBridge
             rightZone.Insert(0, button);
             BridgeToolbarHelper.Register(button);
         }
+
     }
-#endif
 }
