@@ -61,6 +61,13 @@ namespace UnityBridge.Tools
 
         private static Task<JObject> CaptureGameViewAsync(string path, int superSize)
         {
+            if (!EditorApplication.isPlaying)
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "GameView screenshot requires Play Mode. Enter Play Mode first with 'manage_editor play' command.");
+            }
+
             superSize = Mathf.Clamp(superSize, 1, 4);
 
             if (GameViewType == null)
