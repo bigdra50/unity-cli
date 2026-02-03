@@ -30,9 +30,12 @@ namespace UnityBridge.Tools
                 "dump" => HandleDump(parameters),
                 "query" => HandleQuery(parameters),
                 "inspect" => HandleInspect(parameters),
+                "click" => HandleClick(parameters),
+                "scroll" => HandleScroll(parameters),
+                "text" => HandleText(parameters),
                 _ => throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"Unknown action: {action}. Valid actions: dump, query, inspect")
+                    $"Unknown action: {action}. Valid actions: dump, query, inspect, click, scroll, text")
             };
         }
 
@@ -145,11 +148,19 @@ namespace UnityBridge.Tools
 
         private static JObject HandleInspect(JObject parameters)
         {
+            var includeStyle = parameters["include_style"]?.Value<bool>() ?? false;
+            var includeChildren = parameters["include_children"]?.Value<bool>() ?? false;
+
+            var (target, elementRefId) = ResolveTarget(parameters);
+            var result = BuildInspectResult(target, elementRefId, includeStyle, includeChildren);
+            return result;
+        }
+
+        private static (VisualElement element, string refId) ResolveTarget(JObject parameters)
+        {
             var refId = parameters["ref"]?.Value<string>();
             var panelName = parameters["panel"]?.Value<string>();
             var nameFilter = parameters["name"]?.Value<string>();
-            var includeStyle = parameters["include_style"]?.Value<bool>() ?? false;
-            var includeChildren = parameters["include_children"]?.Value<bool>() ?? false;
 
             VisualElement target = null;
 
@@ -192,8 +203,142 @@ namespace UnityBridge.Tools
             }
 
             var elementRefId = FindOrAssignRef(target);
-            var result = BuildInspectResult(target, elementRefId, includeStyle, includeChildren);
-            return result;
+            return (target, elementRefId);
+        }
+
+        private static JObject HandleClick(JObject parameters)
+        {
+            var (target, refId) = ResolveTarget(parameters);
+            var button = parameters["button"]?.Value<int>() ?? 0;
+            var clickCount = parameters["click_count"]?.Value<int>() ?? 1;
+
+            if (!target.enabledInHierarchy)
+                throw new ProtocolException(ErrorCode.InvalidParams,
+                    $"Element is disabled: {refId}");
+
+            if (target.panel == null)
+                throw new ProtocolException(ErrorCode.InvalidParams,
+                    $"Element not connected to a panel: {refId}");
+
+            var center = target.worldBound.center;
+
+            var down = new Event
+            {
+                type = EventType.MouseDown,
+                mousePosition = center,
+                button = button,
+                clickCount = clickCount
+            };
+            using (var pd = PointerDownEvent.GetPooled(down))
+            {
+                pd.target = target;
+                target.panel.visualTree.SendEvent(pd);
+            }
+
+            var up = new Event
+            {
+                type = EventType.MouseUp,
+                mousePosition = center,
+                button = button,
+                clickCount = clickCount
+            };
+            using (var pu = PointerUpEvent.GetPooled(up))
+            {
+                pu.target = target;
+                target.panel.visualTree.SendEvent(pu);
+            }
+
+            return new JObject
+            {
+                ["ref"] = refId,
+                ["type"] = target.GetType().Name,
+                ["action"] = "click",
+                ["message"] = "Clicked element"
+            };
+        }
+
+        private static JObject HandleScroll(JObject parameters)
+        {
+            var (target, refId) = ResolveTarget(parameters);
+            var scrollView = FindScrollView(target);
+
+            if (scrollView == null)
+                throw new ProtocolException(ErrorCode.InvalidParams,
+                    $"No ScrollView found at or above element: {refId}");
+
+            var toChild = parameters["to_child"]?.Value<string>();
+            if (!string.IsNullOrEmpty(toChild))
+            {
+                var child = ResolveRef(toChild);
+                if (child == null)
+                    throw new ProtocolException(ErrorCode.InvalidParams,
+                        $"to_child ref not found: {toChild}");
+
+                scrollView.ScrollTo(child);
+            }
+            else
+            {
+                var offset = scrollView.scrollOffset;
+                var x = parameters["x"];
+                var y = parameters["y"];
+
+                if (x == null && y == null)
+                    throw new ProtocolException(ErrorCode.InvalidParams,
+                        "Either 'x'/'y' or 'to_child' parameter is required for scroll");
+
+                if (x != null) offset.x = x.Value<float>();
+                if (y != null) offset.y = y.Value<float>();
+                scrollView.scrollOffset = offset;
+            }
+
+            var svRefId = FindOrAssignRef(scrollView);
+            var finalOffset = scrollView.scrollOffset;
+            return new JObject
+            {
+                ["ref"] = svRefId,
+                ["type"] = "ScrollView",
+                ["action"] = "scroll",
+                ["scrollOffset"] = new JObject
+                {
+                    ["x"] = finalOffset.x,
+                    ["y"] = finalOffset.y
+                },
+                ["message"] = "Scrolled element"
+            };
+        }
+
+        private static JObject HandleText(JObject parameters)
+        {
+            var (target, refId) = ResolveTarget(parameters);
+
+            string text = null;
+
+            if (target is TextElement textElement)
+            {
+                text = textElement.text;
+            }
+            else if (target is BaseField<string> stringField)
+            {
+                text = stringField.value;
+            }
+            else
+            {
+                var childText = target.Q<TextElement>();
+                if (childText != null)
+                    text = childText.text;
+            }
+
+            if (text == null)
+                throw new ProtocolException(ErrorCode.InvalidParams,
+                    $"Element has no text content: {refId} ({target.GetType().Name})");
+
+            return new JObject
+            {
+                ["ref"] = refId,
+                ["type"] = target.GetType().Name,
+                ["action"] = "text",
+                ["text"] = text
+            };
         }
 
         #endregion
@@ -694,6 +839,17 @@ namespace UnityBridge.Tools
         #endregion
 
         #region Helpers
+
+        private static ScrollView FindScrollView(VisualElement element)
+        {
+            var current = element;
+            while (current != null)
+            {
+                if (current is ScrollView sv) return sv;
+                current = current.parent;
+            }
+            return null;
+        }
 
         private static VisualElement FindElementByName(VisualElement root, string name)
         {

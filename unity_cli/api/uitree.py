@@ -96,3 +96,98 @@ class UITreeAPI:
         if name:
             params["name"] = name
         return self._conn.send_request("uitree", params)
+
+    def click(
+        self,
+        ref: str | None = None,
+        panel: str | None = None,
+        name: str | None = None,
+        button: int = 0,
+        click_count: int = 1,
+    ) -> dict[str, Any]:
+        """Click a UI element.
+
+        Args:
+            ref: Element reference ID (e.g., "ref_3").
+            panel: Panel name (used with name).
+            name: Element name (used with panel).
+            button: Mouse button (0=left, 1=right, 2=middle).
+            click_count: Click count (2=double click).
+
+        Returns:
+            Dictionary containing click result.
+        """
+        params: dict[str, Any] = {"action": "click"}
+        if ref:
+            params["ref"] = ref
+        if panel:
+            params["panel"] = panel
+        if name:
+            params["name"] = name
+        if button != 0:
+            params["button"] = button
+        if click_count != 1:
+            params["click_count"] = click_count
+        return self._conn.send_request("uitree", params)
+
+    def scroll(
+        self,
+        ref: str | None = None,
+        panel: str | None = None,
+        name: str | None = None,
+        x: float | None = None,
+        y: float | None = None,
+        to_child: str | None = None,
+    ) -> dict[str, Any]:
+        """Scroll a ScrollView element.
+
+        Args:
+            ref: Element reference ID (e.g., "ref_5").
+            panel: Panel name (used with name).
+            name: Element name (used with panel).
+            x: Absolute scroll offset X.
+            y: Absolute scroll offset Y.
+            to_child: Ref ID of child element to scroll into view.
+
+        Returns:
+            Dictionary containing scroll result with scrollOffset.
+        """
+        params: dict[str, Any] = {"action": "scroll"}
+        if ref:
+            params["ref"] = ref
+        if panel:
+            params["panel"] = panel
+        if name:
+            params["name"] = name
+        if x is not None:
+            params["x"] = x
+        if y is not None:
+            params["y"] = y
+        if to_child:
+            params["to_child"] = to_child
+        return self._conn.send_request("uitree", params)
+
+    def text(
+        self,
+        ref: str | None = None,
+        panel: str | None = None,
+        name: str | None = None,
+    ) -> dict[str, Any]:
+        """Get text content of a UI element.
+
+        Args:
+            ref: Element reference ID (e.g., "ref_7").
+            panel: Panel name (used with name).
+            name: Element name (used with panel).
+
+        Returns:
+            Dictionary containing element text.
+        """
+        params: dict[str, Any] = {"action": "text"}
+        if ref:
+            params["ref"] = ref
+        if panel:
+            params["panel"] = panel
+        if name:
+            params["name"] = name
+        return self._conn.send_request("uitree", params)

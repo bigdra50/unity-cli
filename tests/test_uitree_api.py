@@ -216,6 +216,164 @@ class TestUITreeAPIInspect:
         }
 
 
+class TestUITreeAPIClick:
+    """click() メソッドのテスト"""
+
+    def test_click_with_ref(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {"ref": "ref_3", "action": "click"}
+
+        sut.click(ref="ref_3")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["action"] == "click"
+        assert params["ref"] == "ref_3"
+        assert "button" not in params
+        assert "click_count" not in params
+
+    def test_click_with_panel_and_name(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.click(panel="GameView", name="StartBtn")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["panel"] == "GameView"
+        assert params["name"] == "StartBtn"
+        assert "ref" not in params
+
+    def test_click_default_button_not_sent(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.click(ref="ref_3")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert "button" not in params
+
+    def test_click_non_default_button_sent(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.click(ref="ref_3", button=1)
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["button"] == 1
+
+    def test_click_default_click_count_not_sent(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.click(ref="ref_3")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert "click_count" not in params
+
+    def test_click_double_click(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.click(ref="ref_3", click_count=2)
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["click_count"] == 2
+
+
+class TestUITreeAPIScroll:
+    """scroll() メソッドのテスト"""
+
+    def test_scroll_offset_mode(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {"ref": "ref_5", "scrollOffset": {"x": 0, "y": 500}}
+
+        sut.scroll(ref="ref_5", y=500.0)
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["action"] == "scroll"
+        assert params["ref"] == "ref_5"
+        assert params["y"] == 500.0
+        assert "x" not in params
+
+    def test_scroll_both_axes(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.scroll(ref="ref_5", x=100.0, y=200.0)
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["x"] == 100.0
+        assert params["y"] == 200.0
+
+    def test_scroll_to_child_mode(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.scroll(ref="ref_5", to_child="ref_12")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["to_child"] == "ref_12"
+        assert "x" not in params
+        assert "y" not in params
+
+    def test_scroll_with_panel_and_name(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.scroll(panel="GameView", name="ScrollArea", y=0.0)
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["panel"] == "GameView"
+        assert params["name"] == "ScrollArea"
+        assert params["y"] == 0.0
+
+    def test_scroll_none_values_not_sent(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.scroll(ref="ref_5")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert "x" not in params
+        assert "y" not in params
+        assert "to_child" not in params
+
+
+class TestUITreeAPIText:
+    """text() メソッドのテスト"""
+
+    def test_text_with_ref(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {"ref": "ref_7", "text": "Hello"}
+
+        result = sut.text(ref="ref_7")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["action"] == "text"
+        assert params["ref"] == "ref_7"
+        assert result["text"] == "Hello"
+
+    def test_text_with_panel_and_name(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {"text": "Title"}
+
+        sut.text(panel="GameView", name="TitleLabel")
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params["panel"] == "GameView"
+        assert params["name"] == "TitleLabel"
+        assert "ref" not in params
+
+    def test_text_without_ref_or_panel_still_sends_request(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        """API層はバリデーションしない（CLI層で行う）"""
+        mock_conn.send_request.return_value = {}
+
+        sut.text()
+
+        call_args = mock_conn.send_request.call_args
+        params = call_args[0][1]
+        assert params == {"action": "text"}
+
+
 class TestUITreeAPIParameterIntegrity:
     """パラメータの整合性テスト"""
 
@@ -231,6 +389,15 @@ class TestUITreeAPIParameterIntegrity:
         sut.inspect(ref="ref_0")
         assert mock_conn.send_request.call_args_list[2][0][0] == "uitree"
 
+        sut.click(ref="ref_0")
+        assert mock_conn.send_request.call_args_list[3][0][0] == "uitree"
+
+        sut.scroll(ref="ref_0")
+        assert mock_conn.send_request.call_args_list[4][0][0] == "uitree"
+
+        sut.text(ref="ref_0")
+        assert mock_conn.send_request.call_args_list[5][0][0] == "uitree"
+
     def test_dump_action_value(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
         mock_conn.send_request.return_value = {}
         sut.dump()
@@ -245,3 +412,18 @@ class TestUITreeAPIParameterIntegrity:
         mock_conn.send_request.return_value = {}
         sut.inspect(ref="ref_0")
         assert mock_conn.send_request.call_args[0][1]["action"] == "inspect"
+
+    def test_click_action_value(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+        sut.click(ref="ref_0")
+        assert mock_conn.send_request.call_args[0][1]["action"] == "click"
+
+    def test_scroll_action_value(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+        sut.scroll(ref="ref_0")
+        assert mock_conn.send_request.call_args[0][1]["action"] == "scroll"
+
+    def test_text_action_value(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+        sut.text(ref="ref_0")
+        assert mock_conn.send_request.call_args[0][1]["action"] == "text"
