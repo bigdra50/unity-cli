@@ -9,6 +9,9 @@ namespace UnityBridge
     /// </summary>
     public class BridgeEditorWindow : EditorWindow
     {
+        private const string EditorPrefsKeyHost = "UnityBridge.Connection.Host";
+        private const string EditorPrefsKeyPort = "UnityBridge.Connection.Port";
+
         private string _host = "127.0.0.1";
         private int _port = ProtocolConstants.DefaultPort;
         private Vector2 _scrollPosition;
@@ -35,6 +38,12 @@ namespace UnityBridge
 
         private void OnEnable()
         {
+            _host = EditorPrefs.GetString(EditorPrefsKeyHost, "127.0.0.1");
+            _port = Mathf.Clamp(
+                EditorPrefs.GetInt(EditorPrefsKeyPort, ProtocolConstants.DefaultPort),
+                1,
+                65535);
+
             RelayServerLauncher.Instance.ServerStarted += OnServerStateChanged;
             RelayServerLauncher.Instance.ServerStopped += OnServerStateChanged;
             EditorApplication.update += PollConnectionStatus;
@@ -199,13 +208,23 @@ namespace UnityBridge
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.LabelField("Host:", GUILayout.Width(40));
-                _host = EditorGUILayout.TextField(_host);
+                var newHost = EditorGUILayout.TextField(_host);
+                if (newHost != _host)
+                {
+                    _host = newHost.Trim();
+                    EditorPrefs.SetString(EditorPrefsKeyHost, _host);
+                }
             }
 
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.LabelField("Port:", GUILayout.Width(40));
-                _port = EditorGUILayout.IntField(_port);
+                var newPort = Mathf.Clamp(EditorGUILayout.IntField(_port), 1, 65535);
+                if (newPort != _port)
+                {
+                    _port = newPort;
+                    EditorPrefs.SetInt(EditorPrefsKeyPort, _port);
+                }
             }
 
             EditorGUILayout.Space(5);
