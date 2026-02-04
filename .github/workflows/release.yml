@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag matches source versions
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PY_VERSION=$(python3 -c "
+          import tomllib, pathlib
+          data = tomllib.loads(pathlib.Path('pyproject.toml').read_text())
+          print(data['project']['version'])
+          ")
+          UPM_VERSION=$(python3 -c "
+          import json, pathlib
+          data = json.loads(pathlib.Path('UnityBridge/package.json').read_text())
+          print(data['version'])
+          ")
+
+          echo "Tag version:             $TAG_VERSION"
+          echo "pyproject.toml:          $PY_VERSION"
+          echo "UnityBridge/package.json: $UPM_VERSION"
+
+          FAILED=0
+          if [ "$TAG_VERSION" != "$PY_VERSION" ]; then
+            echo "::error::Tag $TAG_VERSION != pyproject.toml $PY_VERSION"
+            FAILED=1
+          fi
+          if [ "$TAG_VERSION" != "$UPM_VERSION" ]; then
+            echo "::error::Tag $TAG_VERSION != package.json $UPM_VERSION"
+            FAILED=1
+          fi
+          if [ "$FAILED" -ne 0 ]; then
+            echo ""
+            echo "Fix: python scripts/bump-version.py $TAG_VERSION && git commit -am 'bump version' && git tag -f v$TAG_VERSION"
+            exit 1
+          fi
+
+  test:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | sed -n '2p')
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          {
+            echo "NOTES<<EOF"
+            git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges
+            echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          NOTES: ${{ steps.notes.outputs.NOTES }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "$NOTES"
