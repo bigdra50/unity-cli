@@ -24,10 +24,9 @@ namespace UnityBridge.Tools
                 "execute" => ExecuteMenuItem(parameters),
                 "list" => ListMenuItems(parameters),
                 "context" => ExecuteContextMenu(parameters),
-                _ => new JObject
-                {
-                    ["error"] = $"Unknown action: {action}. Valid: execute, list, context"
-                }
+                _ => throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"Unknown action: {action}. Valid actions: execute, list, context")
             };
         }
 
@@ -36,7 +35,9 @@ namespace UnityBridge.Tools
             var path = parameters["path"]?.ToString();
             if (string.IsNullOrEmpty(path))
             {
-                return new JObject { ["error"] = "path is required" };
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "'path' is required for execute action");
             }
 
             var result = EditorApplication.ExecuteMenuItem(path);
@@ -78,7 +79,9 @@ namespace UnityBridge.Tools
 
             if (string.IsNullOrEmpty(methodName))
             {
-                return new JObject { ["error"] = "method is required" };
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "'method' is required for context action");
             }
 
             UnityEngine.Object targetObject = null;
@@ -99,10 +102,9 @@ namespace UnityBridge.Tools
 
                 if (targetObject == null)
                 {
-                    return new JObject
-                    {
-                        ["error"] = $"Target not found: {targetPath}"
-                    };
+                    throw new ProtocolException(
+                        ErrorCode.InvalidParams,
+                        $"Target not found: {targetPath}");
                 }
             }
 
@@ -148,10 +150,9 @@ namespace UnityBridge.Tools
 
             if (candidates.Count == 0)
             {
-                return new JObject
-                {
-                    ["error"] = $"ContextMenu not found: {methodName}"
-                };
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"ContextMenu not found: {methodName}");
             }
 
             // If target is a GameObject, search for components with matching ContextMenu
@@ -176,18 +177,16 @@ namespace UnityBridge.Tools
                         }
                         catch (Exception ex)
                         {
-                            return new JObject
-                            {
-                                ["error"] = $"Failed to invoke: {ex.InnerException?.Message ?? ex.Message}"
-                            };
+                            throw new ProtocolException(
+                                ErrorCode.InternalError,
+                                $"Failed to invoke: {ex.InnerException?.Message ?? ex.Message}");
                         }
                     }
                 }
 
-                return new JObject
-                {
-                    ["error"] = $"ContextMenu '{methodName}' not found on any component of '{go.name}'"
-                };
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"ContextMenu '{methodName}' not found on any component of '{go.name}'");
             }
 
             // If target is a Component or ScriptableObject
@@ -199,10 +198,9 @@ namespace UnityBridge.Tools
 
                 if (match.Method == null)
                 {
-                    return new JObject
-                    {
-                        ["error"] = $"ContextMenu '{methodName}' not found on type {targetType.Name}"
-                    };
+                    throw new ProtocolException(
+                        ErrorCode.InvalidParams,
+                        $"ContextMenu '{methodName}' not found on type {targetType.Name}");
                 }
 
                 try
@@ -218,10 +216,9 @@ namespace UnityBridge.Tools
                 }
                 catch (Exception ex)
                 {
-                    return new JObject
-                    {
-                        ["error"] = $"Failed to invoke: {ex.InnerException?.Message ?? ex.Message}"
-                    };
+                    throw new ProtocolException(
+                        ErrorCode.InternalError,
+                        $"Failed to invoke: {ex.InnerException?.Message ?? ex.Message}");
                 }
             }
 
@@ -229,11 +226,9 @@ namespace UnityBridge.Tools
             var selection = Selection.objects;
             if (selection.Length == 0)
             {
-                return new JObject
-                {
-                    ["error"] = "No target specified and nothing selected",
-                    ["hint"] = "Provide 'target' parameter or select an object in Unity"
-                };
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "No target specified and nothing selected. Provide 'target' parameter or select an object in Unity.");
             }
 
             var results = new JArray();

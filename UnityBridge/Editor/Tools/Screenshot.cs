@@ -65,7 +65,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    "GameView screenshot requires Play Mode. Enter Play Mode first with 'manage_editor play' command.");
+                    "GameView screenshot requires Play Mode. Enter play mode first with action 'enter'.");
             }
 
             superSize = Mathf.Clamp(superSize, 1, 4);

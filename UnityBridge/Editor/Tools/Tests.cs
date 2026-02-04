@@ -57,7 +57,7 @@ namespace UnityBridge.Tools
                     "list" => await ListTestsAsync(parameters),
                     _ => throw new ProtocolException(
                         ErrorCode.InvalidParams,
-                        $"Unknown action: {action}")
+                        $"Unknown action: {action}. Valid actions: run, list, status")
                 };
             }
             finally

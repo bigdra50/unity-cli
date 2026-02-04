@@ -26,7 +26,7 @@ namespace UnityBridge.Tools
                 "state" => GetState(),
                 _ => throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"Unknown action: {action}")
+                    $"Unknown action: {action}. Valid actions: enter, exit, pause, unpause, step, state")
             };
         }
 
@@ -84,7 +84,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    "Cannot pause: not in play mode");
+                    "Cannot pause: not in play mode. Enter play mode first with action 'enter'.");
             }
 
             EditorApplication.isPaused = true;
@@ -101,7 +101,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    "Cannot unpause: not in play mode");
+                    "Cannot unpause: not in play mode. Enter play mode first with action 'enter'.");
             }
 
             EditorApplication.isPaused = false;
@@ -118,7 +118,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    "Cannot step: not in play mode");
+                    "Cannot step: not in play mode. Enter play mode first with action 'enter'.");
             }
 
             EditorApplication.Step();

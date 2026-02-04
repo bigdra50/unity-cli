@@ -79,6 +79,16 @@ def print_error(message: str, code: str | None = None) -> None:
         err_console.print(code_text)
 
 
+def print_validation_error(message: str, help_command: str) -> None:
+    """Print validation error with --help guidance.
+
+    Args:
+        message: Error message
+        help_command: Command to show help for (e.g., "u scene load")
+    """
+    print_error(f"{message}. Run '{help_command} --help' for usage.")
+
+
 def print_success(message: str) -> None:
     """Print success message.
 
