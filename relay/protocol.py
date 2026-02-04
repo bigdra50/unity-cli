@@ -11,7 +11,7 @@ import json
 import struct
 import time
 import uuid
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -22,7 +22,7 @@ MAX_PAYLOAD_BYTES = 16 * 1024 * 1024  # 16 MiB
 HEADER_SIZE = 4
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     # Unity -> Relay
     REGISTER = "REGISTER"
     REGISTERED = "REGISTERED"
@@ -45,7 +45,7 @@ class MessageType(str, Enum):
     INSTANCES = "INSTANCES"
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     INSTANCE_NOT_FOUND = "INSTANCE_NOT_FOUND"
     INSTANCE_RELOADING = "INSTANCE_RELOADING"
     INSTANCE_BUSY = "INSTANCE_BUSY"
@@ -63,7 +63,7 @@ class ErrorCode(str, Enum):
     AMBIGUOUS_INSTANCE = "AMBIGUOUS_INSTANCE"
 
 
-class InstanceStatus(str, Enum):
+class InstanceStatus(StrEnum):
     READY = "ready"
     BUSY = "busy"
     RELOADING = "reloading"
