@@ -12,7 +12,13 @@ import logging
 import signal
 from typing import Any
 
-from .instance_registry import AmbiguousInstanceError, InstanceRegistry, QueuedCommand, UnityInstance
+from .instance_registry import (
+    QUEUE_MAX_SIZE,
+    AmbiguousInstanceError,
+    InstanceRegistry,
+    QueuedCommand,
+    UnityInstance,
+)
 from .protocol import (
     PROTOCOL_VERSION,
     CommandMessage,
@@ -559,7 +565,7 @@ class RelayServer:
                 return ErrorMessage.from_code(
                     request_id,
                     ErrorCode.QUEUE_FULL,
-                    f"Command queue is full (max: {instance.queue_size}): {instance.instance_id}. Wait for current commands to complete before sending new ones.",
+                    f"Command queue is full (max: {QUEUE_MAX_SIZE}): {instance.instance_id}. Wait for current commands to complete before sending new ones.",
                 ).to_dict()
 
             # Queue disabled - return BUSY error
