@@ -22,11 +22,9 @@ namespace UnityBridge.Tools
             {
                 "read" => HandleRead(parameters),
                 "clear" => HandleClear(),
-                _ => new JObject
-                {
-                    ["success"] = false,
-                    ["error"] = $"Unknown action: {action}. Valid actions: read, clear"
-                }
+                _ => throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"Unknown action: {action}. Valid actions: read, clear")
             };
         }
 
