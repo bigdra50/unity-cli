@@ -30,11 +30,35 @@ BUMP_TYPES = ("patch", "minor", "major")
 
 
 def read_current_version() -> str:
+    """
+    Retrieve the current project version declared in pyproject.toml.
+    
+    Returns:
+        version (str): The semantic version string from the `project.version` field (e.g., "1.2.3").
+    """
     data = tomllib.loads(PYPROJECT.read_text())
     return data["project"]["version"]
 
 
 def compute_next_version(current: str, spec: str) -> str:
+    """
+    Determine the next semantic version based on the current version and a specification.
+    
+    If `spec` is a concrete version string (format X.Y.Z), it is returned unchanged. If `spec` is one of "patch", "minor", or "major", compute the next version by incrementing the corresponding component:
+    - "patch": increment patch
+    - "minor": increment minor and reset patch to 0
+    - "major": increment major and reset minor and patch to 0
+    
+    Parameters:
+        current (str): Current version in the form "X.Y.Z".
+        spec (str): Either a concrete version "X.Y.Z" or a bump type ("patch", "minor", "major").
+    
+    Returns:
+        str: The next version string (format "X.Y.Z").
+    
+    Side effects:
+        Prints an error and exits the process with status 1 if `spec` is neither a valid version nor a supported bump type.
+    """
     if VERSION_RE.match(spec):
         return spec
 
@@ -56,6 +80,14 @@ def compute_next_version(current: str, spec: str) -> str:
 
 
 def update_pyproject(version: str) -> None:
+    """
+    Update the version value in pyproject.toml to the provided version.
+    
+    Replaces the first occurrence of a top-level `version = "..."` entry in the file while preserving surrounding formatting and writes the updated content back to pyproject.toml.
+    
+    Parameters:
+        version (str): New semantic version string (e.g., "1.2.3").
+    """
     text = PYPROJECT.read_text()
     updated = re.sub(
         r'^(version\s*=\s*")[^"]+(")',
@@ -68,13 +100,28 @@ def update_pyproject(version: str) -> None:
 
 
 def update_package_json(version: str) -> None:
+    """
+    Update the UnityBridge/package.json file's version field on disk.
+    
+    Writes the package.json JSON with the `version` set to `version`, using 2-space indentation and a trailing newline.
+    
+    Parameters:
+    	version (str): Semantic version string to write into the package.json `version` field.
+    """
     data = json.loads(PACKAGE_JSON.read_text())
     data["version"] = version
     PACKAGE_JSON.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
 def cleanup_relay_init() -> bool:
-    """Remove __version__ line from relay/__init__.py if present. Returns True if removed."""
+    """
+    Remove a top-level __version__ assignment from relay/__init__.py if present.
+    
+    This edits relay/__init__.py in place when a line like `__version__ = "x.y.z"` exists.
+    
+    Returns:
+        bool: `True` if a `__version__` assignment line was removed, `False` otherwise.
+    """
     if not RELAY_INIT.exists():
         return False
     text = RELAY_INIT.read_text()
@@ -86,12 +133,25 @@ def cleanup_relay_init() -> bool:
 
 
 def create_tag(version: str) -> None:
+    """
+    Create a git tag named `v{version}` in the repository root.
+    
+    Runs `git tag v{version}` in the repository root and prints the created tag. May raise subprocess.CalledProcessError if the git command fails.
+    
+    Parameters:
+        version (str): Semantic version string (e.g., "1.2.3") to tag without the leading "v".
+    """
     tag = f"v{version}"
     subprocess.run(["git", "tag", tag], check=True, cwd=ROOT)
     print(f"Created tag: {tag}")
 
 
 def main() -> None:
+    """
+    Run the version bump command-line workflow.
+    
+    Parses command-line arguments for an explicit version or bump type and optional flags --tag and --dry-run, computes the next semantic version from pyproject.toml, and displays the planned changes. Unless --dry-run is used, updates pyproject.toml and UnityBridge/package.json with the new version, performs a one-time removal of a __version__ line from relay/__init__.py if present, and, if --tag is specified, creates a git tag `v<version>`.
+    """
     parser = argparse.ArgumentParser(description="Bump project version")
     parser.add_argument("version", help="Explicit version (3.4.0) or bump type (patch/minor/major)")
     parser.add_argument("--tag", action="store_true", help="Create git tag after bumping")
