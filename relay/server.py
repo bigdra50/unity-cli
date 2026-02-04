@@ -394,7 +394,7 @@ class RelayServer:
                 response = ErrorMessage.from_code(
                     request_id,
                     ErrorCode.INSTANCE_NOT_FOUND,
-                    f"Instance not found: {instance_id}",
+                    f"Instance not found: {instance_id}. Check available instances with 'u instances'.",
                 )
             await write_frame(writer, response.to_dict())
 
@@ -462,7 +462,7 @@ class RelayServer:
                     return ErrorMessage.from_code(
                         request_id,
                         ErrorCode.INSTANCE_NOT_FOUND,
-                        f"Instance not found: {instance_id}",
+                        f"Instance not found: {instance_id}. Check available instances with 'u instances'.",
                     ).to_dict()
                 else:
                     # No instances - wait and retry (Unity might be restarting)
@@ -503,7 +503,7 @@ class RelayServer:
             return ErrorMessage.from_code(
                 request_id,
                 ErrorCode.INSTANCE_NOT_FOUND,
-                f"Instance not found after waiting {waited_ms}ms",
+                f"Instance not found after waiting {waited_ms}ms. Ensure Unity Editor has UnityBridge connected. Check with 'u instances'.",
             ).to_dict()
 
         # Check capability support
@@ -518,7 +518,7 @@ class RelayServer:
             return ErrorMessage.from_code(
                 request_id,
                 ErrorCode.INSTANCE_RELOADING,
-                f"Instance still reloading after {waited_ms}ms: {instance.instance_id}",
+                f"Instance still reloading after {waited_ms}ms: {instance.instance_id}. The instance is reloading scripts. Retry the command after a few seconds.",
             ).to_dict()
 
         if waited_ms > 0:
@@ -552,21 +552,21 @@ class RelayServer:
                         return ErrorMessage.from_code(
                             request_id,
                             ErrorCode.TIMEOUT,
-                            f"Queued command timed out after {timeout_ms}ms",
+                            f"Queued command timed out after {timeout_ms}ms. The command was queued but did not complete in time. Consider increasing --timeout or retrying.",
                         ).to_dict()
 
                 # Queue full
                 return ErrorMessage.from_code(
                     request_id,
                     ErrorCode.QUEUE_FULL,
-                    f"Command queue is full (max: {instance.queue_size}): {instance.instance_id}",
+                    f"Command queue is full (max: {instance.queue_size}): {instance.instance_id}. Wait for current commands to complete before sending new ones.",
                 ).to_dict()
 
             # Queue disabled - return BUSY error
             return ErrorMessage.from_code(
                 request_id,
                 ErrorCode.INSTANCE_BUSY,
-                f"Instance is busy: {instance.instance_id}",
+                f"Instance is busy: {instance.instance_id}. The instance is processing another command. Retry the command after a few seconds.",
             ).to_dict()
 
         # Send command to Unity
@@ -606,7 +606,7 @@ class RelayServer:
             return ErrorMessage.from_code(
                 request_id,
                 ErrorCode.TIMEOUT,
-                f"Command timed out after {timeout_ms}ms",
+                f"Command timed out after {timeout_ms}ms. The command did not complete in time. Consider increasing --timeout or retrying.",
             ).to_dict()
 
         except Exception as e:

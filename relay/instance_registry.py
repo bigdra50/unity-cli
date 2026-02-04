@@ -29,7 +29,10 @@ class AmbiguousInstanceError(Exception):
         self.query = query
         self.candidates = candidates
         names = ", ".join(f"{c.project_name} ({c.instance_id})" for c in candidates)
-        super().__init__(f"Ambiguous instance '{query}': matches {names}")
+        super().__init__(
+            f"Ambiguous instance '{query}': matches {names}. "
+            "Use --instance with the full path to specify. Run 'u instances' to list available instances."
+        )
 
 
 # Queue configuration
