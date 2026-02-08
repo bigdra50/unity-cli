@@ -140,14 +140,21 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
         console.print("No Unity instances connected", style="dim")
         return
 
+    # Detect duplicate project names to decide whether to show path
+    project_names = [inst.get("project_name", "") for inst in instances]
+    has_duplicates = len(project_names) != len(set(project_names))
+
     table = Table(title=f"Connected Instances ({len(instances)})")
     table.add_column("Project", style="cyan", no_wrap=True)
+    if has_duplicates:
+        table.add_column("Path", style="dim", no_wrap=True)
     table.add_column("Unity Version", style="green")
     table.add_column("Status", style="yellow")
     table.add_column("Default", justify="center")
 
     for inst in instances:
         project = escape(inst.get("project_name", inst.get("instance_id", "Unknown")))
+        instance_id = escape(inst.get("instance_id", ""))
         version = escape(inst.get("unity_version", "Unknown"))
         status = inst.get("status", "unknown")
         is_default = "[green]*[/green]" if inst.get("is_default") else ""
@@ -160,12 +167,12 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
             "disconnected": "red",
         }.get(status.lower(), "dim")
 
-        table.add_row(
-            project,
-            version,
-            Text(escape(status), style=status_style),
-            is_default,
-        )
+        row: list[str | Text] = [project]
+        if has_duplicates:
+            row.append(instance_id)
+        row.extend([version, Text(escape(status), style=status_style), is_default])
+
+        table.add_row(*row)
 
     console.print(table)
 
