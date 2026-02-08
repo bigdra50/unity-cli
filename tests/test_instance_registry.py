@@ -93,12 +93,14 @@ class TestUnityInstance:
             instance_id="/Users/dev/MyGame",
             project_name="MyGame",
             unity_version="2022.3.20f1",
+            ref_id=5,
             capabilities=["manage_editor"],
             status=InstanceStatus.READY,
         )
 
         d = instance.to_dict(is_default=True)
 
+        assert d["ref_id"] == 5
         assert d["instance_id"] == "/Users/dev/MyGame"
         assert d["project_name"] == "MyGame"
         assert d["unity_version"] == "2022.3.20f1"
@@ -505,8 +507,226 @@ class TestInstanceRegistry:
         assert registry._instances["/test"].status == InstanceStatus.DISCONNECTED
 
 
+class TestRefId:
+    """Test stable ref_id assignment and resolution."""
+
+    @pytest.fixture
+    def registry(self) -> InstanceRegistry:
+        return InstanceRegistry()
+
+    @pytest.fixture
+    def mock_reader(self) -> MagicMock:
+        return MagicMock()
+
+    def _make_writer(self) -> MagicMock:
+        writer = MagicMock()
+        writer.is_closing.return_value = False
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
+        return writer
+
+    @pytest.mark.asyncio
+    async def test_first_instance_gets_ref_id_1(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        inst = await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        assert inst.ref_id == 1
+
+    @pytest.mark.asyncio
+    async def test_sequential_ref_ids(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        inst1 = await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        inst2 = await registry.register(
+            instance_id="/b",
+            project_name="B",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        inst3 = await registry.register(
+            instance_id="/c",
+            project_name="C",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        assert inst1.ref_id == 1
+        assert inst2.ref_id == 2
+        assert inst3.ref_id == 3
+
+    @pytest.mark.asyncio
+    async def test_reconnect_reuses_ref_id(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        inst1 = await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        assert inst1.ref_id == 1
+
+        # Takeover (reconnect) should reuse ref_id
+        inst1_again = await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        assert inst1_again.ref_id == 1
+
+    @pytest.mark.asyncio
+    async def test_disconnect_does_not_shift_ref_ids(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        await registry.register(
+            instance_id="/b",
+            project_name="B",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        inst3 = await registry.register(
+            instance_id="/c",
+            project_name="C",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+
+        # Unregister middle instance
+        await registry.unregister("/b")
+
+        # ref_id 3 should remain 3
+        assert inst3.ref_id == 3
+        assert registry.get("/c") is not None
+        assert registry.get("/c").ref_id == 3
+
+    @pytest.mark.asyncio
+    async def test_reconnect_after_unregister_keeps_ref_id(
+        self, registry: InstanceRegistry, mock_reader: MagicMock
+    ) -> None:
+        await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        await registry.unregister("/a")
+
+        # Re-register same instance_id → same ref_id
+        inst = await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        assert inst.ref_id == 1
+
+    @pytest.mark.asyncio
+    async def test_resolve_by_ref_id(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        await registry.register(
+            instance_id="/b",
+            project_name="B",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+
+        result = registry.get_instance_for_request("2")
+        assert result is not None
+        assert result.instance_id == "/b"
+
+    @pytest.mark.asyncio
+    async def test_resolve_ref_id_not_found(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+
+        result = registry.get_instance_for_request("99")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_ref_id_in_to_dict(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+
+        items = registry.list_all()
+        assert items[0]["ref_id"] == 1
+
+    @pytest.mark.asyncio
+    async def test_close_all_resets_ref_ids(self, registry: InstanceRegistry, mock_reader: MagicMock) -> None:
+        await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        await registry.close_all()
+
+        inst = await registry.register(
+            instance_id="/a",
+            project_name="A",
+            unity_version="2022.3",
+            capabilities=[],
+            reader=mock_reader,
+            writer=self._make_writer(),
+        )
+        # After close_all, ref_id counter resets
+        assert inst.ref_id == 1
+
+
 class TestInstanceResolution:
-    """Test _resolve_instance() 4-stage matching logic."""
+    """Test _resolve_instance() 5-stage matching logic."""
 
     @pytest.fixture
     def registry(self) -> InstanceRegistry:

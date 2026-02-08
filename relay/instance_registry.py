@@ -57,6 +57,7 @@ class UnityInstance:
     instance_id: str  # Project path (e.g., "/Users/dev/MyGame")
     project_name: str
     unity_version: str
+    ref_id: int = 0  # Stable reference ID assigned by InstanceRegistry
     capabilities: list[str] = field(default_factory=list)
     status: InstanceStatus = InstanceStatus.DISCONNECTED
     reader: asyncio.StreamReader | None = None
@@ -90,6 +91,7 @@ class UnityInstance:
     def to_dict(self, is_default: bool = False) -> dict:
         """Convert to dictionary for API response"""
         return {
+            "ref_id": self.ref_id,
             "instance_id": self.instance_id,
             "project_name": self.project_name,
             "unity_version": self.unity_version,
@@ -184,6 +186,10 @@ class InstanceRegistry:
         self._grace_period_tasks: dict[str, asyncio.Task[None]] = {}
         # Remember if instance was default before going into grace period
         self._was_default: dict[str, bool] = {}
+        # Stable ref_id: monotonic counter, mapped by instance_id.
+        # Survives disconnect/reconnect within a server session.
+        self._ref_id_map: dict[str, int] = {}
+        self._next_ref_id: int = 1
 
     async def register(
         self,
@@ -219,11 +225,20 @@ class InstanceRegistry:
                 )
                 await old_instance.close_connection()
 
+            # Assign stable ref_id (reuse on reconnect, new for first-time)
+            if instance_id in self._ref_id_map:
+                ref_id = self._ref_id_map[instance_id]
+            else:
+                ref_id = self._next_ref_id
+                self._next_ref_id += 1
+                self._ref_id_map[instance_id] = ref_id
+
             # Create new instance
             instance = UnityInstance(
                 instance_id=instance_id,
                 project_name=project_name,
                 unity_version=unity_version,
+                ref_id=ref_id,
                 capabilities=capabilities,
                 status=InstanceStatus.READY,
                 reader=reader,
@@ -373,9 +388,10 @@ class InstanceRegistry:
         ]
 
     def _resolve_instance(self, query: str) -> UnityInstance | None:
-        """Resolve an instance by 4-stage matching.
+        """Resolve an instance by 5-stage matching.
 
         Priority:
+            0. ref_id (integer query)
             1. instance_id exact match
             2. project_name exact match
             3. instance_id suffix match (path ends with query)
@@ -386,6 +402,15 @@ class InstanceRegistry:
         Raises:
             AmbiguousInstanceError: When multiple instances match at the same priority level.
         """
+        # Stage 0: ref_id match (integer query)
+        try:
+            query_ref_id = int(query)
+            for inst in self._instances.values():
+                if inst.ref_id == query_ref_id:
+                    return inst
+        except ValueError:
+            pass
+
         # Stage 1: instance_id exact match
         exact = self._instances.get(query)
         if exact:
@@ -442,12 +467,14 @@ class InstanceRegistry:
         return sum(1 for i in self._instances.values() if i.is_connected)
 
     async def close_all(self) -> None:
-        """Close all instance connections"""
+        """Close all instance connections and reset ref_id state"""
         async with self._lock:
             for instance in self._instances.values():
                 await instance.close_connection()
             self._instances.clear()
             self._default_instance_id = None
+            self._ref_id_map.clear()
+            self._next_ref_id = 1
             logger.info("Closed all instances")
 
     def get_instances_by_status(self, status: InstanceStatus) -> list[UnityInstance]:

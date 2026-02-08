@@ -7,6 +7,7 @@ Supports JSON output mode with field filtering for scripting.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from rich.console import Console
@@ -145,16 +146,20 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
     has_duplicates = len(project_names) != len(set(project_names))
 
     table = Table(title=f"Connected Instances ({len(instances)})")
+    table.add_column("#", style="dim", justify="right", no_wrap=True)
     table.add_column("Project", style="cyan", no_wrap=True)
     if has_duplicates:
-        table.add_column("Path", style="dim", no_wrap=True)
+        table.add_column("Path (-i)", style="dim")
     table.add_column("Unity Version", style="green")
     table.add_column("Status", style="yellow")
     table.add_column("Default", justify="center")
 
+    cwd = os.getcwd()
+
     for inst in instances:
+        ref_id = str(inst.get("ref_id", ""))
         project = escape(inst.get("project_name", inst.get("instance_id", "Unknown")))
-        instance_id = escape(inst.get("instance_id", ""))
+        instance_id = inst.get("instance_id", "")
         version = escape(inst.get("unity_version", "Unknown"))
         status = inst.get("status", "unknown")
         is_default = "[green]*[/green]" if inst.get("is_default") else ""
@@ -167,9 +172,10 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
             "disconnected": "red",
         }.get(status.lower(), "dim")
 
-        row: list[str | Text] = [project]
+        row: list[str | Text] = [ref_id, project]
         if has_duplicates:
-            row.append(instance_id)
+            rel_path = os.path.relpath(instance_id, cwd)
+            row.append(escape(rel_path))
         row.extend([version, Text(escape(status), style=status_style), is_default])
 
         table.add_row(*row)
