@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -19,6 +20,7 @@ namespace UnityBridge.Tools
     public static class UITree
     {
         private static Dictionary<string, WeakReference<VisualElement>> s_RefMap = new();
+        private static readonly ConditionalWeakTable<VisualElement, string> s_ElementToRef = new();
         private static int s_NextRefId = 1;
 
         public static JObject HandleCommand(JObject parameters)
@@ -60,7 +62,7 @@ namespace UnityBridge.Tools
                     $"Panel not found: {panelName}");
             }
 
-            ClearRefs();
+            PruneDeadRefs();
 
             var elementCount = 0;
 
@@ -124,7 +126,7 @@ namespace UnityBridge.Tools
                     $"Panel not found: {panelName}");
             }
 
-            ClearRefs();
+            PruneDeadRefs();
 
             try
             {
@@ -246,6 +248,19 @@ namespace UnityBridge.Tools
             {
                 pu.target = target;
                 target.panel.visualTree.SendEvent(pu);
+            }
+
+            var click = new Event
+            {
+                type = EventType.MouseUp,
+                mousePosition = center,
+                button = button,
+                clickCount = clickCount
+            };
+            using (var ce = ClickEvent.GetPooled(click))
+            {
+                ce.target = target;
+                target.panel.visualTree.SendEvent(ce);
             }
 
             return new JObject
@@ -575,7 +590,7 @@ namespace UnityBridge.Tools
                 return;
 
             var indent = new string(' ', currentDepth * 2);
-            var refId = AssignRef(element);
+            var refId = FindOrAssignRef(element);
             elementCount++;
 
             sb.Append(indent);
@@ -603,7 +618,7 @@ namespace UnityBridge.Tools
             VisualElement element, int maxDepth, int currentDepth,
             ref int elementCount)
         {
-            var refId = AssignRef(element);
+            var refId = FindOrAssignRef(element);
             elementCount++;
 
             var node = new JObject
@@ -663,7 +678,7 @@ namespace UnityBridge.Tools
                     !string.IsNullOrEmpty(nameFilter) ||
                     !string.IsNullOrEmpty(classFilter))
                 {
-                    var refId = AssignRef(element);
+                    var refId = FindOrAssignRef(element);
                     var layout = element.layout;
                     matches.Add(new JObject
                     {
@@ -803,23 +818,15 @@ namespace UnityBridge.Tools
 
         #region Ref ID Management
 
-        private static string AssignRef(VisualElement ve)
-        {
-            var refId = $"ref_{s_NextRefId++}";
-            s_RefMap[refId] = new WeakReference<VisualElement>(ve);
-            return refId;
-        }
-
         private static string FindOrAssignRef(VisualElement ve)
         {
-            // Check if this element already has a ref
-            foreach (var kvp in s_RefMap)
-            {
-                if (kvp.Value.TryGetTarget(out var existing) && existing == ve)
-                    return kvp.Key;
-            }
+            if (s_ElementToRef.TryGetValue(ve, out var refId))
+                return refId;
 
-            return AssignRef(ve);
+            refId = $"ref_{s_NextRefId++}";
+            s_RefMap[refId] = new WeakReference<VisualElement>(ve);
+            s_ElementToRef.Add(ve, refId);
+            return refId;
         }
 
         private static VisualElement ResolveRef(string refId)
@@ -830,10 +837,16 @@ namespace UnityBridge.Tools
             return null;
         }
 
-        private static void ClearRefs()
+        private static void PruneDeadRefs()
         {
-            s_RefMap.Clear();
-            s_NextRefId = 1;
+            var dead = new List<string>();
+            foreach (var kvp in s_RefMap)
+            {
+                if (!kvp.Value.TryGetTarget(out _))
+                    dead.Add(kvp.Key);
+            }
+            foreach (var key in dead)
+                s_RefMap.Remove(key);
         }
 
         #endregion
