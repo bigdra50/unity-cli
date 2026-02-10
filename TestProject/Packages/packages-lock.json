@@ -1,11 +1,11 @@
 {
   "dependencies": {
     "com.bigdra50.unity-bridge": {
-      "version": "file:../../UnityBridge",
+      "version": "file:/Volumes/CrucialX9/dev/github.com/bigdra50/unity-cli/UnityBridge",
       "depth": 0,
       "source": "local",
       "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.0.0"
+        "com.unity.nuget.newtonsoft-json": "3.0.2"
       }
     },
     "com.unity.ai.navigation": {

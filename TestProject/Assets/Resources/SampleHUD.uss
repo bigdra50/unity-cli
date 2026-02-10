@@ -1,0 +1,393 @@
+/* ============================================
+   Neumorphism Game Title Screen UI
+   Reference: 430 x 932 (iPhone 14 Pro logical)
+   ============================================ */
+
+.root {
+    flex-grow: 1;
+    background-color: #E0E5EC;
+    padding: 16px 20px;
+}
+
+/* --- Neumorphism Primitives --- */
+
+.neu-card {
+    background-color: #E0E5EC;
+    border-radius: 20px;
+    border-top-width: 3px;
+    border-left-width: 3px;
+    border-bottom-width: 3px;
+    border-right-width: 3px;
+    border-top-color: rgba(255, 255, 255, 0.8);
+    border-left-color: rgba(255, 255, 255, 0.8);
+    border-bottom-color: rgba(163, 177, 198, 0.6);
+    border-right-color: rgba(163, 177, 198, 0.6);
+    padding: 16px;
+}
+
+.neu-inset {
+    background-color: #D1D9E6;
+    border-radius: 12px;
+    border-top-width: 2px;
+    border-left-width: 2px;
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+    border-top-color: rgba(163, 177, 198, 0.5);
+    border-left-color: rgba(163, 177, 198, 0.5);
+    border-bottom-color: rgba(255, 255, 255, 0.7);
+    border-right-color: rgba(255, 255, 255, 0.7);
+}
+
+.neu-raised {
+    background-color: #E0E5EC;
+    border-radius: 16px;
+    border-top-width: 3px;
+    border-left-width: 3px;
+    border-bottom-width: 3px;
+    border-right-width: 3px;
+    border-top-color: rgba(255, 255, 255, 0.9);
+    border-left-color: rgba(255, 255, 255, 0.9);
+    border-bottom-color: rgba(163, 177, 198, 0.7);
+    border-right-color: rgba(163, 177, 198, 0.7);
+}
+
+/* --- Status Bar --- */
+
+.status-bar {
+    flex-direction: row;
+    justify-content: center;
+    padding: 8px 0 12px 0;
+}
+
+.status-time {
+    font-size: 16px;
+    color: #636E72;
+    -unity-font-style: bold;
+}
+
+/* --- Title Area --- */
+
+.title-area {
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 8px 0;
+}
+
+.game-title {
+    font-size: 30px;
+    color: #2D3436;
+    -unity-font-style: bold;
+    letter-spacing: 4px;
+    -unity-text-align: middle-center;
+    margin-bottom: 4px;
+}
+
+.game-subtitle {
+    font-size: 14px;
+    color: #A3B1C6;
+    -unity-font-style: italic;
+    -unity-text-align: middle-center;
+}
+
+/* --- Profile Card --- */
+
+.profile-card {
+    margin-bottom: 20px;
+}
+
+.profile-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 30px;
+    justify-content: center;
+    align-items: center;
+    margin-right: 16px;
+    background-color: #6C63FF;
+    border-top-color: rgba(108, 99, 255, 0.3);
+    border-left-color: rgba(108, 99, 255, 0.3);
+    border-bottom-color: rgba(255, 255, 255, 0.4);
+    border-right-color: rgba(255, 255, 255, 0.4);
+}
+
+.avatar-text {
+    font-size: 28px;
+    color: white;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.profile-info {
+    flex-grow: 1;
+}
+
+.profile-name {
+    font-size: 22px;
+    color: #2D3436;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.profile-sub {
+    font-size: 13px;
+    color: #636E72;
+}
+
+/* XP Bar */
+
+.xp-section {
+    margin-top: 4px;
+}
+
+.xp-header {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.xp-level {
+    font-size: 16px;
+    color: #6C63FF;
+    -unity-font-style: bold;
+}
+
+.xp-text {
+    font-size: 13px;
+    color: #636E72;
+    -unity-text-align: middle-right;
+}
+
+.xp-bar-bg {
+    height: 14px;
+    border-radius: 7px;
+    overflow: hidden;
+    padding: 2px;
+}
+
+.xp-bar-fill {
+    width: 65%;
+    height: 100%;
+    border-radius: 5px;
+    background-color: #6C63FF;
+}
+
+/* --- Section --- */
+
+.section {
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 18px;
+    color: #2D3436;
+    -unity-font-style: bold;
+    margin-bottom: 12px;
+    margin-left: 4px;
+}
+
+/* --- Featured Cards --- */
+
+.card-row {
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.featured-card {
+    width: 31%;
+    padding: 14px 8px;
+    align-items: center;
+    border-radius: 16px;
+}
+
+.card-icon-area {
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+    border-top-width: 2px;
+    border-left-width: 2px;
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+}
+
+.card-icon-fire {
+    background-color: rgba(255, 107, 107, 0.15);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    border-left-color: rgba(255, 255, 255, 0.6);
+    border-bottom-color: rgba(255, 107, 107, 0.3);
+    border-right-color: rgba(255, 107, 107, 0.3);
+}
+
+.card-icon-water {
+    background-color: rgba(84, 160, 255, 0.15);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    border-left-color: rgba(255, 255, 255, 0.6);
+    border-bottom-color: rgba(84, 160, 255, 0.3);
+    border-right-color: rgba(84, 160, 255, 0.3);
+}
+
+.card-icon-grass {
+    background-color: rgba(92, 216, 90, 0.15);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    border-left-color: rgba(255, 255, 255, 0.6);
+    border-bottom-color: rgba(92, 216, 90, 0.3);
+    border-right-color: rgba(92, 216, 90, 0.3);
+}
+
+.card-number {
+    font-size: 22px;
+    -unity-font-style: bold;
+    color: #636E72;
+    -unity-text-align: middle-center;
+}
+
+.card-name {
+    font-size: 13px;
+    color: #2D3436;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-bottom: 2px;
+}
+
+.card-stat {
+    font-size: 11px;
+    color: #636E72;
+    -unity-text-align: middle-center;
+    margin-bottom: 4px;
+}
+
+.card-rarity {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.rarity-stars {
+    font-size: 14px;
+    color: #FDCB6E;
+    -unity-font-style: bold;
+    letter-spacing: 2px;
+}
+
+/* --- Action Buttons --- */
+
+.action-row {
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.action-btn {
+    flex-grow: 1;
+    height: 56px;
+    margin: 0 6px;
+    justify-content: center;
+    align-items: center;
+}
+
+.action-label {
+    font-size: 15px;
+    color: #636E72;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    letter-spacing: 2px;
+}
+
+.action-label-primary {
+    color: #6C63FF;
+}
+
+/* --- Card Selection --- */
+
+.card-selected {
+    border-top-color: rgba(108, 99, 255, 0.5);
+    border-left-color: rgba(108, 99, 255, 0.5);
+    border-bottom-color: rgba(108, 99, 255, 0.8);
+    border-right-color: rgba(108, 99, 255, 0.8);
+    background-color: #D8DDE8;
+}
+
+/* --- Button Pressed --- */
+
+.btn-pressed {
+    border-top-color: rgba(163, 177, 198, 0.7);
+    border-left-color: rgba(163, 177, 198, 0.7);
+    border-bottom-color: rgba(255, 255, 255, 0.9);
+    border-right-color: rgba(255, 255, 255, 0.9);
+    background-color: #D8DDE8;
+}
+
+/* --- Toast --- */
+
+.toast {
+    align-self: center;
+    padding: 12px 24px;
+    border-radius: 12px;
+    background-color: #2D3436;
+    margin-top: 8px;
+    transition-property: opacity;
+    transition-duration: 300ms;
+}
+
+.toast-message {
+    font-size: 14px;
+    color: white;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.hidden {
+    display: none;
+}
+
+/* --- Spacer --- */
+
+.spacer {
+    flex-grow: 1;
+}
+
+/* --- Tab Bar --- */
+
+.tab-bar {
+    flex-direction: row;
+    padding: 10px 12px;
+    border-radius: 24px;
+    margin-top: 8px;
+}
+
+.tab {
+    flex-grow: 1;
+    height: 48px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 14px;
+    margin: 0 4px;
+}
+
+.tab-active {
+    background-color: #6C63FF;
+    border-top-width: 2px;
+    border-left-width: 2px;
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+    border-top-color: rgba(140, 130, 255, 0.8);
+    border-left-color: rgba(140, 130, 255, 0.8);
+    border-bottom-color: rgba(80, 72, 200, 0.8);
+    border-right-color: rgba(80, 72, 200, 0.8);
+}
+
+.tab-label {
+    font-size: 14px;
+    color: #A3B1C6;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.tab-label-active {
+    color: white;
+}

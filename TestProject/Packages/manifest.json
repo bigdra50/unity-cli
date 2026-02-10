@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.bigdra50.unity-bridge": "file:../../UnityBridge",
+    "com.bigdra50.unity-bridge": "file:/Volumes/CrucialX9/dev/github.com/bigdra50/unity-cli/UnityBridge",
     "com.unity.ai.navigation": "2.0.9",
     "com.unity.ide.rider": "3.0.38",
     "com.unity.ide.visualstudio": "2.0.23",

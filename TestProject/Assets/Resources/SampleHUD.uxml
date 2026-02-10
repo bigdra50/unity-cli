@@ -1,0 +1,113 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="SampleHUD.uss" />
+    <ui:VisualElement name="Root" class="root">
+
+        <!-- Status Bar -->
+        <ui:VisualElement name="StatusBar" class="status-bar">
+            <ui:Label name="StatusTime" text="12:34" class="status-time" />
+        </ui:VisualElement>
+
+        <!-- Game Title Card -->
+        <ui:VisualElement name="TitleCard" class="neu-card profile-card">
+            <ui:VisualElement class="title-area">
+                <ui:Label text="AETHER CHRONICLE" class="game-title" />
+                <ui:Label text="- Tales of the Rift -" class="game-subtitle" />
+            </ui:VisualElement>
+            <!-- Save Data -->
+            <ui:VisualElement class="xp-section">
+                <ui:VisualElement class="profile-row">
+                    <ui:VisualElement name="Avatar" class="neu-inset avatar">
+                        <ui:Label name="AvatarText" text="A" class="avatar-text" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="profile-info">
+                        <ui:Label name="ProfileName" text="Aria  Lv.42" class="profile-name" />
+                        <ui:Label name="ProfileSub" text="Chapter II - Shadow Rift  |  12:34:56" class="profile-sub" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="xp-header">
+                    <ui:Label name="ProgressLabel" text="Story Progress" class="xp-level" />
+                    <ui:Label name="ProgressPercent" text="65%" class="xp-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="neu-inset xp-bar-bg">
+                    <ui:VisualElement name="XpFill" class="xp-bar-fill" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Chapters -->
+        <ui:VisualElement name="Chapters" class="section">
+            <ui:Label text="Chapters" class="section-title" />
+            <ui:VisualElement class="card-row">
+                <ui:VisualElement name="Chapter1" class="neu-card featured-card card-selected">
+                    <ui:VisualElement class="card-icon-area card-icon-grass">
+                        <ui:Label text="I" class="card-number" />
+                    </ui:VisualElement>
+                    <ui:Label text="Awakening" class="card-name" />
+                    <ui:Label name="Chapter1Status" text="Complete" class="card-stat" />
+                    <ui:VisualElement class="card-rarity">
+                        <ui:Label text="***" class="rarity-stars" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="Chapter2" class="neu-card featured-card">
+                    <ui:VisualElement class="card-icon-area card-icon-water">
+                        <ui:Label text="II" class="card-number" />
+                    </ui:VisualElement>
+                    <ui:Label text="Shadow Rift" class="card-name" />
+                    <ui:Label name="Chapter2Status" text="In Progress" class="card-stat" />
+                    <ui:VisualElement class="card-rarity">
+                        <ui:Label text="**" class="rarity-stars" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="Chapter3" class="neu-card featured-card">
+                    <ui:VisualElement class="card-icon-area card-icon-fire">
+                        <ui:Label text="III" class="card-number" />
+                    </ui:VisualElement>
+                    <ui:Label text="Final Dawn" class="card-name" />
+                    <ui:Label name="Chapter3Status" text="Locked" class="card-stat" />
+                    <ui:VisualElement class="card-rarity">
+                        <ui:Label text="---" class="rarity-stars" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Menu -->
+        <ui:VisualElement name="Menu" class="section">
+            <ui:VisualElement class="action-row">
+                <ui:VisualElement name="BtnContinue" class="neu-raised action-btn">
+                    <ui:Label text="CONTINUE" class="action-label action-label-primary" />
+                </ui:VisualElement>
+                <ui:VisualElement name="BtnNewGame" class="neu-raised action-btn">
+                    <ui:Label text="NEW GAME" class="action-label" />
+                </ui:VisualElement>
+                <ui:VisualElement name="BtnSettings" class="neu-raised action-btn">
+                    <ui:Label text="SETTINGS" class="action-label" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Toast -->
+        <ui:VisualElement name="Toast" class="toast hidden">
+            <ui:Label name="ToastMessage" text="" class="toast-message" />
+        </ui:VisualElement>
+
+        <!-- Spacer -->
+        <ui:VisualElement class="spacer" />
+
+        <!-- Bottom Tab Bar -->
+        <ui:VisualElement name="TabBar" class="neu-card tab-bar">
+            <ui:VisualElement name="TabHome" class="tab tab-active">
+                <ui:Label text="Home" class="tab-label tab-label-active" />
+            </ui:VisualElement>
+            <ui:VisualElement name="TabQuest" class="tab">
+                <ui:Label text="Quest" class="tab-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="TabCodex" class="tab">
+                <ui:Label text="Codex" class="tab-label" />
+            </ui:VisualElement>
+            <ui:VisualElement name="TabConfig" class="tab">
+                <ui:Label text="Config" class="tab-label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

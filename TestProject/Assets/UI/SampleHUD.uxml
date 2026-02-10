@@ -1,0 +1,105 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="SampleHUD.uss" />
+    <ui:VisualElement name="Root" class="root">
+
+        <!-- Status Bar -->
+        <ui:VisualElement name="StatusBar" class="status-bar">
+            <ui:Label text="12:34" class="status-time" />
+        </ui:VisualElement>
+
+        <!-- Profile Card -->
+        <ui:VisualElement name="ProfileCard" class="neu-card profile-card">
+            <ui:VisualElement class="profile-row">
+                <ui:VisualElement name="Avatar" class="neu-inset avatar">
+                    <ui:Label text="R" class="avatar-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="profile-info">
+                    <ui:Label text="Trainer Red" class="profile-name" />
+                    <ui:Label text="Rank 42  |  Collection 128/250" class="profile-sub" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <!-- XP Bar -->
+            <ui:VisualElement class="xp-section">
+                <ui:VisualElement class="xp-header">
+                    <ui:Label text="Lv.42" class="xp-level" />
+                    <ui:Label text="3,280 / 5,000 XP" class="xp-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="neu-inset xp-bar-bg">
+                    <ui:VisualElement name="XpFill" class="xp-bar-fill" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Featured Section -->
+        <ui:VisualElement name="Featured" class="section">
+            <ui:Label text="Featured" class="section-title" />
+            <ui:VisualElement class="card-row">
+                <ui:VisualElement class="neu-card featured-card">
+                    <ui:VisualElement class="card-icon-area card-icon-fire">
+                        <ui:Label text="005" class="card-number" />
+                    </ui:VisualElement>
+                    <ui:Label text="Charmeleon" class="card-name" />
+                    <ui:Label text="HP 80" class="card-stat" />
+                    <ui:VisualElement class="card-rarity">
+                        <ui:Label text="***" class="rarity-stars" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="neu-card featured-card">
+                    <ui:VisualElement class="card-icon-area card-icon-water">
+                        <ui:Label text="008" class="card-number" />
+                    </ui:VisualElement>
+                    <ui:Label text="Wartortle" class="card-name" />
+                    <ui:Label text="HP 70" class="card-stat" />
+                    <ui:VisualElement class="card-rarity">
+                        <ui:Label text="**" class="rarity-stars" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="neu-card featured-card">
+                    <ui:VisualElement class="card-icon-area card-icon-grass">
+                        <ui:Label text="002" class="card-number" />
+                    </ui:VisualElement>
+                    <ui:Label text="Ivysaur" class="card-name" />
+                    <ui:Label text="HP 90" class="card-stat" />
+                    <ui:VisualElement class="card-rarity">
+                        <ui:Label text="***" class="rarity-stars" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Quick Actions -->
+        <ui:VisualElement name="Actions" class="section">
+            <ui:Label text="Quick Actions" class="section-title" />
+            <ui:VisualElement class="action-row">
+                <ui:VisualElement class="neu-raised action-btn">
+                    <ui:Label text="BATTLE" class="action-label action-label-primary" />
+                </ui:VisualElement>
+                <ui:VisualElement class="neu-raised action-btn">
+                    <ui:Label text="TRADE" class="action-label" />
+                </ui:VisualElement>
+                <ui:VisualElement class="neu-raised action-btn">
+                    <ui:Label text="PACK" class="action-label" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Spacer -->
+        <ui:VisualElement class="spacer" />
+
+        <!-- Bottom Tab Bar -->
+        <ui:VisualElement name="TabBar" class="neu-card tab-bar">
+            <ui:VisualElement class="tab tab-active">
+                <ui:Label text="Home" class="tab-label tab-label-active" />
+            </ui:VisualElement>
+            <ui:VisualElement class="tab">
+                <ui:Label text="Deck" class="tab-label" />
+            </ui:VisualElement>
+            <ui:VisualElement class="tab">
+                <ui:Label text="Shop" class="tab-label" />
+            </ui:VisualElement>
+            <ui:VisualElement class="tab">
+                <ui:Label text="Social" class="tab-label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
