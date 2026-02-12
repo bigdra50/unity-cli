@@ -90,7 +90,7 @@ namespace UnityBridge
 
 #if UNITY_BRIDGE_LOCAL_DEV
             // Force local development mode with define symbol
-            var projectRoot = Path.GetDirectoryName(Application.dataPath);
+            var projectRoot = Path.GetDirectoryName(Application.dataPath) ?? ".";
             var relayPath = Path.Combine(projectRoot, "relay");
             if (Directory.Exists(relayPath))
             {

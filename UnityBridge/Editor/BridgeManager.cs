@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 using UnityBridge.Helpers;
 using UnityEditor;
 

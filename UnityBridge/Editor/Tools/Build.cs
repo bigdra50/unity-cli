@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
-using UnityEditor.Build.Reporting;
 using UnityEngine;
 
 namespace UnityBridge.Tools
@@ -32,7 +31,7 @@ namespace UnityBridge.Tools
             var scenes = EditorBuildSettings.scenes
                 .Where(s => s.enabled)
                 .Select(s => s.path)
-                .ToArray();
+                .ToArray<object>();
 
             var scriptingBackend = PlayerSettings.GetScriptingBackend(
                 UnityEditor.Build.NamedBuildTarget.FromBuildTargetGroup(targetGroup));
@@ -120,7 +119,7 @@ namespace UnityBridge.Tools
                     ["name"] = s.name,
                     ["duration"] = s.duration.TotalSeconds
                 })
-                .ToArray();
+                .ToArray<object>();
 
             var messages = report.steps
                 .SelectMany(s => s.messages)
@@ -130,7 +129,7 @@ namespace UnityBridge.Tools
                     ["type"] = m.type.ToString(),
                     ["content"] = m.content
                 })
-                .ToArray();
+                .ToArray<object>();
 
             return new JObject
             {
@@ -155,7 +154,7 @@ namespace UnityBridge.Tools
                     ["enabled"] = s.enabled,
                     ["guid"] = s.guid.ToString()
                 })
-                .ToArray();
+                .ToArray<object>();
 
             return new JObject
             {
@@ -171,9 +170,7 @@ namespace UnityBridge.Tools
                 BuildTarget.StandaloneWindows => ".exe",
                 BuildTarget.StandaloneWindows64 => ".exe",
                 BuildTarget.StandaloneOSX => ".app",
-                BuildTarget.StandaloneLinux64 => "",
                 BuildTarget.Android => ".apk",
-                BuildTarget.WebGL => "",
                 _ => ""
             };
         }

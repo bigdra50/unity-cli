@@ -55,12 +55,12 @@ namespace UnityBridge.Tools
                 path += ".prefab";
             }
 
-            GameObject source = FindGameObject(sourceName, sourceId);
+            var source = FindGameObject(sourceName, sourceId);
             if (source == null)
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"Source GameObject not found: {sourceName ?? sourceId?.ToString()}");
+                    $"Source GameObject not found: {sourceName ?? sourceId.Value.ToString()}");
             }
 
             // Ensure directory exists
@@ -196,7 +196,7 @@ namespace UnityBridge.Tools
             var deps = AssetDatabase.GetDependencies(path, recursive)
                 .Where(p => p != path)
                 .Select(BuildAssetInfo)
-                .ToArray();
+                .ToArray<object>();
 
             return new JObject
             {
@@ -231,7 +231,7 @@ namespace UnityBridge.Tools
                 .Where(assetPath => assetPath != path)
                 .Where(assetPath => AssetDatabase.GetDependencies(assetPath, false).Contains(path))
                 .Select(BuildAssetInfo)
-                .ToArray();
+                .ToArray<object>();
 
             return new JObject
             {

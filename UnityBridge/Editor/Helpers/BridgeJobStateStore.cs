@@ -22,7 +22,9 @@ namespace UnityBridge.Helpers
         public static void SaveState<T>(string toolName, T state)
         {
             var path = GetStatePath(toolName);
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
             var json = JsonConvert.SerializeObject(state ?? Activator.CreateInstance<T>());
             File.WriteAllText(path, json);
         }

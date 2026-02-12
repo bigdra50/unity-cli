@@ -27,28 +27,28 @@ namespace UnityBridge.Tools
 
         private static JObject GetSelection()
         {
-            var activeObject = UnityEditor.Selection.activeObject;
-            var activeGameObject = UnityEditor.Selection.activeGameObject;
-            var activeTransform = UnityEditor.Selection.activeTransform;
+            var activeObject = Selection.activeObject;
+            var activeGameObject = Selection.activeGameObject;
+            var activeTransform = Selection.activeTransform;
 
-            var selectedObjects = UnityEditor.Selection.objects;
-            var selectedGameObjects = UnityEditor.Selection.gameObjects;
+            var selectedObjects = Selection.objects;
+            var selectedGameObjects = Selection.gameObjects;
 
             var result = new JObject
             {
-                ["count"] = UnityEditor.Selection.count,
+                ["count"] = Selection.count,
                 ["activeObject"] = activeObject != null
                     ? SerializeObject(activeObject)
                     : null,
                 ["activeGameObject"] = activeGameObject != null
                     ? SerializeGameObject(activeGameObject)
                     : null,
-                ["activeInstanceID"] = UnityEditor.Selection.activeInstanceID,
+                ["activeInstanceID"] = Selection.activeInstanceID,
                 ["objects"] = new JArray(
                     selectedObjects.Select(SerializeObject)),
                 ["gameObjects"] = new JArray(
                     selectedGameObjects.Select(SerializeGameObject)),
-                ["assetGUIDs"] = new JArray(Selection.assetGUIDs)
+                ["assetGUIDs"] = new JArray(Selection.assetGUIDs.ToArray<object>())
             };
 
             if (activeTransform != null)

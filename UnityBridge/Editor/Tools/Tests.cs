@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -309,7 +310,7 @@ namespace UnityBridge.Tools
                 {
                     ["fullName"] = test.FullName,
                     ["name"] = test.Name,
-                    ["categories"] = new JArray(test.Categories ?? Array.Empty<string>()),
+                    ["categories"] = new JArray((test.Categories ?? Array.Empty<string>()).ToArray<object>()),
                     ["runState"] = test.RunState.ToString()
                 });
             }

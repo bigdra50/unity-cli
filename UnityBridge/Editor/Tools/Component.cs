@@ -17,15 +17,6 @@ namespace UnityBridge.Tools
     [BridgeTool("component")]
     public static class Component
     {
-        // Types that require special handling to avoid circular references
-        private static readonly HashSet<Type> SpecialTypes = new()
-        {
-            typeof(Transform),
-            typeof(Camera),
-            typeof(GameObject),
-            typeof(UnityEngine.Component)
-        };
-
         public static JObject HandleCommand(JObject parameters)
         {
             var action = parameters["action"]?.Value<string>() ?? "";

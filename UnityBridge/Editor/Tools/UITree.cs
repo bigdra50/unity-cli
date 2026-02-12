@@ -19,7 +19,7 @@ namespace UnityBridge.Tools
     [BridgeTool("uitree")]
     public static class UITree
     {
-        private static Dictionary<string, WeakReference<VisualElement>> _refMap = new();
+        private static readonly Dictionary<string, WeakReference<VisualElement>> RefMap = new();
         private static readonly ConditionalWeakTable<VisualElement, string> ElementToRef = new();
         private static int _nextRefId = 1;
 
@@ -164,7 +164,7 @@ namespace UnityBridge.Tools
             var panelName = parameters["panel"]?.Value<string>();
             var nameFilter = parameters["name"]?.Value<string>();
 
-            VisualElement target = null;
+            VisualElement target;
 
             if (!string.IsNullOrEmpty(refId))
             {
@@ -479,7 +479,7 @@ namespace UnityBridge.Tools
             {
                 // Use TypedReference / pointer trick not available, so collect all at once
                 // by repeatedly calling MoveNext on the boxed struct via interface
-                if (iterator is System.Collections.IEnumerator enumerator)
+                if (iterator is IEnumerator enumerator)
                 {
                     while (enumerator.MoveNext())
                     {
@@ -824,14 +824,14 @@ namespace UnityBridge.Tools
                 return refId;
 
             refId = $"ref_{_nextRefId++}";
-            _refMap[refId] = new WeakReference<VisualElement>(ve);
+            RefMap[refId] = new WeakReference<VisualElement>(ve);
             ElementToRef.Add(ve, refId);
             return refId;
         }
 
         private static VisualElement ResolveRef(string refId)
         {
-            if (_refMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
+            if (RefMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
                 return element;
 
             return null;
@@ -840,13 +840,13 @@ namespace UnityBridge.Tools
         private static void PruneDeadRefs()
         {
             var dead = new List<string>();
-            foreach (var kvp in _refMap)
+            foreach (var kvp in RefMap)
             {
                 if (!kvp.Value.TryGetTarget(out _))
                     dead.Add(kvp.Key);
             }
             foreach (var key in dead)
-                _refMap.Remove(key);
+                RefMap.Remove(key);
         }
 
         #endregion
