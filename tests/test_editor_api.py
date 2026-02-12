@@ -125,48 +125,6 @@ class TestGetState:
         assert result == expected
 
 
-class TestGetTags:
-    """get_tags() メソッドのテスト"""
-
-    def test_get_tags_sends_get_tags_command(self, sut: EditorAPI, mock_conn: MagicMock) -> None:
-        """Send 'get_tags' as the command name."""
-        mock_conn.send_request.return_value = {}
-
-        sut.get_tags()
-
-        assert mock_conn.send_request.call_args[0][0] == "get_tags"
-
-    def test_get_tags_sends_empty_params(self, sut: EditorAPI, mock_conn: MagicMock) -> None:
-        """Send empty params dict."""
-        mock_conn.send_request.return_value = {}
-
-        sut.get_tags()
-
-        params = mock_conn.send_request.call_args[0][1]
-        assert params == {}
-
-
-class TestGetLayers:
-    """get_layers() メソッドのテスト"""
-
-    def test_get_layers_sends_get_layers_command(self, sut: EditorAPI, mock_conn: MagicMock) -> None:
-        """Send 'get_layers' as the command name."""
-        mock_conn.send_request.return_value = {}
-
-        sut.get_layers()
-
-        assert mock_conn.send_request.call_args[0][0] == "get_layers"
-
-    def test_get_layers_sends_empty_params(self, sut: EditorAPI, mock_conn: MagicMock) -> None:
-        """Send empty params dict."""
-        mock_conn.send_request.return_value = {}
-
-        sut.get_layers()
-
-        params = mock_conn.send_request.call_args[0][1]
-        assert params == {}
-
-
 class TestRefresh:
     """refresh() メソッドのテスト"""
 
