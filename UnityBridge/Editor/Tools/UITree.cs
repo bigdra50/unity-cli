@@ -19,9 +19,9 @@ namespace UnityBridge.Tools
     [BridgeTool("uitree")]
     public static class UITree
     {
-        private static Dictionary<string, WeakReference<VisualElement>> s_RefMap = new();
-        private static readonly ConditionalWeakTable<VisualElement, string> s_ElementToRef = new();
-        private static int s_NextRefId = 1;
+        private static Dictionary<string, WeakReference<VisualElement>> _refMap = new();
+        private static readonly ConditionalWeakTable<VisualElement, string> ElementToRef = new();
+        private static int _nextRefId = 1;
 
         public static JObject HandleCommand(JObject parameters)
         {
@@ -820,18 +820,18 @@ namespace UnityBridge.Tools
 
         private static string FindOrAssignRef(VisualElement ve)
         {
-            if (s_ElementToRef.TryGetValue(ve, out var refId))
+            if (ElementToRef.TryGetValue(ve, out var refId))
                 return refId;
 
-            refId = $"ref_{s_NextRefId++}";
-            s_RefMap[refId] = new WeakReference<VisualElement>(ve);
-            s_ElementToRef.Add(ve, refId);
+            refId = $"ref_{_nextRefId++}";
+            _refMap[refId] = new WeakReference<VisualElement>(ve);
+            ElementToRef.Add(ve, refId);
             return refId;
         }
 
         private static VisualElement ResolveRef(string refId)
         {
-            if (s_RefMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
+            if (_refMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
                 return element;
 
             return null;
@@ -840,13 +840,13 @@ namespace UnityBridge.Tools
         private static void PruneDeadRefs()
         {
             var dead = new List<string>();
-            foreach (var kvp in s_RefMap)
+            foreach (var kvp in _refMap)
             {
                 if (!kvp.Value.TryGetTarget(out _))
                     dead.Add(kvp.Key);
             }
             foreach (var key in dead)
-                s_RefMap.Remove(key);
+                _refMap.Remove(key);
         }
 
         #endregion

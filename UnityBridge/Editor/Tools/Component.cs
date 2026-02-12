@@ -770,7 +770,7 @@ namespace UnityBridge.Tools
             }
 
             // Handle arrays and lists of primitives
-            if (type.IsArray && type.GetElementType()?.IsPrimitive == true)
+            if (type.IsArray && type.GetElementType() is { IsPrimitive: true })
             {
                 return JArray.FromObject(value);
             }

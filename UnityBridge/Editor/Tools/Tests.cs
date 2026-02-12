@@ -303,7 +303,7 @@ namespace UnityBridge.Tools
             if (test == null) return;
 
             // Only include actual test methods (leaf nodes)
-            if (!test.HasChildren && test.IsSuite == false)
+            if (!test.HasChildren && !test.IsSuite)
             {
                 tests.Add(new JObject
                 {

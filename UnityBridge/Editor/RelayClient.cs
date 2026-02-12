@@ -318,7 +318,7 @@ namespace UnityBridge
 
             try
             {
-                while (!cancellationToken.IsCancellationRequested && _client?.Connected == true)
+                while (!cancellationToken.IsCancellationRequested && _client is { Connected: true })
                 {
                     var msg = await Framing.ReadFrameAsync(_stream, cancellationToken);
                     await HandleMessageAsync(msg, cancellationToken);
@@ -387,7 +387,7 @@ namespace UnityBridge
 
             try
             {
-                while (!cancellationToken.IsCancellationRequested && _client?.Connected == true)
+                while (!cancellationToken.IsCancellationRequested && _client is { Connected: true })
                 {
                     await Task.Delay(_heartbeatIntervalMs, cancellationToken);
 
