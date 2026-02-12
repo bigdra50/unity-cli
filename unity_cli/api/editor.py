@@ -62,22 +62,6 @@ class EditorAPI:
         """
         return self._conn.send_request("playmode", {"action": "state"})
 
-    def get_tags(self) -> dict[str, Any]:
-        """Get all tags.
-
-        Returns:
-            Dictionary with all available tags
-        """
-        return self._conn.send_request("get_tags", {})
-
-    def get_layers(self) -> dict[str, Any]:
-        """Get all layers.
-
-        Returns:
-            Dictionary with all available layers
-        """
-        return self._conn.send_request("get_layers", {})
-
     def refresh(self) -> dict[str, Any]:
         """Refresh asset database (triggers recompilation).
 

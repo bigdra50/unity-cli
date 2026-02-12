@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         ConsoleAPI,
         EditorAPI,
         GameObjectAPI,
-        MaterialAPI,
         MenuAPI,
         PackageAPI,
         ProfilerAPI,
@@ -541,7 +540,6 @@ class UnityClient:
         gameobject: GameObject CRUD operations.
         scene: Scene management.
         component: Component inspection.
-        material: Material management.
         tests: Test execution.
         menu: Menu item execution.
     """
@@ -591,7 +589,6 @@ class UnityClient:
             ConsoleAPI,
             EditorAPI,
             GameObjectAPI,
-            MaterialAPI,
             MenuAPI,
             PackageAPI,
             ProfilerAPI,
@@ -610,7 +607,6 @@ class UnityClient:
         self.gameobject: GameObjectAPI = GameObjectAPI(self._conn)
         self.scene: SceneAPI = SceneAPI(self._conn)
         self.component: ComponentAPI = ComponentAPI(self._conn)
-        self.material: MaterialAPI = MaterialAPI(self._conn)
         self.package: PackageAPI = PackageAPI(self._conn)
         self.profiler: ProfilerAPI = ProfilerAPI(self._conn)
         self.tests: TestAPI = TestAPI(self._conn)

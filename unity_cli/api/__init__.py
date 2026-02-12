@@ -10,7 +10,6 @@ from unity_cli.api.component import ComponentAPI
 from unity_cli.api.console import ConsoleAPI
 from unity_cli.api.editor import EditorAPI
 from unity_cli.api.gameobject import GameObjectAPI
-from unity_cli.api.material import MaterialAPI
 from unity_cli.api.menu import MenuAPI
 from unity_cli.api.package import PackageAPI
 from unity_cli.api.profiler import ProfilerAPI
@@ -27,7 +26,6 @@ __all__ = [
     "ConsoleAPI",
     "EditorAPI",
     "GameObjectAPI",
-    "MaterialAPI",
     "MenuAPI",
     "PackageAPI",
     "ProfilerAPI",
