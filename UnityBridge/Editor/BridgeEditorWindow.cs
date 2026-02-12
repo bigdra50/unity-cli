@@ -140,30 +140,29 @@ namespace UnityBridge
 
             // Settings foldout
             _showServerSettings = EditorGUILayout.Foldout(_showServerSettings, "Server Settings", true);
-            if (_showServerSettings)
+            if (!_showServerSettings) return;
+
+            EditorGUI.indentLevel++;
+
+            EditorGUILayout.LabelField($"Detail: {detail}", EditorStyles.miniLabel);
+
+            EditorGUILayout.Space(5);
+            EditorGUILayout.LabelField("Custom Command (optional):", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("Use {port} as placeholder", EditorStyles.miniLabel);
+
+            _customCommand = launcher.CustomCommand;
+            var newCommand = EditorGUILayout.TextField(_customCommand);
+            if (newCommand != _customCommand)
             {
-                EditorGUI.indentLevel++;
-
-                EditorGUILayout.LabelField($"Detail: {detail}", EditorStyles.miniLabel);
-
-                EditorGUILayout.Space(5);
-                EditorGUILayout.LabelField("Custom Command (optional):", EditorStyles.miniLabel);
-                EditorGUILayout.LabelField("Use {port} as placeholder", EditorStyles.miniLabel);
-
-                _customCommand = launcher.CustomCommand;
-                var newCommand = EditorGUILayout.TextField(_customCommand);
-                if (newCommand != _customCommand)
-                {
-                    launcher.CustomCommand = newCommand;
-                    _customCommand = newCommand;
-                }
-
-                EditorGUILayout.Space(3);
-                EditorGUILayout.LabelField("Example: uv run --from git+https://... unity-relay --port {port}",
-                    EditorStyles.miniLabel);
-
-                EditorGUI.indentLevel--;
+                launcher.CustomCommand = newCommand;
+                _customCommand = newCommand;
             }
+
+            EditorGUILayout.Space(3);
+            EditorGUILayout.LabelField("Example: uv run --from git+https://... unity-relay --port {port}",
+                EditorStyles.miniLabel);
+
+            EditorGUI.indentLevel--;
         }
 
         private void DrawServerCommandPreview(RelayServerLauncher launcher)
@@ -252,25 +251,23 @@ namespace UnityBridge
             }
 
             // Status message
-            if (!string.IsNullOrEmpty(_statusMessage))
+            if (string.IsNullOrEmpty(_statusMessage)) return;
+            EditorGUILayout.Space(5);
+
+            var style = _statusMessageType switch
             {
-                EditorGUILayout.Space(5);
-
-                var style = _statusMessageType switch
+                MessageType.Error => new GUIStyle(EditorStyles.helpBox)
                 {
-                    MessageType.Error => new GUIStyle(EditorStyles.helpBox)
-                    {
-                        normal = { textColor = new Color(0.9f, 0.3f, 0.3f) }
-                    },
-                    MessageType.Warning => new GUIStyle(EditorStyles.helpBox)
-                    {
-                        normal = { textColor = new Color(0.9f, 0.7f, 0.2f) }
-                    },
-                    _ => EditorStyles.helpBox
-                };
+                    normal = { textColor = new Color(0.9f, 0.3f, 0.3f) }
+                },
+                MessageType.Warning => new GUIStyle(EditorStyles.helpBox)
+                {
+                    normal = { textColor = new Color(0.9f, 0.7f, 0.2f) }
+                },
+                _ => EditorStyles.helpBox
+            };
 
-                EditorGUILayout.LabelField(_statusMessage, style);
-            }
+            EditorGUILayout.LabelField(_statusMessage, style);
         }
 
         private void DrawStatusSection()

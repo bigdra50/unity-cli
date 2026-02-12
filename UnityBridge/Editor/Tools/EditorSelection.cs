@@ -48,8 +48,7 @@ namespace UnityBridge.Tools
                     selectedObjects.Select(SerializeObject)),
                 ["gameObjects"] = new JArray(
                     selectedGameObjects.Select(SerializeGameObject)),
-                ["assetGUIDs"] = new JArray(
-                    UnityEditor.Selection.assetGUIDs)
+                ["assetGUIDs"] = new JArray(Selection.assetGUIDs)
             };
 
             if (activeTransform != null)

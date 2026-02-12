@@ -626,7 +626,7 @@ namespace UnityBridge.Tools
                 ["ref"] = refId,
                 ["type"] = element.GetType().Name,
                 ["name"] = string.IsNullOrEmpty(element.name) ? null : element.name,
-                ["classes"] = new JArray(element.GetClasses().ToArray()),
+                ["classes"] = new JArray(element.GetClasses().ToArray<object>()),
                 ["childCount"] = element.childCount
             };
 
@@ -685,7 +685,7 @@ namespace UnityBridge.Tools
                         ["ref"] = refId,
                         ["type"] = typeName,
                         ["name"] = string.IsNullOrEmpty(element.name) ? null : element.name,
-                        ["classes"] = new JArray(element.GetClasses().ToArray()),
+                        ["classes"] = new JArray(element.GetClasses().ToArray<object>()),
                         ["path"] = currentPath,
                         ["layout"] = new JObject
                         {
@@ -720,7 +720,7 @@ namespace UnityBridge.Tools
                 ["ref"] = refId,
                 ["type"] = element.GetType().Name,
                 ["name"] = string.IsNullOrEmpty(element.name) ? null : element.name,
-                ["classes"] = new JArray(element.GetClasses().ToArray()),
+                ["classes"] = new JArray(element.GetClasses().ToArray<object>()),
                 ["visible"] = element.visible,
                 ["enabledSelf"] = element.enabledSelf,
                 ["enabledInHierarchy"] = element.enabledInHierarchy,
@@ -755,7 +755,7 @@ namespace UnityBridge.Tools
                         ["ref"] = childRefId,
                         ["type"] = child.GetType().Name,
                         ["name"] = string.IsNullOrEmpty(child.name) ? null : child.name,
-                        ["classes"] = new JArray(child.GetClasses().ToArray())
+                        ["classes"] = new JArray(child.GetClasses().ToArray<object>())
                     });
                 }
                 result["children"] = children;

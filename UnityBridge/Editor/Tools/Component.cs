@@ -63,7 +63,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId?.ToString()}");
+                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var components = gameObject.GetComponents<UnityEngine.Component>();
@@ -116,7 +116,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId?.ToString()}");
+                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -173,7 +173,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId?.ToString()}");
+                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -242,7 +242,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId?.ToString()}");
+                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -324,7 +324,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId?.ToString()}");
+                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -367,7 +367,7 @@ namespace UnityBridge.Tools
             SetSerializedPropertyValue(sp, valueToken);
             so.ApplyModifiedProperties();
             EditorUtility.SetDirty(gameObject);
-            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
             return new JObject
             {
@@ -452,7 +452,7 @@ namespace UnityBridge.Tools
 
         private static Vector2 ParseVector2FromToken(JToken token)
         {
-            if (token is JArray arr && arr.Count >= 2)
+            if (token is JArray { Count: >= 2 } arr)
             {
                 return new Vector2(arr[0].Value<float>(), arr[1].Value<float>());
             }
@@ -469,7 +469,7 @@ namespace UnityBridge.Tools
 
         private static Vector3 ParseVector3FromToken(JToken token)
         {
-            if (token is JArray arr && arr.Count >= 3)
+            if (token is JArray { Count: >= 3 } arr)
             {
                 return new Vector3(arr[0].Value<float>(), arr[1].Value<float>(), arr[2].Value<float>());
             }
@@ -487,7 +487,7 @@ namespace UnityBridge.Tools
 
         private static Color ParseColorFromToken(JToken token)
         {
-            if (token is JArray arr && arr.Count >= 3)
+            if (token is JArray { Count: >= 3 } arr)
             {
                 return new Color(
                     arr[0].Value<float>(),

@@ -296,7 +296,7 @@ namespace UnityBridge.Tools
             var parts = path.Split('/');
             var current = parts[0]; // "Assets"
 
-            for (int i = 1; i < parts.Length; i++)
+            for (var i = 1; i < parts.Length; i++)
             {
                 var next = current + "/" + parts[i];
                 if (!AssetDatabase.IsValidFolder(next))

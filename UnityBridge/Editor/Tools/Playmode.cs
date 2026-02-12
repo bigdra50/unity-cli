@@ -2,6 +2,7 @@ using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace UnityBridge.Tools
 {
@@ -131,7 +132,7 @@ namespace UnityBridge.Tools
 
         private static JObject GetState()
         {
-            var activeScene = EditorSceneManager.GetActiveScene();
+            var activeScene = SceneManager.GetActiveScene();
 
             return new JObject
             {

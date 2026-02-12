@@ -67,10 +67,9 @@ namespace UnityBridge
         private readonly string _host;
         private readonly int _port;
         private int _heartbeatIntervalMs = ProtocolConstants.HeartbeatIntervalMs;
-        private long _lastPingTs;
 
         private ConnectionStatus _status = ConnectionStatus.Disconnected;
-        private readonly object _statusLock = new object();
+        private readonly object _statusLock = new();
 
         /// <summary>
         /// Instance ID (project path)
@@ -231,7 +230,7 @@ namespace UnityBridge
         /// </summary>
         public async Task SendReloadingStatusAsync()
         {
-            if (_stream == null || !_client?.Connected == true)
+            if (_stream == null || _client is not { Connected: true })
                 return;
 
             try
@@ -252,7 +251,7 @@ namespace UnityBridge
         /// </summary>
         public async Task SendReadyStatusAsync()
         {
-            if (_stream == null || !_client?.Connected == true)
+            if (_stream == null || _client is not { Connected: true })
                 return;
 
             try
@@ -272,7 +271,7 @@ namespace UnityBridge
         /// </summary>
         public async Task SendCommandResultAsync(string id, JObject data)
         {
-            if (_stream == null || !_client?.Connected == true)
+            if (_stream == null || _client is not { Connected: true })
             {
                 BridgeLog.Warn("Cannot send result: not connected");
                 return;
@@ -295,7 +294,7 @@ namespace UnityBridge
         /// </summary>
         public async Task SendCommandErrorAsync(string id, string code, string message)
         {
-            if (_stream == null || !_client?.Connected == true)
+            if (_stream == null || _client is not { Connected: true })
             {
                 BridgeLog.Warn("Cannot send error: not connected");
                 return;
@@ -364,7 +363,6 @@ namespace UnityBridge
         private async Task HandlePingAsync(JObject msg, CancellationToken cancellationToken)
         {
             var pingTs = Messages.ParsePing(msg);
-            _lastPingTs = pingTs;
 
             var pongMsg = Messages.CreatePong(pingTs);
             await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken);
@@ -477,9 +475,9 @@ namespace UnityBridge
                 // Wait briefly for tasks to complete (non-blocking)
                 // Use ConfigureAwait(false) to avoid deadlock on UI thread
                 var tasksToWait = new System.Collections.Generic.List<Task>();
-                if (receiveTask != null && !receiveTask.IsCompleted)
+                if (receiveTask is { IsCompleted: false })
                     tasksToWait.Add(receiveTask);
-                if (heartbeatTask != null && !heartbeatTask.IsCompleted)
+                if (heartbeatTask is { IsCompleted: false })
                     tasksToWait.Add(heartbeatTask);
 
                 if (tasksToWait.Count > 0)
@@ -535,7 +533,8 @@ namespace UnityBridge
                     BridgeLog.Verbose($"Status: {oldStatus} -> Disconnected");
                     try
                     {
-                        StatusChanged?.Invoke(this, new ConnectionStatusChangedEventArgs(oldStatus, ConnectionStatus.Disconnected));
+                        StatusChanged?.Invoke(this,
+                            new ConnectionStatusChangedEventArgs(oldStatus, ConnectionStatus.Disconnected));
                     }
                     catch (Exception ex)
                     {

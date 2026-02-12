@@ -23,7 +23,7 @@ namespace UnityBridge.Tools
         private static TestResultCollector _activeCollector;
 
         // SemaphoreSlim for exclusive access (prevents concurrent test runs)
-        private static readonly SemaphoreSlim _operationLock = new(1, 1);
+        private static readonly SemaphoreSlim OperationLock = new(1, 1);
 
         private static TestRunnerApi Api
         {
@@ -48,7 +48,7 @@ namespace UnityBridge.Tools
             }
 
             // Acquire lock for run/list operations
-            await _operationLock.WaitAsync().ConfigureAwait(true);
+            await OperationLock.WaitAsync().ConfigureAwait(true);
             try
             {
                 return action.ToLowerInvariant() switch
@@ -62,7 +62,7 @@ namespace UnityBridge.Tools
             }
             finally
             {
-                _operationLock.Release();
+                OperationLock.Release();
             }
         }
 

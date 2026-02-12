@@ -71,60 +71,57 @@ namespace UnityBridge
             BridgeLog.Verbose("Before assembly reload");
 
             var manager = BridgeManager.Instance;
-            if (manager != null && manager.Client != null && manager.Client.IsConnected)
+            if (manager is not { Client: { IsConnected: true } }) return;
+            WasConnected = true;
+            LastHost = manager.Host;
+            LastPort = manager.Port;
+
+            // Synchronous STATUS send with 500ms timeout
+            try
             {
-                WasConnected = true;
-                LastHost = manager.Host;
-                LastPort = manager.Port;
-
-                // Synchronous STATUS send with 500ms timeout
-                try
-                {
-                    using var cts = new CancellationTokenSource(500);
-                    var task = manager.Client.SendReloadingStatusAsync();
-                    task.Wait(cts.Token);
-                    BridgeLog.Verbose("STATUS reloading sent successfully");
-                }
-                catch (OperationCanceledException)
-                {
-                    BridgeLog.Warn("STATUS send timed out, relying on status file");
-                }
-                catch (Exception ex)
-                {
-                    BridgeLog.Warn($"STATUS send failed: {ex.Message}, relying on status file");
-                }
-
-                // File fallback: write status file for relay server to detect
-                BridgeStatusFile.WriteStatus(
-                    manager.Client.InstanceId,
-                    UnityEngine.Application.productName,
-                    UnityEngine.Application.unityVersion,
-                    "reloading",
-                    manager.Host,
-                    manager.Port);
+                using var cts = new CancellationTokenSource(500);
+                var task = manager.Client.SendReloadingStatusAsync();
+                task.Wait(cts.Token);
+                BridgeLog.Verbose("STATUS reloading sent successfully");
             }
+            catch (OperationCanceledException)
+            {
+                BridgeLog.Warn("STATUS send timed out, relying on status file");
+            }
+            catch (Exception ex)
+            {
+                BridgeLog.Warn($"STATUS send failed: {ex.Message}, relying on status file");
+            }
+
+            // File fallback: write status file for relay server to detect
+            BridgeStatusFile.WriteStatus(
+                manager.Client.InstanceId,
+                UnityEngine.Application.productName,
+                UnityEngine.Application.unityVersion,
+                "reloading",
+                manager.Host,
+                manager.Port);
         }
 
         private static void OnAfterAssemblyReload()
         {
             BridgeLog.Verbose("After assembly reload");
 
-            if (WasConnected)
+            if (!WasConnected) return;
+            WasConnected = false;
+
+            // Use update callback instead of delayCall
+            // delayCall doesn't fire until editor receives focus
+            var host = LastHost;
+            var port = LastPort;
+
+            EditorApplication.update += ReconnectOnUpdate;
+            return;
+
+            void ReconnectOnUpdate()
             {
-                WasConnected = false;
-
-                // Use update callback instead of delayCall
-                // delayCall doesn't fire until editor receives focus
-                var host = LastHost;
-                var port = LastPort;
-
-                void ReconnectOnUpdate()
-                {
-                    EditorApplication.update -= ReconnectOnUpdate;
-                    ReconnectAsync(host, port);
-                }
-
-                EditorApplication.update += ReconnectOnUpdate;
+                EditorApplication.update -= ReconnectOnUpdate;
+                ReconnectAsync(host, port);
             }
         }
 
@@ -148,19 +145,17 @@ namespace UnityBridge
                 await manager.ConnectAsync(host, port);
                 BridgeLog.Verbose("Reconnected after reload");
 
-                if (manager.Client != null && manager.Client.IsConnected)
-                {
-                    await manager.Client.SendReadyStatusAsync();
+                if (manager.Client is not { IsConnected: true }) return;
+                await manager.Client.SendReadyStatusAsync();
 
-                    // Update status file to ready
-                    BridgeStatusFile.WriteStatus(
-                        manager.Client.InstanceId,
-                        UnityEngine.Application.productName,
-                        UnityEngine.Application.unityVersion,
-                        "ready",
-                        host,
-                        port);
-                }
+                // Update status file to ready
+                BridgeStatusFile.WriteStatus(
+                    manager.Client.InstanceId,
+                    UnityEngine.Application.productName,
+                    UnityEngine.Application.unityVersion,
+                    "ready",
+                    host,
+                    port);
             }
             catch (Exception ex)
             {
