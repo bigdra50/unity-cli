@@ -19,9 +19,9 @@ namespace UnityBridge.Tools
     [BridgeTool("uitree")]
     public static class UITree
     {
-        private static Dictionary<string, WeakReference<VisualElement>> s_RefMap = new();
-        private static readonly ConditionalWeakTable<VisualElement, string> s_ElementToRef = new();
-        private static int s_NextRefId = 1;
+        private static readonly Dictionary<string, WeakReference<VisualElement>> RefMap = new();
+        private static readonly ConditionalWeakTable<VisualElement, string> ElementToRef = new();
+        private static int _nextRefId = 1;
 
         public static JObject HandleCommand(JObject parameters)
         {
@@ -164,7 +164,7 @@ namespace UnityBridge.Tools
             var panelName = parameters["panel"]?.Value<string>();
             var nameFilter = parameters["name"]?.Value<string>();
 
-            VisualElement target = null;
+            VisualElement target;
 
             if (!string.IsNullOrEmpty(refId))
             {
@@ -479,7 +479,7 @@ namespace UnityBridge.Tools
             {
                 // Use TypedReference / pointer trick not available, so collect all at once
                 // by repeatedly calling MoveNext on the boxed struct via interface
-                if (iterator is System.Collections.IEnumerator enumerator)
+                if (iterator is IEnumerator enumerator)
                 {
                     while (enumerator.MoveNext())
                     {
@@ -626,7 +626,7 @@ namespace UnityBridge.Tools
                 ["ref"] = refId,
                 ["type"] = element.GetType().Name,
                 ["name"] = string.IsNullOrEmpty(element.name) ? null : element.name,
-                ["classes"] = new JArray(element.GetClasses().ToArray()),
+                ["classes"] = new JArray(element.GetClasses().ToArray<object>()),
                 ["childCount"] = element.childCount
             };
 
@@ -685,7 +685,7 @@ namespace UnityBridge.Tools
                         ["ref"] = refId,
                         ["type"] = typeName,
                         ["name"] = string.IsNullOrEmpty(element.name) ? null : element.name,
-                        ["classes"] = new JArray(element.GetClasses().ToArray()),
+                        ["classes"] = new JArray(element.GetClasses().ToArray<object>()),
                         ["path"] = currentPath,
                         ["layout"] = new JObject
                         {
@@ -720,7 +720,7 @@ namespace UnityBridge.Tools
                 ["ref"] = refId,
                 ["type"] = element.GetType().Name,
                 ["name"] = string.IsNullOrEmpty(element.name) ? null : element.name,
-                ["classes"] = new JArray(element.GetClasses().ToArray()),
+                ["classes"] = new JArray(element.GetClasses().ToArray<object>()),
                 ["visible"] = element.visible,
                 ["enabledSelf"] = element.enabledSelf,
                 ["enabledInHierarchy"] = element.enabledInHierarchy,
@@ -755,7 +755,7 @@ namespace UnityBridge.Tools
                         ["ref"] = childRefId,
                         ["type"] = child.GetType().Name,
                         ["name"] = string.IsNullOrEmpty(child.name) ? null : child.name,
-                        ["classes"] = new JArray(child.GetClasses().ToArray())
+                        ["classes"] = new JArray(child.GetClasses().ToArray<object>())
                     });
                 }
                 result["children"] = children;
@@ -820,18 +820,18 @@ namespace UnityBridge.Tools
 
         private static string FindOrAssignRef(VisualElement ve)
         {
-            if (s_ElementToRef.TryGetValue(ve, out var refId))
+            if (ElementToRef.TryGetValue(ve, out var refId))
                 return refId;
 
-            refId = $"ref_{s_NextRefId++}";
-            s_RefMap[refId] = new WeakReference<VisualElement>(ve);
-            s_ElementToRef.Add(ve, refId);
+            refId = $"ref_{_nextRefId++}";
+            RefMap[refId] = new WeakReference<VisualElement>(ve);
+            ElementToRef.Add(ve, refId);
             return refId;
         }
 
         private static VisualElement ResolveRef(string refId)
         {
-            if (s_RefMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
+            if (RefMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
                 return element;
 
             return null;
@@ -840,13 +840,13 @@ namespace UnityBridge.Tools
         private static void PruneDeadRefs()
         {
             var dead = new List<string>();
-            foreach (var kvp in s_RefMap)
+            foreach (var kvp in RefMap)
             {
                 if (!kvp.Value.TryGetTarget(out _))
                     dead.Add(kvp.Key);
             }
             foreach (var key in dead)
-                s_RefMap.Remove(key);
+                RefMap.Remove(key);
         }
 
         #endregion

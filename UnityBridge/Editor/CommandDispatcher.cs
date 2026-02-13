@@ -61,10 +61,7 @@ namespace UnityBridge
             if (string.IsNullOrEmpty(commandName))
                 throw new ArgumentNullException(nameof(commandName));
 
-            if (handler == null)
-                throw new ArgumentNullException(nameof(handler));
-
-            _handlers[commandName] = handler;
+            _handlers[commandName] = handler ?? throw new ArgumentNullException(nameof(handler));
             BridgeLog.Verbose($"Registered handler: {commandName}");
         }
 

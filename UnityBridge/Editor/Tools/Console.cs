@@ -165,9 +165,9 @@ namespace UnityBridge.Tools
                     {
                         entries.Add(new
                         {
-                            message = message,
+                            message,
                             type = entryType,
-                            stackTrace = stackTrace,
+                            stackTrace,
                             timestamp = DateTime.Now.ToString("HH:mm:ss")
                         });
                     }
@@ -175,7 +175,7 @@ namespace UnityBridge.Tools
                     {
                         entries.Add(new
                         {
-                            message = message,
+                            message,
                             type = entryType,
                             timestamp = DateTime.Now.ToString("HH:mm:ss")
                         });

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 using UnityBridge.Helpers;
 using UnityEditor;
 
@@ -14,10 +13,7 @@ namespace UnityBridge
     public class BridgeManager
     {
         private static BridgeManager _instance;
-        private static readonly object _lock = new object();
-
-        private RelayClient _client;
-        private CommandDispatcher _dispatcher;
+        private static readonly object Lock = new();
 
         // Command queue for main thread execution
         private readonly ConcurrentQueue<CommandReceivedEventArgs> _commandQueue = new();
@@ -30,15 +26,10 @@ namespace UnityBridge
         {
             get
             {
-                if (_instance == null)
+                if (_instance != null) return _instance;
+                lock (Lock)
                 {
-                    lock (_lock)
-                    {
-                        if (_instance == null)
-                        {
-                            _instance = new BridgeManager();
-                        }
-                    }
+                    _instance ??= new BridgeManager();
                 }
 
                 return _instance;
@@ -48,12 +39,12 @@ namespace UnityBridge
         /// <summary>
         /// The relay client instance
         /// </summary>
-        public RelayClient Client => _client;
+        public RelayClient Client { get; private set; }
 
         /// <summary>
         /// The command dispatcher instance
         /// </summary>
-        public CommandDispatcher Dispatcher => _dispatcher;
+        public CommandDispatcher Dispatcher { get; }
 
         /// <summary>
         /// Current connection host
@@ -68,7 +59,7 @@ namespace UnityBridge
         /// <summary>
         /// Whether the client is connected
         /// </summary>
-        public bool IsConnected => _client?.IsConnected ?? false;
+        public bool IsConnected => Client?.IsConnected ?? false;
 
         /// <summary>
         /// Event fired when connection status changes
@@ -77,7 +68,7 @@ namespace UnityBridge
 
         private BridgeManager()
         {
-            _dispatcher = new CommandDispatcher();
+            Dispatcher = new CommandDispatcher();
         }
 
         /// <summary>
@@ -85,7 +76,7 @@ namespace UnityBridge
         /// </summary>
         public async Task ConnectAsync(string host = "127.0.0.1", int port = ProtocolConstants.DefaultPort)
         {
-            if (_client != null)
+            if (Client != null)
             {
                 await DisconnectAsync();
             }
@@ -93,14 +84,14 @@ namespace UnityBridge
             Host = host;
             Port = port;
 
-            _client = new RelayClient(host, port);
-            _client.StatusChanged += OnClientStatusChanged;
-            _client.CommandReceived += OnCommandReceived;
+            Client = new RelayClient(host, port);
+            Client.StatusChanged += OnClientStatusChanged;
+            Client.CommandReceived += OnCommandReceived;
 
-            await _client.ConnectAsync();
+            await Client.ConnectAsync();
 
             // Register for reload handling
-            BridgeReloadHandler.RegisterClient(_client, host, port);
+            BridgeReloadHandler.RegisterClient(Client, host, port);
         }
 
         /// <summary>
@@ -114,8 +105,8 @@ namespace UnityBridge
             UnregisterUpdate();
 
             // Capture reference to avoid race conditions
-            var client = _client;
-            _client = null;
+            var client = Client;
+            Client = null;
 
             if (client != null)
             {
@@ -193,7 +184,7 @@ namespace UnityBridge
         {
             BridgeLog.Verbose($"Executing command on main thread: {e.Command} (id: {e.Id})");
 
-            if (_client == null || !_client.IsConnected)
+            if (Client is not { IsConnected: true })
             {
                 BridgeLog.Warn($"Cannot execute command, not connected: {e.Command}");
                 return;
@@ -202,17 +193,17 @@ namespace UnityBridge
             try
             {
                 // Execute command asynchronously - await allows EditorApplication.update to continue
-                var result = await _dispatcher.ExecuteAsync(e.Command, e.Parameters);
+                var result = await Dispatcher.ExecuteAsync(e.Command, e.Parameters);
 
                 // Send result
-                await _client.SendCommandResultAsync(e.Id, result).ConfigureAwait(false);
+                await Client.SendCommandResultAsync(e.Id, result).ConfigureAwait(false);
             }
             catch (ProtocolException pex)
             {
                 BridgeLog.Warn($"Protocol error: {pex.Code} - {pex.Message}");
                 try
                 {
-                    await _client.SendCommandErrorAsync(e.Id, pex.Code, pex.Message).ConfigureAwait(false);
+                    await Client.SendCommandErrorAsync(e.Id, pex.Code, pex.Message).ConfigureAwait(false);
                 }
                 catch (Exception sendEx)
                 {
@@ -224,7 +215,8 @@ namespace UnityBridge
                 BridgeLog.Error($"Command execution failed: {ex.GetType().Name} - {ex.Message}\n{ex.StackTrace}");
                 try
                 {
-                    await _client.SendCommandErrorAsync(e.Id, ErrorCode.InternalError, ex.Message).ConfigureAwait(false);
+                    await Client.SendCommandErrorAsync(e.Id, ErrorCode.InternalError, ex.Message)
+                        .ConfigureAwait(false);
                 }
                 catch (Exception sendEx)
                 {
@@ -238,9 +230,9 @@ namespace UnityBridge
         /// </summary>
         public void SetCapabilities(params string[] capabilities)
         {
-            if (_client != null)
+            if (Client != null)
             {
-                _client.Capabilities = capabilities;
+                Client.Capabilities = capabilities;
             }
         }
     }

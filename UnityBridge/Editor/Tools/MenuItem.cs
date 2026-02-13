@@ -90,15 +90,9 @@ namespace UnityBridge.Tools
             {
                 // Try to find by hierarchy path
                 var go = GameObject.Find(targetPath);
-                if (go != null)
-                {
-                    targetObject = go;
-                }
-                else
-                {
+                targetObject = go != null ? go :
                     // Try asset path
-                    targetObject = AssetDatabase.LoadMainAssetAtPath(targetPath);
-                }
+                    AssetDatabase.LoadMainAssetAtPath(targetPath);
 
                 if (targetObject == null)
                 {

@@ -80,7 +80,7 @@ namespace UnityBridge.Helpers
                     instance_id = instanceId,
                     project_name = projectName,
                     unity_version = unityVersion,
-                    status = status,
+                    status,
                     relay_host = relayHost,
                     relay_port = relayPort,
                     timestamp = DateTime.UtcNow.ToString("O"),

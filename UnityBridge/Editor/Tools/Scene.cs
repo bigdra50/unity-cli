@@ -35,7 +35,7 @@ namespace UnityBridge.Tools
 
         private static JObject GetActiveScene()
         {
-            var scene = EditorSceneManager.GetActiveScene();
+            var scene = SceneManager.GetActiveScene();
 
             return new JObject
             {
@@ -54,7 +54,7 @@ namespace UnityBridge.Tools
             var pageSize = parameters["page_size"]?.Value<int>() ?? DefaultPageSize;
             var cursor = parameters["cursor"]?.Value<int>() ?? 0;
 
-            var scene = EditorSceneManager.GetActiveScene();
+            var scene = SceneManager.GetActiveScene();
             var rootObjects = scene.GetRootGameObjects();
             var totalRootCount = rootObjects.Length;
 
@@ -207,18 +207,11 @@ namespace UnityBridge.Tools
         private static JObject SaveScene(JObject parameters)
         {
             var path = parameters["path"]?.Value<string>();
-            var scene = EditorSceneManager.GetActiveScene();
+            var scene = SceneManager.GetActiveScene();
 
-            bool saved;
-
-            if (!string.IsNullOrEmpty(path))
-            {
-                saved = EditorSceneManager.SaveScene(scene, path);
-            }
-            else
-            {
-                saved = EditorSceneManager.SaveScene(scene);
-            }
+            var saved = !string.IsNullOrEmpty(path)
+                ? EditorSceneManager.SaveScene(scene, path)
+                : EditorSceneManager.SaveScene(scene);
 
             if (!saved)
             {

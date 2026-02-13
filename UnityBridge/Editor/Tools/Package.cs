@@ -39,7 +39,7 @@ namespace UnityBridge.Tools
                     ["displayName"] = p.displayName,
                     ["source"] = p.source.ToString()
                 })
-                .ToArray();
+                .ToArray<object>();
 
             return new JObject
             {

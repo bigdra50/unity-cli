@@ -13,33 +13,50 @@ namespace UnityBridge
         internal static readonly Color ConnectingColor = new(0.9f, 0.7f, 0.2f);
         internal static readonly Color ConnectedColor = new(0.3f, 0.8f, 0.3f);
 
-        static VisualElement s_button;
-        static ConnectionStatus s_lastStatus = ConnectionStatus.Disconnected;
+        private static VisualElement _button;
+        private static ConnectionStatus _lastStatus = ConnectionStatus.Disconnected;
 
         internal static VisualElement CreateButton()
         {
-            var button = new VisualElement();
-            button.style.flexDirection = FlexDirection.Row;
-            button.style.alignItems = Align.Center;
-            button.style.paddingLeft = 4;
-            button.style.paddingRight = 4;
-            button.style.marginLeft = 2;
-            button.style.marginRight = 2;
+            var button = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    paddingLeft = 4,
+                    paddingRight = 4,
+                    marginLeft = 2,
+                    marginRight = 2
+                }
+            };
             button.AddToClassList("unity-toolbar-button");
 
-            var indicator = new VisualElement { name = "bridge-indicator" };
-            indicator.style.width = 8;
-            indicator.style.height = 8;
-            indicator.style.borderTopLeftRadius = 4;
-            indicator.style.borderTopRightRadius = 4;
-            indicator.style.borderBottomLeftRadius = 4;
-            indicator.style.borderBottomRightRadius = 4;
-            indicator.style.marginRight = 4;
-            indicator.style.backgroundColor = DisconnectedColor;
+            var indicator = new VisualElement
+            {
+                name = "bridge-indicator",
+                style =
+                {
+                    width = 8,
+                    height = 8,
+                    borderTopLeftRadius = 4,
+                    borderTopRightRadius = 4,
+                    borderBottomLeftRadius = 4,
+                    borderBottomRightRadius = 4,
+                    marginRight = 4,
+                    backgroundColor = DisconnectedColor
+                }
+            };
 
-            var label = new Label("Bridge") { name = "bridge-label" };
-            label.style.unityTextAlign = TextAnchor.MiddleCenter;
-            label.style.fontSize = 11;
+            var label = new Label("Bridge")
+            {
+                name = "bridge-label",
+                style =
+                {
+                    unityTextAlign = TextAnchor.MiddleCenter,
+                    fontSize = 11
+                }
+            };
 
             button.Add(indicator);
             button.Add(label);
@@ -54,34 +71,34 @@ namespace UnityBridge
 
         internal static void Register(VisualElement button)
         {
-            s_button = button;
-            s_lastStatus = GetCurrentStatus();
-            ApplyButtonState(s_button, s_lastStatus);
+            _button = button;
+            _lastStatus = GetCurrentStatus();
+            ApplyButtonState(_button, _lastStatus);
             EditorApplication.update += PollStatus;
         }
 
-        static void PollStatus()
+        private static void PollStatus()
         {
-            if (s_button?.panel == null)
+            if (_button?.panel == null)
             {
                 EditorApplication.update -= PollStatus;
-                s_button = null;
+                _button = null;
                 return;
             }
 
             var current = GetCurrentStatus();
-            if (current == s_lastStatus) return;
+            if (current == _lastStatus) return;
 
-            s_lastStatus = current;
-            ApplyButtonState(s_button, current);
+            _lastStatus = current;
+            ApplyButtonState(_button, current);
         }
 
-        static ConnectionStatus GetCurrentStatus()
+        private static ConnectionStatus GetCurrentStatus()
         {
             return BridgeManager.Instance.Client?.Status ?? ConnectionStatus.Disconnected;
         }
 
-        static void ApplyButtonState(VisualElement button, ConnectionStatus status)
+        private static void ApplyButtonState(VisualElement button, ConnectionStatus status)
         {
             if (button?.panel == null) return;
 
@@ -140,26 +157,25 @@ namespace UnityBridge
     }
 
     [InitializeOnLoad]
-    static class BridgeToolbarInjector
+    internal static class BridgeToolbarInjector
     {
-        static readonly Type s_toolbarType;
-        static readonly FieldInfo s_getField;
-        static readonly PropertyInfo s_visualTreeProp;
+        private static readonly FieldInfo GetField;
+        private static readonly PropertyInfo VisualTreeProp;
 
         static BridgeToolbarInjector()
         {
             var editorAssembly = typeof(Editor).Assembly;
-            s_toolbarType = editorAssembly.GetType("UnityEditor.Toolbar");
+            var sToolbarType = editorAssembly.GetType("UnityEditor.Toolbar");
             var guiViewType = editorAssembly.GetType("UnityEditor.GUIView");
 
             // Unity 6000.3+ changed "get" field - try multiple approaches
-            s_getField = s_toolbarType?.GetField("get", BindingFlags.Public | BindingFlags.Static)
-                      ?? s_toolbarType?.GetField("get", BindingFlags.NonPublic | BindingFlags.Static);
+            GetField = sToolbarType?.GetField("get", BindingFlags.Public | BindingFlags.Static)
+                       ?? sToolbarType?.GetField("get", BindingFlags.NonPublic | BindingFlags.Static);
 
-            s_visualTreeProp = guiViewType?.GetProperty("visualTree",
+            VisualTreeProp = guiViewType?.GetProperty("visualTree",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if (s_toolbarType == null || s_getField == null || s_visualTreeProp == null)
+            if (sToolbarType == null || GetField == null || VisualTreeProp == null)
             {
                 BridgeLog.Warn("Toolbar injection: required types/members not found");
                 return;
@@ -168,24 +184,26 @@ namespace UnityBridge
             EditorApplication.update += WaitForToolbar;
         }
 
-        static void WaitForToolbar()
+        private static void WaitForToolbar()
         {
-            var toolbar = s_getField.GetValue(null);
+            var toolbar = GetField.GetValue(null);
             if (toolbar == null) return;
 
             EditorApplication.update -= WaitForToolbar;
 
-            if (s_visualTreeProp?.GetValue(toolbar) is not VisualElement root) return;
+            if (VisualTreeProp?.GetValue(toolbar) is not VisualElement root) return;
 
             // Unity 6000.3+: find the main toolbar container
-            var overlayContainer = root.Query<VisualElement>().Where(e => e.GetType().Name == "MainToolbarOverlayContainer").First();
+            var overlayContainer = root.Query<VisualElement>()
+                .Where(e => e.GetType().Name == "MainToolbarOverlayContainer").FirstOrDefault();
 
             // Find the right-most ContainerSection (after Account/Services)
             VisualElement rightZone = null;
             if (overlayContainer != null)
             {
-                var sections = overlayContainer.Query<VisualElement>().Where(e => e.GetType().Name == "ContainerSection").ToList();
-                rightZone = sections.Count > 0 ? sections[sections.Count - 1] : null;
+                var sections = overlayContainer.Query<VisualElement>()
+                    .Where(e => e.GetType().Name == "ContainerSection").ToList();
+                rightZone = sections.Count > 0 ? sections[^1] : null;
             }
 
             // Fallback for older Unity versions
@@ -202,6 +220,5 @@ namespace UnityBridge
             rightZone.Insert(0, button);
             BridgeToolbarHelper.Register(button);
         }
-
     }
 }

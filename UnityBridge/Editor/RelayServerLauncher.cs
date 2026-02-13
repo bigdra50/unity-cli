@@ -40,21 +40,20 @@ namespace UnityBridge
 
                 // Check if there's a saved PID from before domain reload
                 var savedPid = SessionState.GetInt(SessionStateKeyPid, -1);
-                if (savedPid > 0)
+                if (savedPid <= 0) return false;
+                try
                 {
-                    try
+                    var process = Process.GetProcessById(savedPid);
+                    if (!process.HasExited)
                     {
-                        var process = Process.GetProcessById(savedPid);
-                        if (!process.HasExited)
-                        {
-                            return true;
-                        }
+                        return true;
                     }
-                    catch
-                    {
-                        // Process doesn't exist anymore
-                        SessionState.EraseInt(SessionStateKeyPid);
-                    }
+                    SessionState.EraseInt(SessionStateKeyPid);
+                }
+                catch
+                {
+                    // Process doesn't exist anymore
+                    SessionState.EraseInt(SessionStateKeyPid);
                 }
 
                 return false;
@@ -92,7 +91,7 @@ namespace UnityBridge
 
 #if UNITY_BRIDGE_LOCAL_DEV
             // Force local development mode with define symbol
-            var projectRoot = Path.GetDirectoryName(Application.dataPath);
+            var projectRoot = Path.GetDirectoryName(Application.dataPath) ?? ".";
             var relayPath = Path.Combine(projectRoot, "relay");
             if (Directory.Exists(relayPath))
             {
@@ -296,28 +295,24 @@ namespace UnityBridge
 
                 _serverProcess.OutputDataReceived += (_, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        BridgeLog.Relay(e.Data);
-                        OutputReceived?.Invoke(this, e.Data);
-                    }
+                    if (string.IsNullOrEmpty(e.Data)) return;
+                    BridgeLog.Relay(e.Data);
+                    OutputReceived?.Invoke(this, e.Data);
                 };
 
                 _serverProcess.ErrorDataReceived += (_, e) =>
                 {
-                    if (!string.IsNullOrEmpty(e.Data))
+                    if (string.IsNullOrEmpty(e.Data)) return;
+                    if (e.Data.Contains("ERROR") || e.Data.Contains("Exception"))
                     {
-                        if (e.Data.Contains("ERROR") || e.Data.Contains("Exception"))
-                        {
-                            BridgeLog.RelayError(e.Data);
-                        }
-                        else
-                        {
-                            BridgeLog.Relay(e.Data);
-                        }
-
-                        ErrorReceived?.Invoke(this, e.Data);
+                        BridgeLog.RelayError(e.Data);
                     }
+                    else
+                    {
+                        BridgeLog.Relay(e.Data);
+                    }
+
+                    ErrorReceived?.Invoke(this, e.Data);
                 };
 
                 _serverProcess.Exited += (_, _) =>
@@ -352,13 +347,15 @@ namespace UnityBridge
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                Environment =
+                {
+                    // Set augmented PATH for Unity GUI environment
+                    ["PATH"] = BuildAugmentedPath(),
+                    // Set PYTHONUNBUFFERED for real-time output
+                    ["PYTHONUNBUFFERED"] = "1"
+                }
             };
-
-            // Set augmented PATH for Unity GUI environment
-            startInfo.Environment["PATH"] = BuildAugmentedPath();
-            // Set PYTHONUNBUFFERED for real-time output
-            startInfo.Environment["PYTHONUNBUFFERED"] = "1";
 
             // Priority 1: Custom command from EditorPrefs
             var customCmd = CustomCommand;
@@ -446,11 +443,9 @@ namespace UnityBridge
                 {
                     // Fallback: use saved PID from SessionState (after domain reload)
                     var savedPid = SessionState.GetInt(SessionStateKeyPid, -1);
-                    if (savedPid > 0)
-                    {
-                        BridgeLog.Verbose($"Killing server by saved PID: {savedPid}");
-                        KillProcess(savedPid);
-                    }
+                    if (savedPid <= 0) return;
+                    BridgeLog.Verbose($"Killing server by saved PID: {savedPid}");
+                    KillProcess(savedPid);
                 }
             }
             catch (Exception ex)
@@ -541,28 +536,22 @@ namespace UnityBridge
 
 #if UNITY_BRIDGE_LOCAL_DEV
             // Priority 2: Local development
-            if (!string.IsNullOrEmpty(_localDevPath))
+            if (string.IsNullOrEmpty(_localDevPath))
+                return _uvPath != null ? $"uvx --from {PackageSource} unity-relay --port {port}" : null;
+            if (_uvPath != null)
             {
-                if (_uvPath != null)
-                {
-                    return $"cd \"{_localDevPath}\" && uv run python -m relay.server --port {port}";
-                }
+                return $"cd \"{_localDevPath}\" && uv run python -m relay.server --port {port}";
+            }
 
-                var python = FindExecutable("python3") ?? FindExecutable("python");
-                if (python != null)
-                {
-                    return $"cd \"{_localDevPath}\" && python -m relay.server --port {port}";
-                }
+            var python = FindExecutable("python3") ?? FindExecutable("python");
+            if (python != null)
+            {
+                return $"cd \"{_localDevPath}\" && \"{python}\" -m relay.server --port {port}";
             }
 #endif
 
             // Priority 3: uvx (production)
-            if (_uvPath != null)
-            {
-                return $"uvx --from {PackageSource} unity-relay --port {port}";
-            }
-
-            return null;
+            return _uvPath != null ? $"uvx --from {PackageSource} unity-relay --port {port}" : null;
         }
     }
 }

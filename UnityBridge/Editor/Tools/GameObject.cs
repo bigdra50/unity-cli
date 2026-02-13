@@ -89,7 +89,7 @@ namespace UnityBridge.Tools
             }
 
             var primitiveStr = parameters["primitive"]?.Value<string>();
-            UnityEngine.GameObject newGo;
+            GameObject newGo;
 
             if (!string.IsNullOrEmpty(primitiveStr))
             {
@@ -101,12 +101,12 @@ namespace UnityBridge.Tools
                         $"Invalid primitive type: '{primitiveStr}'. Valid types: {validTypes}");
                 }
 
-                newGo = UnityEngine.GameObject.CreatePrimitive(primitiveType);
+                newGo = GameObject.CreatePrimitive(primitiveType);
                 newGo.name = name;
             }
             else
             {
-                newGo = new UnityEngine.GameObject(name);
+                newGo = new GameObject(name);
             }
 
             Undo.RegisterCreatedObjectUndo(newGo, $"Create GameObject '{name}'");
@@ -115,7 +115,7 @@ namespace UnityBridge.Tools
             ApplyTransform(newGo.transform, parameters);
 
             EditorUtility.SetDirty(newGo);
-            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             Selection.activeGameObject = newGo;
 
             return new JObject
@@ -149,7 +149,7 @@ namespace UnityBridge.Tools
             }
 
             EditorUtility.SetDirty(targetGo);
-            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
             return new JObject
             {
@@ -172,7 +172,7 @@ namespace UnityBridge.Tools
             var goId = targetGo.GetInstanceID();
 
             Undo.DestroyObjectImmediate(targetGo);
-            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
             return new JObject
             {
@@ -208,7 +208,7 @@ namespace UnityBridge.Tools
             Undo.RecordObject(targetGo, "Set Active");
             targetGo.SetActive(active);
             EditorUtility.SetDirty(targetGo);
-            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
 
             return new JObject
             {
@@ -221,7 +221,7 @@ namespace UnityBridge.Tools
 
         #region Helpers
 
-        private static UnityEngine.GameObject ResolveTarget(JObject parameters)
+        private static GameObject ResolveTarget(JObject parameters)
         {
             var id = parameters["id"]?.Value<int>();
             var name = parameters["name"]?.Value<string>();
@@ -239,21 +239,43 @@ namespace UnityBridge.Tools
             return null;
         }
 
-        private static UnityEngine.GameObject FindByInstanceId(int instanceId)
+        private static GameObject FindByInstanceId(int instanceId)
         {
+            // Check prefab stage first
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage?.prefabContentsRoot != null)
+            {
+                foreach (var transform in prefabStage.prefabContentsRoot.GetComponentsInChildren<Transform>(true))
+                {
+                    if (transform.gameObject.GetInstanceID() == instanceId)
+                        return transform.gameObject;
+                }
+            }
+
             var allObjects = GetAllSceneObjects(includeInactive: true);
             return allObjects.FirstOrDefault(go => go.GetInstanceID() == instanceId);
         }
 
-        private static UnityEngine.GameObject FindByName(string name)
+        private static GameObject FindByName(string name)
         {
+            // Check prefab stage first
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage?.prefabContentsRoot != null)
+            {
+                foreach (var transform in prefabStage.prefabContentsRoot.GetComponentsInChildren<Transform>(true))
+                {
+                    if (transform.name == name)
+                        return transform.gameObject;
+                }
+            }
+
             var allObjects = GetAllSceneObjects(includeInactive: true);
             return allObjects.FirstOrDefault(go => go.name == name);
         }
 
-        private static IEnumerable<UnityEngine.GameObject> GetAllSceneObjects(bool includeInactive)
+        private static IEnumerable<GameObject> GetAllSceneObjects(bool includeInactive)
         {
-            var rootObjects = new List<UnityEngine.GameObject>();
+            var rootObjects = new List<GameObject>();
             var sceneCount = SceneManager.sceneCount;
 
             for (var i = 0; i < sceneCount; i++)
@@ -339,7 +361,7 @@ namespace UnityBridge.Tools
             }
         }
 
-        private static JObject CreateGameObjectData(UnityEngine.GameObject go)
+        private static JObject CreateGameObjectData(GameObject go)
         {
             var transform = go.transform;
 

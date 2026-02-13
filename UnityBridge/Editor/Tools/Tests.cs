@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -23,7 +24,7 @@ namespace UnityBridge.Tools
         private static TestResultCollector _activeCollector;
 
         // SemaphoreSlim for exclusive access (prevents concurrent test runs)
-        private static readonly SemaphoreSlim _operationLock = new(1, 1);
+        private static readonly SemaphoreSlim OperationLock = new(1, 1);
 
         private static TestRunnerApi Api
         {
@@ -48,7 +49,7 @@ namespace UnityBridge.Tools
             }
 
             // Acquire lock for run/list operations
-            await _operationLock.WaitAsync().ConfigureAwait(true);
+            await OperationLock.WaitAsync().ConfigureAwait(true);
             try
             {
                 return action.ToLowerInvariant() switch
@@ -62,7 +63,7 @@ namespace UnityBridge.Tools
             }
             finally
             {
-                _operationLock.Release();
+                OperationLock.Release();
             }
         }
 
@@ -303,13 +304,13 @@ namespace UnityBridge.Tools
             if (test == null) return;
 
             // Only include actual test methods (leaf nodes)
-            if (!test.HasChildren && test.IsSuite == false)
+            if (!test.HasChildren && !test.IsSuite)
             {
                 tests.Add(new JObject
                 {
                     ["fullName"] = test.FullName,
                     ["name"] = test.Name,
-                    ["categories"] = new JArray(test.Categories ?? Array.Empty<string>()),
+                    ["categories"] = new JArray((test.Categories ?? Array.Empty<string>()).ToArray<object>()),
                     ["runState"] = test.RunState.ToString()
                 });
             }
