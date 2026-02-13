@@ -195,7 +195,7 @@ namespace UnityBridge
 
             // Unity 6000.3+: find the main toolbar container
             var overlayContainer = root.Query<VisualElement>()
-                .Where(e => e.GetType().Name == "MainToolbarOverlayContainer").FirstOrDefault();
+                .Where(e => e.GetType().Name == "MainToolbarOverlayContainer").First();
 
             // Find the right-most ContainerSection (after Account/Services)
             VisualElement rightZone = null;
