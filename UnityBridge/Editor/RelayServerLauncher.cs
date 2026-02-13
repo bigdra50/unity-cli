@@ -48,6 +48,7 @@ namespace UnityBridge
                     {
                         return true;
                     }
+                    SessionState.EraseInt(SessionStateKeyPid);
                 }
                 catch
                 {
