@@ -241,6 +241,17 @@ namespace UnityBridge.Tools
 
         private static GameObject FindByInstanceId(int instanceId)
         {
+            // Check prefab stage first
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage?.prefabContentsRoot != null)
+            {
+                foreach (var transform in prefabStage.prefabContentsRoot.GetComponentsInChildren<Transform>(true))
+                {
+                    if (transform.gameObject.GetInstanceID() == instanceId)
+                        return transform.gameObject;
+                }
+            }
+
             var allObjects = GetAllSceneObjects(includeInactive: true);
             return allObjects.FirstOrDefault(go => go.GetInstanceID() == instanceId);
         }

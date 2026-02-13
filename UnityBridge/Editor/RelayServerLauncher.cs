@@ -546,7 +546,7 @@ namespace UnityBridge
             var python = FindExecutable("python3") ?? FindExecutable("python");
             if (python != null)
             {
-                return $"cd \"{_localDevPath}\" && python -m relay.server --port {port}";
+                return $"cd \"{_localDevPath}\" && \"{python}\" -m relay.server --port {port}";
             }
 #endif
 
