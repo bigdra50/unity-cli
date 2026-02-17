@@ -31,22 +31,10 @@ def _try_connect() -> RelayConnection | None:
         return None
 
 
-_conn_cache: RelayConnection | None = None
-_conn_checked = False
-
-
-def _get_connection() -> RelayConnection | None:
-    global _conn_cache, _conn_checked
-    if not _conn_checked:
-        _conn_cache = _try_connect()
-        _conn_checked = True
-    return _conn_cache
-
-
 @pytest.fixture(scope="session")
 def conn() -> RelayConnection:
     """Session-scoped relay connection to TestProject."""
-    c = _get_connection()
+    c = _try_connect()
     if c is None:
         pytest.skip("Relay Server or TestProject not available")
     return c
