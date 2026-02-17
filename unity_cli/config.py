@@ -28,6 +28,7 @@ CONFIG_FILE_NAME = ".unity-cli.toml"
 
 # Valid log types for validation
 VALID_LOG_TYPES = frozenset({"log", "warning", "error", "assert", "exception"})
+_DEFAULT_LOG_TYPES = ["log", "warning", "error"]
 
 
 # =============================================================================
@@ -67,7 +68,7 @@ class UnityCLIConfig(BaseModel):
     timeout: Annotated[float, Field(gt=0)] = 15.0
     timeout_ms: Annotated[int, Field(gt=0)] = DEFAULT_TIMEOUT_MS
     instance: str | None = None
-    log_types: list[str] = Field(default_factory=lambda: ["log", "warning", "error"])
+    log_types: list[str] = Field(default_factory=lambda: list(_DEFAULT_LOG_TYPES))
     log_count: Annotated[int, Field(gt=0)] = 20
     retry_initial_ms: Annotated[int, Field(gt=0)] = 500
     retry_max_ms: Annotated[int, Field(gt=0)] = 8000
@@ -78,7 +79,7 @@ class UnityCLIConfig(BaseModel):
     def validate_log_types(cls, v: Any) -> list[str]:
         """Validate that log_types contains only valid types."""
         if v is None:
-            return ["error", "warning"]
+            return list(_DEFAULT_LOG_TYPES)
 
         if isinstance(v, str):
             v = [v]
