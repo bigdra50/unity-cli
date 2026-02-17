@@ -25,7 +25,6 @@ from unity_cli.config import (
     HEADER_SIZE,
     MAX_PAYLOAD_BYTES,
     PROTOCOL_VERSION,
-    VALID_LOG_TYPES,
     UnityCLIConfig,
 )
 from unity_cli.exceptions import (
@@ -49,7 +48,6 @@ __all__ = [
     "HEADER_SIZE",
     "MAX_PAYLOAD_BYTES",
     "PROTOCOL_VERSION",
-    "VALID_LOG_TYPES",
     # Models
     "Vector3",
     "Color",

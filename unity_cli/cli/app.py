@@ -2134,8 +2134,6 @@ def config_show(
             "relay_port": context.config.relay_port,
             "timeout": context.config.timeout,
             "instance": context.config.instance,
-            "log_types": context.config.log_types,
-            "log_count": context.config.log_count,
         }
         print_json(data, None)
     else:
@@ -2145,8 +2143,6 @@ def config_show(
         console.print(f"Relay port: {context.config.relay_port}")
         console.print(f"Timeout: {context.config.timeout}s")
         console.print(f"Instance: {context.config.instance or '[dim](default)[/dim]'}")
-        console.print(f"Log types: {', '.join(context.config.log_types)}")
-        console.print(f"Log count: {context.config.log_count}")
 
 
 @config_app.command("init")
