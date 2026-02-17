@@ -1,17 +1,10 @@
 """Integration test fixtures.
 
-Requires a running Relay Server and Unity Editor.
+Requires a running Relay Server and Unity Editor (TestProject).
 Tests are skipped automatically when the environment is unavailable.
-
-Environment variables:
-    UNITY_TEST_INSTANCE: Unity instance name (default: "TestProject")
 """
 
 from __future__ import annotations
-
-import os
-import uuid
-from typing import Any
 
 import pytest
 
@@ -25,7 +18,7 @@ from unity_cli.api import (
 from unity_cli.client import RelayConnection
 from unity_cli.exceptions import ConnectionError
 
-INSTANCE = os.environ.get("UNITY_TEST_INSTANCE", "TestProject")
+INSTANCE = "TestProject"
 
 
 def _try_connect() -> RelayConnection | None:
@@ -38,12 +31,24 @@ def _try_connect() -> RelayConnection | None:
         return None
 
 
+_conn_cache: RelayConnection | None = None
+_conn_checked = False
+
+
+def _get_connection() -> RelayConnection | None:
+    global _conn_cache, _conn_checked
+    if not _conn_checked:
+        _conn_cache = _try_connect()
+        _conn_checked = True
+    return _conn_cache
+
+
 @pytest.fixture(scope="session")
 def conn() -> RelayConnection:
-    """Session-scoped relay connection."""
-    c = _try_connect()
+    """Session-scoped relay connection to TestProject."""
+    c = _get_connection()
     if c is None:
-        pytest.skip("Relay Server or Unity Editor not available")
+        pytest.skip("Relay Server or TestProject not available")
     return c
 
 
@@ -70,32 +75,3 @@ def console(conn: RelayConnection) -> ConsoleAPI:
 @pytest.fixture(scope="session")
 def uitree(conn: RelayConnection) -> UITreeAPI:
     return UITreeAPI(conn)
-
-
-@pytest.fixture()
-def temp_gameobject(gameobject: GameObjectAPI):
-    """Factory fixture: creates temporary GameObjects with auto-cleanup.
-
-    Yields a callable that creates a GameObject with a UUID-based unique name.
-    All created objects are deleted via instance_id on teardown.
-
-    Usage::
-
-        name, result = temp_gameobject()
-        name, result = temp_gameobject("_suffix")
-    """
-    created_ids: list[int] = []
-
-    def _create(suffix: str = "") -> tuple[str, dict[str, Any]]:
-        name = f"_Test_{uuid.uuid4().hex[:8]}{suffix}"
-        result = gameobject.create(name=name)
-        created_ids.append(result["gameObject"]["instanceID"])
-        return name, result
-
-    yield _create
-
-    for instance_id in created_ids:
-        try:
-            gameobject.delete(instance_id=instance_id)
-        except Exception:
-            pass
