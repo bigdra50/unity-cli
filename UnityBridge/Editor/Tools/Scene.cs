@@ -79,14 +79,13 @@ namespace UnityBridge.Tools
                 currentIndex++;
             }
 
-            var hasMore = currentIndex < totalRootCount || collected >= pageSize;
-            var nextCursor = hasMore ? cursor + collected : -1;
+            var hasMore = currentIndex < totalRootCount;
 
             return new JObject
             {
                 ["items"] = JArray.FromObject(items),
-                ["hasMore"] = hasMore && nextCursor < totalRootCount,
-                ["nextCursor"] = nextCursor >= totalRootCount ? -1 : nextCursor,
+                ["hasMore"] = hasMore,
+                ["nextCursor"] = hasMore ? currentIndex : -1,
                 ["totalRootCount"] = totalRootCount
             };
         }
