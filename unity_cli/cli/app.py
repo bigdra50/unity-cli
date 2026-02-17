@@ -52,7 +52,6 @@ class CLIContext:
 
     config: UnityCLIConfig
     client: UnityClient
-    json_mode: bool = False
 
 
 # =============================================================================
@@ -108,14 +107,6 @@ def main(
             help="Timeout in seconds",
         ),
     ] = None,
-    json_output: Annotated[
-        bool,
-        typer.Option(
-            "--json",
-            "-j",
-            help="Output JSON format",
-        ),
-    ] = False,
 ) -> None:
     """Unity CLI - Control Unity Editor via Relay Server."""
     # Load config from file
@@ -149,7 +140,6 @@ def main(
     ctx.obj = CLIContext(
         config=config,
         client=client,
-        json_mode=json_output,
     )
 
 
@@ -169,14 +159,19 @@ def version() -> None:
 
 
 @app.command()
-def instances(ctx: typer.Context) -> None:
+def instances(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """List connected Unity instances."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.list_instances()
 
-        if context.json_mode:
-            # JSON mode (--json with or without fields)
+        if output_format == "json":
             print_json(result, None)
         else:
             print_instances_table(result)
@@ -203,10 +198,7 @@ def play(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         context.client.editor.play()
-        if context.json_mode:
-            print_json({"success": True, "action": "play"})
-        else:
-            print_success("Entered play mode")
+        print_success("Entered play mode")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -218,10 +210,7 @@ def stop(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         context.client.editor.stop()
-        if context.json_mode:
-            print_json({"success": True, "action": "stop"})
-        else:
-            print_success("Exited play mode")
+        print_success("Exited play mode")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -233,10 +222,7 @@ def pause(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         context.client.editor.pause()
-        if context.json_mode:
-            print_json({"success": True, "action": "pause"})
-        else:
-            print_success("Toggled pause")
+        print_success("Toggled pause")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -248,10 +234,7 @@ def refresh(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         context.client.editor.refresh()
-        if context.json_mode:
-            print_json({"success": True, "action": "refresh"})
-        else:
-            print_success("Asset database refreshed")
+        print_success("Asset database refreshed")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -427,10 +410,7 @@ def console_clear(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         context.client.console.clear()
-        if context.json_mode:
-            print_json({"success": True, "action": "clear"})
-        else:
-            print_success("Console cleared")
+        print_success("Console cleared")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -471,12 +451,7 @@ def scene_hierarchy(
             page_size=page_size,
             cursor=cursor,
         )
-        # For --json mode, output items array directly
-        if context.json_mode:
-            items = result.get("items", [])
-            print_json(items)
-        else:
-            print_json(result)
+        print_json(result)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -693,12 +668,7 @@ def gameobject_find(
 
     try:
         result = context.client.gameobject.find(name=name, instance_id=id)
-        # For --json mode, output objects array directly
-        if context.json_mode:
-            objects = result.get("objects", [])
-            print_json(objects)
-        else:
-            print_json(result)
+        print_json(result)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -803,10 +773,7 @@ def gameobject_active(
             name=name,
             instance_id=id,
         )
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", f"Active set to {active}"))
+        print_success(result.get("message", f"Active set to {active}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -856,12 +823,7 @@ def component_list(
 
     try:
         result = context.client.component.list(target=target, target_id=target_id)
-        # For --json mode, output components array directly
-        if context.json_mode:
-            components = result.get("components", [])
-            print_json(components)
-        else:
-            print_json(result)
+        print_json(result)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -913,10 +875,7 @@ def component_add(
             target_id=target_id,
             component_type=component_type,
         )
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", "Component added"))
+        print_success(result.get("message", "Component added"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -960,10 +919,7 @@ def component_modify(
             prop=prop,
             value=parsed_value,
         )
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", "Property modified"))
+        print_success(result.get("message", "Property modified"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -989,10 +945,7 @@ def component_remove(
             target_id=target_id,
             component_type=component_type,
         )
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", "Component removed"))
+        print_success(result.get("message", "Component removed"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1015,14 +968,11 @@ def menu_exec(
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.execute(path)
-        if context.json_mode:
-            print_json(result)
+        if result.get("success"):
+            print_success(result.get("message", f"Executed: {path}"))
         else:
-            if result.get("success"):
-                print_success(result.get("message", f"Executed: {path}"))
-            else:
-                print_error(result.get("message", f"Failed: {path}"))
-                raise typer.Exit(1) from None
+            print_error(result.get("message", f"Failed: {path}"))
+            raise typer.Exit(1) from None
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1044,11 +994,7 @@ def menu_list(
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.list(filter_text=filter_text, limit=limit)
-        if context.json_mode:
-            items = result.get("items", [])
-            print_json(items)
-        else:
-            print_json(result)
+        print_json(result)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1101,10 +1047,7 @@ def asset_prefab(
             source=source,
             source_id=source_id,
         )
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", f"Prefab created: {path}"))
+        print_success(result.get("message", f"Prefab created: {path}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1123,10 +1066,7 @@ def asset_scriptable_object(
             type_name=type_name,
             path=path,
         )
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", f"ScriptableObject created: {path}"))
+        print_success(result.get("message", f"ScriptableObject created: {path}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1155,12 +1095,16 @@ def asset_deps(
         bool,
         typer.Option("--recursive/--no-recursive", "-r/-R", help="Include indirect dependencies"),
     ] = True,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Get asset dependencies (what this asset depends on)."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.asset.deps(path=path, recursive=recursive)
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             deps = result.get("dependencies", [])
@@ -1181,12 +1125,16 @@ def asset_deps(
 def asset_refs(
     ctx: typer.Context,
     path: Annotated[str, typer.Argument(help="Asset path")],
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Get asset referencers (what depends on this asset)."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.asset.refs(path=path)
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             refs = result.get("referencers", [])
@@ -1213,12 +1161,18 @@ app.add_typer(build_app, name="build")
 
 
 @build_app.command("settings")
-def build_settings(ctx: typer.Context) -> None:
+def build_settings(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Show current build settings."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.build.settings()
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             from rich.table import Table
@@ -1260,6 +1214,10 @@ def build_run(
         list[str] | None,
         typer.Option("--scene", "-s", help="Scene paths to include (repeatable)"),
     ] = None,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Run a build."""
     context: CLIContext = ctx.obj
@@ -1269,7 +1227,7 @@ def build_run(
             output_path=output,
             scenes=scenes,
         )
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             build_result = result.get("result", "Unknown")
@@ -1301,12 +1259,18 @@ def build_run(
 
 
 @build_app.command("scenes")
-def build_scenes(ctx: typer.Context) -> None:
+def build_scenes(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """List build scenes."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.build.scenes()
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             from rich.table import Table
@@ -1337,12 +1301,16 @@ app.add_typer(package_app, name="package")
 @package_app.command("list")
 def package_list(
     ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """List installed packages."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.package.list()
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             from rich.table import Table
@@ -1375,10 +1343,7 @@ def package_add(
     context: CLIContext = ctx.obj
     try:
         result = context.client.package.add(name)
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", f"Package added: {name}"))
+        print_success(result.get("message", f"Package added: {name}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1393,10 +1358,7 @@ def package_remove(
     context: CLIContext = ctx.obj
     try:
         result = context.client.package.remove(name)
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", f"Package removed: {name}"))
+        print_success(result.get("message", f"Package removed: {name}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1411,12 +1373,18 @@ app.add_typer(profiler_app, name="profiler")
 
 
 @profiler_app.command("status")
-def profiler_status(ctx: typer.Context) -> None:
+def profiler_status(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Get profiler status."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.status()
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             enabled = result.get("enabled", False)
@@ -1434,13 +1402,10 @@ def profiler_start(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.start()
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", "Profiler started"))
-            warning = result.get("warning")
-            if warning:
-                err_console.print(f"[yellow]{warning}[/yellow]")
+        print_success(result.get("message", "Profiler started"))
+        warning = result.get("warning")
+        if warning:
+            err_console.print(f"[yellow]{warning}[/yellow]")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1452,22 +1417,25 @@ def profiler_stop(ctx: typer.Context) -> None:
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.stop()
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(result.get("message", "Profiler stopped"))
+        print_success(result.get("message", "Profiler stopped"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
 
 
 @profiler_app.command("snapshot")
-def profiler_snapshot(ctx: typer.Context) -> None:
+def profiler_snapshot(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Get current frame profiler data."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.snapshot()
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             from rich.table import Table
@@ -1508,12 +1476,16 @@ def profiler_frames(
         int,
         typer.Option("--count", "-c", help="Number of frames to retrieve"),
     ] = 10,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Get recent N frames summary."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.frames(count=count)
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             frames = result.get("frames", [])
@@ -1572,7 +1544,7 @@ def uitree_dump(
     ] = -1,
     output_format: Annotated[
         str,
-        typer.Option("--output", "-o", help="Output format: text or json"),
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
     ] = "text",
 ) -> None:
     """Dump UI tree or list panels.
@@ -1591,7 +1563,7 @@ def uitree_dump(
             format=output_format,
         )
 
-        if context.json_mode or output_format == "json":
+        if output_format == "json":
             print_json(result, None)
         elif panel:
             # Tree output for a specific panel
@@ -1640,6 +1612,10 @@ def uitree_query(
         str | None,
         typer.Option("--class", "-c", help="USS class filter"),
     ] = None,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Query UI elements by type, name, or class.
 
@@ -1660,7 +1636,7 @@ def uitree_query(
             class_name=class_filter,
         )
 
-        if context.json_mode:
+        if output_format == "json":
             print_json(result, None)
         else:
             matches = result.get("matches", [])
@@ -1726,6 +1702,10 @@ def uitree_inspect(
         bool,
         typer.Option("--children", help="Include children info"),
     ] = False,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Inspect a specific UI element.
 
@@ -1752,7 +1732,7 @@ def uitree_inspect(
             include_children=children,
         )
 
-        if context.json_mode:
+        if output_format == "json":
             print_json(result, None)
         else:
             elem = result
@@ -1896,13 +1876,10 @@ def uitree_click(
             click_count=count,
         )
 
-        if context.json_mode:
-            print_json(result, None)
-        else:
-            elem_ref = result.get("ref", "")
-            elem_type = result.get("type", "")
-            msg = result.get("message", "")
-            console.print(f"{elem_ref} {elem_type}: {msg}")
+        elem_ref = result.get("ref", "")
+        elem_type = result.get("type", "")
+        msg = result.get("message", "")
+        console.print(f"{elem_ref} {elem_type}: {msg}")
 
     except UnityCLIError as e:
         print_error(e.message, e.code)
@@ -1968,14 +1945,11 @@ def uitree_scroll(
             to_child=to,
         )
 
-        if context.json_mode:
-            print_json(result, None)
-        else:
-            elem_ref = result.get("ref", "")
-            offset = result.get("scrollOffset", {})
-            ox = offset.get("x", 0)
-            oy = offset.get("y", 0)
-            console.print(f"{elem_ref} ScrollView: scrollOffset=({ox}, {oy})")
+        elem_ref = result.get("ref", "")
+        offset = result.get("scrollOffset", {})
+        ox = offset.get("x", 0)
+        oy = offset.get("y", 0)
+        console.print(f"{elem_ref} ScrollView: scrollOffset=({ox}, {oy})")
 
     except UnityCLIError as e:
         print_error(e.message, e.code)
@@ -2019,13 +1993,10 @@ def uitree_text(
             name=name,
         )
 
-        if context.json_mode:
-            print_json(result, None)
-        else:
-            elem_ref = result.get("ref", "")
-            elem_type = result.get("type", "")
-            text = result.get("text", "")
-            console.print(f"{elem_ref} {elem_type}: {text}")
+        elem_ref = result.get("ref", "")
+        elem_type = result.get("type", "")
+        text = result.get("text", "")
+        console.print(f"{elem_ref} {elem_type}: {text}")
 
     except UnityCLIError as e:
         print_error(e.message, e.code)
@@ -2041,12 +2012,18 @@ app.add_typer(config_app, name="config")
 
 
 @config_app.command("show")
-def config_show(ctx: typer.Context) -> None:
+def config_show(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Show current configuration."""
     context: CLIContext = ctx.obj
     config_file = UnityCLIConfig._find_config_file()
 
-    if context.json_mode:
+    if output_format == "json":
         # JSON mode
         data = {
             "config_file": str(config_file) if config_file else None,
@@ -2108,6 +2085,10 @@ def project_info(
         Path,
         typer.Argument(help="Unity project path"),
     ] = Path("."),
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Show project information parsed from files.
 
@@ -2122,7 +2103,7 @@ def project_info(
     try:
         info = ProjectInfo.from_path(path)
 
-        if context.json_mode:
+        if output_format == "json":
             print_json(info.to_dict())
         else:
             from rich.panel import Panel
@@ -2175,6 +2156,10 @@ def project_version(
         Path,
         typer.Argument(help="Unity project path"),
     ] = Path("."),
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Show Unity version for project."""
     from unity_cli.exceptions import ProjectVersionError
@@ -2185,7 +2170,7 @@ def project_version(
     try:
         version = ProjectVersion.from_file(path)
 
-        if context.json_mode:
+        if output_format == "json":
             print_json({"version": version.version, "revision": version.revision})
         else:
             console.print(f"Unity: [cyan]{version.version}[/cyan]")
@@ -2208,6 +2193,10 @@ def project_packages(
         bool,
         typer.Option("--include-modules", help="Include Unity built-in modules"),
     ] = False,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """List installed packages from manifest.json."""
     from unity_cli.hub.project import is_unity_project
@@ -2236,7 +2225,7 @@ def project_packages(
         is_local = version.startswith("file:")
         packages.append({"name": name, "version": version, "local": is_local})
 
-    if context.json_mode:
+    if output_format == "json":
         print_json(packages)
     else:
         from rich.table import Table
@@ -2258,6 +2247,10 @@ def project_tags(
         Path,
         typer.Argument(help="Unity project path"),
     ] = Path("."),
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Show tags, layers, and sorting layers."""
     from unity_cli.hub.project import TagLayerSettings, is_unity_project
@@ -2271,7 +2264,7 @@ def project_tags(
 
     settings = TagLayerSettings.from_file(path)
 
-    if context.json_mode:
+    if output_format == "json":
         print_json(
             {
                 "tags": settings.tags,
@@ -2316,6 +2309,10 @@ def project_quality(
         Path,
         typer.Argument(help="Unity project path"),
     ] = Path("."),
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Show quality settings."""
     from unity_cli.hub.project import QualitySettings, is_unity_project
@@ -2329,7 +2326,7 @@ def project_quality(
 
     settings = QualitySettings.from_file(path)
 
-    if context.json_mode:
+    if output_format == "json":
         print_json(
             {
                 "current_quality": settings.current_quality,
@@ -2379,6 +2376,10 @@ def project_assemblies(
         Path,
         typer.Argument(help="Unity project path"),
     ] = Path("."),
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """List Assembly Definitions (.asmdef) in Assets/."""
     from unity_cli.hub.project import find_assembly_definitions, is_unity_project
@@ -2392,7 +2393,7 @@ def project_assemblies(
 
     assemblies = find_assembly_definitions(path)
 
-    if context.json_mode:
+    if output_format == "json":
         print_json(
             [
                 {
@@ -2479,14 +2480,19 @@ app.add_typer(editor_app, name="editor")
 
 
 @editor_app.command("list")
-def editor_list(ctx: typer.Context) -> None:
+def editor_list(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """List installed Unity editors."""
     from unity_cli.hub.paths import get_installed_editors
 
-    context: CLIContext = ctx.obj
     editors = get_installed_editors()
 
-    if context.json_mode:
+    if output_format == "json":
         data = [{"version": e.version, "path": str(e.path)} for e in editors]
         print_json(data)
     else:
@@ -2542,13 +2548,19 @@ def editor_install(
 
 
 @app.command()
-def selection(ctx: typer.Context) -> None:
+def selection(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Get current editor selection."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.selection.get()
 
-        if context.json_mode:
+        if output_format == "json":
             print_json(result)
         else:
             count = result.get("count", 0)
@@ -2647,14 +2659,11 @@ def screenshot(
             camera=camera_name,
         )
 
-        if context.json_mode:
-            print_json(result)
-        else:
-            print_success(f"Screenshot captured: {result.get('path')}")
-            if result.get("note"):
-                console.print(f"[dim]{result.get('note')}[/dim]")
-            if result.get("camera"):
-                console.print(f"[dim]Camera: {result.get('camera')}[/dim]")
+        print_success(f"Screenshot captured: {result.get('path')}")
+        if result.get("note"):
+            console.print(f"[dim]{result.get('note')}[/dim]")
+        if result.get("camera"):
+            console.print(f"[dim]Camera: {result.get('camera')}[/dim]")
 
     except UnityCLIError as e:
         print_error(e.message, e.code)
