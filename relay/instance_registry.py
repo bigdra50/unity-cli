@@ -57,6 +57,7 @@ class UnityInstance:
     instance_id: str  # Project path (e.g., "/Users/dev/MyGame")
     project_name: str
     unity_version: str
+    bridge_version: str = ""
     ref_id: int = 0  # Stable reference ID assigned by InstanceRegistry
     capabilities: list[str] = field(default_factory=list)
     status: InstanceStatus = InstanceStatus.DISCONNECTED
@@ -95,6 +96,7 @@ class UnityInstance:
             "instance_id": self.instance_id,
             "project_name": self.project_name,
             "unity_version": self.unity_version,
+            "bridge_version": self.bridge_version,
             "status": self.status.value,
             "is_default": is_default,
             "capabilities": self.capabilities,
@@ -199,6 +201,7 @@ class InstanceRegistry:
         capabilities: list[str],
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
+        bridge_version: str = "",
     ) -> UnityInstance:
         """
         Register a new Unity instance.
@@ -238,6 +241,7 @@ class InstanceRegistry:
                 instance_id=instance_id,
                 project_name=project_name,
                 unity_version=unity_version,
+                bridge_version=bridge_version,
                 ref_id=ref_id,
                 capabilities=capabilities,
                 status=InstanceStatus.READY,

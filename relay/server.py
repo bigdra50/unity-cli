@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.metadata
 import logging
 import signal
 from typing import Any
@@ -190,6 +191,7 @@ class RelayServer:
             capabilities=register_msg.get("capabilities", []),
             reader=reader,
             writer=writer,
+            bridge_version=register_msg.get("bridge_version", ""),
         )
 
         # Send registration response
@@ -601,11 +603,17 @@ class RelayServer:
             )
 
             # Convert COMMAND_RESULT to RESPONSE
+            try:
+                relay_version = importlib.metadata.version("unity-cli")
+            except importlib.metadata.PackageNotFoundError:
+                relay_version = ""
             return ResponseMessage(
                 id=request_id,
                 success=result.get("success", False),
                 data=result.get("data"),
                 error=result.get("error"),
+                relay_version=relay_version,
+                bridge_version=instance.bridge_version,
             ).to_dict()
 
         except TimeoutError:
