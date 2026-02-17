@@ -41,6 +41,9 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "integration: requires running Relay Server and Unity Editor",
+]
 
 [project.urls]
 Homepage = "https://github.com/bigdra50/unity-cli"

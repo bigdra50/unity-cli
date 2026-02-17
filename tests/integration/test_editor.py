@@ -2,24 +2,28 @@
 
 from __future__ import annotations
 
+import pytest
+
 from unity_cli.api import EditorAPI
+
+pytestmark = pytest.mark.integration
 
 
 class TestState:
     def test_get_state_returns_valid_response(self, editor: EditorAPI) -> None:
-        actual = editor.get_state()
+        response = editor.get_state()
 
-        assert "isPlaying" in actual
-        assert "isPaused" in actual
+        assert "isPlaying" in response
+        assert "isPaused" in response
 
     def test_get_state_not_playing_by_default(self, editor: EditorAPI) -> None:
-        actual = editor.get_state()
+        response = editor.get_state()
 
-        assert actual["isPlaying"] is False
+        assert response["isPlaying"] is False
 
 
 class TestRefresh:
     def test_refresh_succeeds(self, editor: EditorAPI) -> None:
-        actual = editor.refresh()
+        response = editor.refresh()
 
-        assert actual is not None
+        assert isinstance(response, dict)
