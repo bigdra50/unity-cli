@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.metadata
 import logging
 import signal
 from typing import Any
@@ -69,6 +70,10 @@ class RelayServer:
         self.reload_grace_period_ms = reload_grace_period_ms
         self.registry = InstanceRegistry()
         self.request_cache = RequestCache(ttl_seconds=60.0)
+        try:
+            self._relay_version = importlib.metadata.version("unity-cli")
+        except importlib.metadata.PackageNotFoundError:
+            self._relay_version = ""
         self._server: asyncio.Server | None = None
         self._running = False
         self._pending_commands: dict[str, asyncio.Future[dict[str, Any]]] = {}
@@ -183,6 +188,10 @@ class RelayServer:
 
         # Register instance
         instance_id = register_msg.get("instance_id", "")
+        raw_bridge_version = register_msg.get("bridge_version", "")
+        bridge_version = raw_bridge_version if isinstance(raw_bridge_version, str) else ""
+        if len(bridge_version) > 64:
+            bridge_version = ""
         instance = await self.registry.register(
             instance_id=instance_id,
             project_name=register_msg.get("project_name", ""),
@@ -190,6 +199,7 @@ class RelayServer:
             capabilities=register_msg.get("capabilities", []),
             reader=reader,
             writer=writer,
+            bridge_version=bridge_version,
         )
 
         # Send registration response
@@ -606,6 +616,8 @@ class RelayServer:
                 success=result.get("success", False),
                 data=result.get("data"),
                 error=result.get("error"),
+                relay_version=self._relay_version,
+                bridge_version=instance.bridge_version,
             ).to_dict()
 
         except TimeoutError:
