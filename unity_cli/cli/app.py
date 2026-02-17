@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from rich.markup import escape
 
 from unity_cli.cli.output import (
     console,
@@ -406,11 +407,11 @@ def console_get(
             for entry in entries:
                 ts = entry.get("timestamp", "")
                 log_type = entry.get("type", "log")
-                msg = entry.get("message", "")
+                msg = escape(entry.get("message", ""))
                 console.print(f"{ts} {log_type} {msg}")
                 if verbose and entry.get("stackTrace"):
-                    for line in entry["stackTrace"].split("\n"):
-                        console.print(f"  {line}", style="dim")
+                    for st_line in entry["stackTrace"].split("\n"):
+                        console.print(f"  {escape(st_line)}", style="dim")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -663,9 +664,9 @@ def tests_list(
             print_json(result, None)
         else:
             tests = result.get("tests", [])
-            console.print(f"[bold]Tests ({mode}Mode): {len(tests)}[/bold]")
+            console.print(f"[bold]Tests ({escape(mode)}Mode): {len(tests)}[/bold]")
             for t in tests:
-                console.print(f"  {t}")
+                console.print(f"  {escape(str(t))}")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -735,7 +736,7 @@ def gameobject_find(
             objects = result.get("objects", [])
             console.print(f"[bold]Found {len(objects)} GameObject(s)[/bold]")
             for obj in objects:
-                obj_name = obj.get("name", "Unknown")
+                obj_name = escape(obj.get("name", "Unknown"))
                 obj_id = obj.get("instanceID", "")
                 console.print(f"  {obj_name} (ID: {obj_id})")
     except UnityCLIError as e:
@@ -1087,7 +1088,7 @@ def menu_list(
             items = result.get("items", [])
             console.print(f"[bold]Menu Items ({len(items)})[/bold]")
             for item in items:
-                console.print(f"  {item}")
+                console.print(f"  {escape(str(item))}")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1349,7 +1350,7 @@ def build_run(
                 console.print()
                 for msg in messages:
                     style = "red" if msg.get("type") == "Error" else "yellow"
-                    console.print(f"  [{style}]{msg.get('type')}: {msg.get('content')}[/{style}]")
+                    console.print(f"  [{style}]{escape(str(msg.get('type', '')))}: {escape(str(msg.get('content', '')))}[/{style}]")
 
             if build_result != "Succeeded":
                 raise typer.Exit(1) from None
@@ -2198,8 +2199,6 @@ def project_info(
     from unity_cli.exceptions import ProjectError
     from unity_cli.hub.project import ProjectInfo
 
-    context: CLIContext = ctx.obj
-
     try:
         info = ProjectInfo.from_path(path)
 
@@ -2265,8 +2264,6 @@ def project_version(
     from unity_cli.exceptions import ProjectVersionError
     from unity_cli.hub.project import ProjectVersion
 
-    context: CLIContext = ctx.obj
-
     try:
         version = ProjectVersion.from_file(path)
 
@@ -2301,7 +2298,6 @@ def project_packages(
     """List installed packages from manifest.json."""
     from unity_cli.hub.project import is_unity_project
 
-    context: CLIContext = ctx.obj
     path = path.resolve()
 
     if not is_unity_project(path):
@@ -2355,7 +2351,6 @@ def project_tags(
     """Show tags, layers, and sorting layers."""
     from unity_cli.hub.project import TagLayerSettings, is_unity_project
 
-    context: CLIContext = ctx.obj
     path = path.resolve()
 
     if not is_unity_project(path):
@@ -2417,7 +2412,6 @@ def project_quality(
     """Show quality settings."""
     from unity_cli.hub.project import QualitySettings, is_unity_project
 
-    context: CLIContext = ctx.obj
     path = path.resolve()
 
     if not is_unity_project(path):
@@ -2484,7 +2478,6 @@ def project_assemblies(
     """List Assembly Definitions (.asmdef) in Assets/."""
     from unity_cli.hub.project import find_assembly_definitions, is_unity_project
 
-    context: CLIContext = ctx.obj
     path = path.resolve()
 
     if not is_unity_project(path):
