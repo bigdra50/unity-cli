@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 # =============================================================================
 # Protocol Constants
@@ -25,10 +25,6 @@ HEADER_SIZE = 4
 MAX_PAYLOAD_BYTES = 16 * 1024 * 1024  # 16 MiB
 DEFAULT_TIMEOUT_MS = 30000
 CONFIG_FILE_NAME = ".unity-cli.toml"
-
-# Valid log types for validation
-VALID_LOG_TYPES = frozenset({"log", "warning", "error", "assert", "exception"})
-_DEFAULT_LOG_TYPES = ["log", "warning", "error"]
 
 
 # =============================================================================
@@ -45,8 +41,6 @@ class UnityCLIConfig(BaseModel):
         timeout: TCP socket timeout in seconds (for connect/read operations).
         timeout_ms: Unity command timeout in milliseconds (for command execution).
         instance: Target Unity instance path (optional).
-        log_types: Log types to filter (log, warning, error, assert, exception).
-        log_count: Number of logs to retrieve.
         retry_initial_ms: Initial retry backoff interval in milliseconds.
         retry_max_ms: Maximum retry backoff interval in milliseconds.
         retry_max_time_ms: Maximum total retry time in milliseconds.
@@ -68,30 +62,9 @@ class UnityCLIConfig(BaseModel):
     timeout: Annotated[float, Field(gt=0)] = 15.0
     timeout_ms: Annotated[int, Field(gt=0)] = DEFAULT_TIMEOUT_MS
     instance: str | None = None
-    log_types: list[str] = Field(default_factory=lambda: list(_DEFAULT_LOG_TYPES))
-    log_count: Annotated[int, Field(gt=0)] = 20
     retry_initial_ms: Annotated[int, Field(gt=0)] = 500
     retry_max_ms: Annotated[int, Field(gt=0)] = 8000
     retry_max_time_ms: Annotated[int, Field(gt=0)] = 45000
-
-    @field_validator("log_types", mode="before")
-    @classmethod
-    def validate_log_types(cls, v: Any) -> list[str]:
-        """Validate that log_types contains only valid types."""
-        if v is None:
-            return list(_DEFAULT_LOG_TYPES)
-
-        if isinstance(v, str):
-            v = [v]
-
-        if not isinstance(v, list):
-            raise ValueError("log_types must be a list of strings")
-
-        invalid_types = set(v) - VALID_LOG_TYPES
-        if invalid_types:
-            raise ValueError(f"Invalid log types: {invalid_types}. Valid types: {', '.join(sorted(VALID_LOG_TYPES))}")
-
-        return list(v)
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> Self:
@@ -146,7 +119,6 @@ class UnityCLIConfig(BaseModel):
         Returns:
             TOML formatted configuration string.
         """
-        log_types_str = ", ".join(f'"{t}"' for t in self.log_types)
         instance_str = f'"{self.instance}"' if self.instance else "# not set"
 
         return f'''# Unity CLI Configuration
@@ -156,8 +128,6 @@ relay_port = {self.relay_port}
 timeout = {self.timeout}
 timeout_ms = {self.timeout_ms}
 instance = {instance_str}
-log_types = [{log_types_str}]
-log_count = {self.log_count}
 
 # Retry settings (exponential backoff)
 retry_initial_ms = {self.retry_initial_ms}
