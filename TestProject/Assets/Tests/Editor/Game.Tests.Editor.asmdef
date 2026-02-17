@@ -1,12 +1,17 @@
 {
     "name": "Game.Tests.Editor",
     "references": [
-        "Game"
+        "Game",
+        "UnityBridge.Editor"
     ],
     "optionalUnityReferences": [
         "TestAssemblies"
     ],
     "includePlatforms": [
         "Editor"
+    ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll"
     ]
 }
