@@ -18,9 +18,12 @@ import typer
 from unity_cli.cli.output import (
     console,
     err_console,
+    print_components_table,
     print_error,
+    print_hierarchy_table,
     print_instances_table,
     print_json,
+    print_key_value,
     print_success,
     print_validation_error,
 )
@@ -181,12 +184,21 @@ def instances(
 
 
 @app.command()
-def state(ctx: typer.Context) -> None:
+def state(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Get editor state."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.editor.get_state()
-        print_json(result, None)
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            print_key_value(result, "Editor State")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -425,12 +437,21 @@ app.add_typer(scene_app, name="scene")
 
 
 @scene_app.command("active")
-def scene_active(ctx: typer.Context) -> None:
+def scene_active(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Get active scene info."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.scene.get_active()
-        print_json(result, None)
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            print_key_value(result, "Active Scene")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -442,6 +463,10 @@ def scene_hierarchy(
     depth: Annotated[int, typer.Option("--depth", "-d", help="Hierarchy depth")] = 1,
     page_size: Annotated[int, typer.Option("--page-size", help="Page size")] = 50,
     cursor: Annotated[int, typer.Option("--cursor", help="Pagination cursor")] = 0,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Get scene hierarchy."""
     context: CLIContext = ctx.obj
@@ -451,7 +476,10 @@ def scene_hierarchy(
             page_size=page_size,
             cursor=cursor,
         )
-        print_json(result)
+        if output_format == "json":
+            print_json(result)
+        else:
+            print_hierarchy_table(result.get("items", []))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -473,7 +501,7 @@ def scene_load(
 
     try:
         result = context.client.scene.load(path=path, name=name, additive=additive)
-        print_json(result, None)
+        print_success(result.get("message", "Scene loaded"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -488,7 +516,7 @@ def scene_save(
     context: CLIContext = ctx.obj
     try:
         result = context.client.scene.save(path=path)
-        print_json(result, None)
+        print_success(result.get("message", "Scene saved"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -598,7 +626,7 @@ def tests_run(
         )
 
         if no_wait:
-            print_json(result, None)
+            print_success(result.get("message", "Tests started"))
             return
 
         # Auto-poll for results
@@ -609,7 +637,7 @@ def tests_run(
         if "tests" in final:
             print_test_results_table(final["tests"])
         else:
-            print_json(final, None)
+            print_key_value(final)
 
         if final.get("failed", 0) > 0:
             raise typer.Exit(1)
@@ -622,24 +650,53 @@ def tests_run(
 def tests_list(
     ctx: typer.Context,
     mode: Annotated[str, typer.Argument(help="Test mode (edit or play)", autocompletion=_complete_test_mode)] = "edit",
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """List available tests."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.tests.list(mode=mode)
-        print_json(result, None)
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            tests = result.get("tests", [])
+            console.print(f"[bold]Tests ({mode}Mode): {len(tests)}[/bold]")
+            for t in tests:
+                console.print(f"  {t}")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
 
 
 @tests_app.command("status")
-def tests_status(ctx: typer.Context) -> None:
+def tests_status(
+    ctx: typer.Context,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
+) -> None:
     """Check running test status."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.tests.status()
-        print_json(result, None)
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            running = result.get("running", False)
+            status_text = "[green]running[/green]" if running else "[dim]idle[/dim]"
+            console.print(f"Tests: {status_text}")
+            if running:
+                passed = result.get("passed", 0)
+                failed = result.get("failed", 0)
+                skipped = result.get("skipped", 0)
+                started = result.get("testsStarted", 0)
+                finished = result.get("testsFinished", 0)
+                console.print(f"  Progress: {finished}/{started}")
+                console.print(f"  Passed: {passed}  Failed: {failed}  Skipped: {skipped}")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -658,6 +715,10 @@ def gameobject_find(
     ctx: typer.Context,
     name: Annotated[str | None, typer.Option("--name", "-n", help="GameObject name")] = None,
     id: Annotated[int | None, typer.Option("--id", help="Instance ID")] = None,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Find GameObjects by name or ID."""
     context: CLIContext = ctx.obj
@@ -668,7 +729,15 @@ def gameobject_find(
 
     try:
         result = context.client.gameobject.find(name=name, instance_id=id)
-        print_json(result)
+        if output_format == "json":
+            print_json(result)
+        else:
+            objects = result.get("objects", [])
+            console.print(f"[bold]Found {len(objects)} GameObject(s)[/bold]")
+            for obj in objects:
+                obj_name = obj.get("name", "Unknown")
+                obj_id = obj.get("instanceID", "")
+                console.print(f"  {obj_name} (ID: {obj_id})")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -705,7 +774,7 @@ def gameobject_create(
             rotation=list(rotation) if rotation else None,
             scale=list(scale) if scale else None,
         )
-        print_json(result, None)
+        print_success(result.get("message", f"Created: {name}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -744,7 +813,7 @@ def gameobject_modify(
             rotation=list(rotation) if rotation else None,
             scale=list(scale) if scale else None,
         )
-        print_json(result, None)
+        print_success(result.get("message", "Transform modified"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -794,7 +863,7 @@ def gameobject_delete(
 
     try:
         result = context.client.gameobject.delete(name=name, instance_id=id)
-        print_json(result, None)
+        print_success(result.get("message", "GameObject deleted"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -813,6 +882,10 @@ def component_list(
     ctx: typer.Context,
     target: Annotated[str | None, typer.Option("--target", "-t", help="Target GameObject name")] = None,
     target_id: Annotated[int | None, typer.Option("--target-id", help="Target GameObject ID")] = None,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """List components on a GameObject."""
     context: CLIContext = ctx.obj
@@ -823,7 +896,10 @@ def component_list(
 
     try:
         result = context.client.component.list(target=target, target_id=target_id)
-        print_json(result)
+        if output_format == "json":
+            print_json(result)
+        else:
+            print_components_table(result.get("components", []))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -835,6 +911,10 @@ def component_inspect(
     component_type: Annotated[str, typer.Option("--type", "-T", help="Component type name")],
     target: Annotated[str | None, typer.Option("--target", "-t", help="Target GameObject name")] = None,
     target_id: Annotated[int | None, typer.Option("--target-id", help="Target GameObject ID")] = None,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Inspect component properties."""
     context: CLIContext = ctx.obj
@@ -849,7 +929,10 @@ def component_inspect(
             target_id=target_id,
             component_type=component_type,
         )
-        print_json(result, None)
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            print_key_value(result, component_type)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -989,12 +1072,22 @@ def menu_list(
         int,
         typer.Option("--limit", "-l", help="Maximum items to return"),
     ] = 100,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """List available menu items."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.list(filter_text=filter_text, limit=limit)
-        print_json(result)
+        if output_format == "json":
+            print_json(result)
+        else:
+            items = result.get("items", [])
+            console.print(f"[bold]Menu Items ({len(items)})[/bold]")
+            for item in items:
+                console.print(f"  {item}")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1013,7 +1106,7 @@ def menu_context(
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.context(method=method, target=target)
-        print_json(result, None)
+        print_success(result.get("message", f"Executed: {method}"))
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1076,12 +1169,19 @@ def asset_scriptable_object(
 def asset_info(
     ctx: typer.Context,
     path: Annotated[str, typer.Argument(help="Asset path")],
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", "-o", help="Output format: text or json"),
+    ] = "text",
 ) -> None:
     """Get asset information."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.asset.info(path=path)
-        print_json(result, None)
+        if output_format == "json":
+            print_json(result, None)
+        else:
+            print_key_value(result, path)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
