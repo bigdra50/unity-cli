@@ -32,7 +32,9 @@ class TestCreateAndDelete:
         name = "_IntegrationTest_Temp"
 
         # Cleanup leftover from previous failed runs
-        while gameobject.find(name=name)["found"] > 0:
+        for _ in range(5):
+            if gameobject.find(name=name)["found"] == 0:
+                break
             gameobject.delete(name=name)
 
         create_result = gameobject.create(name=name)

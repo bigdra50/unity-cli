@@ -15,8 +15,9 @@ class TestDump:
 
     def test_dump_panel_returns_tree(self, uitree: UITreeAPI) -> None:
         panels = uitree.dump()["panels"]
+        assert len(panels) > 0
         panel_name = panels[0]["name"]
 
         actual = uitree.dump(panel=panel_name, depth=1)
 
-        assert "elements" in actual or "tree" in actual or "root" in actual
+        assert "tree" in actual
