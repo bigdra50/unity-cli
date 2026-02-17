@@ -72,6 +72,7 @@ namespace UnityBridge
         public const string ProtocolVersionMismatch = "PROTOCOL_VERSION_MISMATCH";
         public const string CapabilityNotSupported = "CAPABILITY_NOT_SUPPORTED";
         public const string QueueFull = "QUEUE_FULL";
+        public const string StaleRef = "STALE_REF";
     }
 
     /// <summary>
@@ -245,10 +246,18 @@ namespace UnityBridge
                 ["instance_id"] = instanceId,
                 ["project_name"] = projectName,
                 ["unity_version"] = unityVersion,
+                ["bridge_version"] = GetBridgeVersion(),
                 ["capabilities"] = new JArray(capabilities ?? Array.Empty<string>()),
                 ["ts"] = GetTimestamp()
             };
             return msg;
+        }
+
+        private static string GetBridgeVersion()
+        {
+            var info = UnityEditor.PackageManager.PackageInfo
+                .FindForAssembly(typeof(ProtocolConstants).Assembly);
+            return info?.version ?? "unknown";
         }
 
         /// <summary>

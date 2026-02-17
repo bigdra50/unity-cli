@@ -60,6 +60,7 @@ class ErrorCode(StrEnum):
     PROTOCOL_VERSION_MISMATCH = "PROTOCOL_VERSION_MISMATCH"
     CAPABILITY_NOT_SUPPORTED = "CAPABILITY_NOT_SUPPORTED"
     QUEUE_FULL = "QUEUE_FULL"
+    STALE_REF = "STALE_REF"
     AMBIGUOUS_INSTANCE = "AMBIGUOUS_INSTANCE"
 
 
@@ -105,6 +106,7 @@ class RegisterMessage(Message):
     instance_id: str = ""
     project_name: str = ""
     unity_version: str = ""
+    bridge_version: str = ""
     capabilities: list[str] = Field(default_factory=list)
 
     @field_validator("instance_id")
@@ -249,6 +251,8 @@ class ResponseMessage(Message):
     success: bool = True
     data: dict[str, Any] | None = None
     error: dict[str, str] | None = None
+    relay_version: str = ""
+    bridge_version: str = ""
 
 
 class ErrorMessage(Message):
