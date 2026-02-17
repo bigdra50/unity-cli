@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json.Linq;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityBridge.Helpers;
@@ -19,9 +20,20 @@ namespace UnityBridge.Tools
     [BridgeTool("uitree")]
     public static class UITree
     {
+        private const string SessionKeyEpoch = "UnityBridge.UITree.Epoch";
+
         private static readonly Dictionary<string, WeakReference<VisualElement>> RefMap = new();
         private static readonly ConditionalWeakTable<VisualElement, string> ElementToRef = new();
-        private static int _nextRefId = 1;
+        private static int _epoch;
+        private static int _nextSeq = 1;
+
+        [InitializeOnLoadMethod]
+        private static void OnDomainReload()
+        {
+            _epoch = SessionState.GetInt(SessionKeyEpoch, 0) + 1;
+            SessionState.SetInt(SessionKeyEpoch, _epoch);
+            _nextSeq = 1;
+        }
 
         public static JObject HandleCommand(JObject parameters)
         {
@@ -823,7 +835,7 @@ namespace UnityBridge.Tools
             if (ElementToRef.TryGetValue(ve, out var refId))
                 return refId;
 
-            refId = $"ref_{_nextRefId++}";
+            refId = $"ref_{_epoch}_{_nextSeq++}";
             RefMap[refId] = new WeakReference<VisualElement>(ve);
             ElementToRef.Add(ve, refId);
             return refId;
@@ -831,10 +843,37 @@ namespace UnityBridge.Tools
 
         private static VisualElement ResolveRef(string refId)
         {
-            if (RefMap.TryGetValue(refId, out var weakRef) && weakRef.TryGetTarget(out var element))
-                return element;
+            ValidateRefEpoch(refId);
 
-            return null;
+            if (!RefMap.TryGetValue(refId, out var weakRef) || !weakRef.TryGetTarget(out var element))
+                return null;
+
+            if (element.panel == null)
+            {
+                RefMap.Remove(refId);
+                return null;
+            }
+
+            return element;
+        }
+
+        private static void ValidateRefEpoch(string refId)
+        {
+            // ref format: ref_{epoch}_{seq}
+            var parts = refId.Split('_');
+            if (parts.Length != 3 || !int.TryParse(parts[1], out var refEpoch))
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"Invalid ref format: {refId} (hint: ref IDs were reset by domain reload, re-dump the UI tree)");
+            }
+
+            if (refEpoch != _epoch)
+            {
+                throw new ProtocolException(
+                    ErrorCode.StaleRef,
+                    $"Stale ref: {refId} belongs to epoch {refEpoch}, current epoch is {_epoch}. Re-dump the UI tree to get fresh refs.");
+            }
         }
 
         private static void PruneDeadRefs()
