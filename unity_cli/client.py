@@ -397,12 +397,15 @@ class RelayConnection:
                 error_msg = error_info.get("message", f"{command} failed") if error_info else f"{command} failed"
                 error_code = error_info.get("code", "COMMAND_FAILED") if error_info else "COMMAND_FAILED"
                 raise UnityCLIError(error_msg, error_code)
-            # Version info callback (once per connection)
+            # Version info callback (once per RelayConnection instance)
             if self.on_version_info and not self._version_info_called:
                 relay_version = response.get("relay_version", "")
                 bridge_version = response.get("bridge_version", "")
                 if relay_version or bridge_version:
-                    self.on_version_info(relay_version, bridge_version)
+                    try:
+                        self.on_version_info(relay_version, bridge_version)
+                    except Exception:
+                        pass
                     self._version_info_called = True
             data: dict[str, Any] = response.get("data", {})
             return data
@@ -566,6 +569,7 @@ class UnityClient:
         retry_max_ms: int = 8000,
         retry_max_time_ms: int = 30000,
         on_retry: RetryCallback | None = None,
+        on_version_info: Callable[[str, str], None] | None = None,
     ) -> None:
         """Initialize Unity client.
 
@@ -579,6 +583,7 @@ class UnityClient:
             retry_max_ms: Maximum retry interval in milliseconds (default: 8000).
             retry_max_time_ms: Maximum total retry time in milliseconds (default: 30000).
             on_retry: Optional callback(code, message, attempt, backoff_ms) for retry events.
+            on_version_info: Optional callback(relay_version, bridge_version) called once on first success.
         """
         self._conn = RelayConnection(
             host=relay_host,
@@ -590,6 +595,7 @@ class UnityClient:
             retry_max_ms=retry_max_ms,
             retry_max_time_ms=retry_max_time_ms,
             on_retry=on_retry,
+            on_version_info=on_version_info,
         )
 
         # Lazy import to avoid circular dependencies
