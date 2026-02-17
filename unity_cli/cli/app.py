@@ -405,8 +405,8 @@ def console_get(
             # Plain text output: timestamp type message
             entries = result.get("entries", [])
             for entry in entries:
-                ts = entry.get("timestamp", "")
-                log_type = entry.get("type", "log")
+                ts = escape(entry.get("timestamp", ""))
+                log_type = escape(entry.get("type", "log"))
                 msg = escape(entry.get("message", ""))
                 console.print(f"{ts} {log_type} {msg}")
                 if verbose and entry.get("stackTrace"):
@@ -1350,7 +1350,9 @@ def build_run(
                 console.print()
                 for msg in messages:
                     style = "red" if msg.get("type") == "Error" else "yellow"
-                    console.print(f"  [{style}]{escape(str(msg.get('type', '')))}: {escape(str(msg.get('content', '')))}[/{style}]")
+                    console.print(
+                        f"  [{style}]{escape(str(msg.get('type', '')))}: {escape(str(msg.get('content', '')))}[/{style}]"
+                    )
 
             if build_result != "Succeeded":
                 raise typer.Exit(1) from None
@@ -1506,7 +1508,7 @@ def profiler_start(ctx: typer.Context) -> None:
         print_success(result.get("message", "Profiler started"))
         warning = result.get("warning")
         if warning:
-            err_console.print(f"[yellow]{warning}[/yellow]")
+            err_console.print(f"[yellow]{escape(warning)}[/yellow]")
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1978,8 +1980,8 @@ def uitree_click(
         )
 
         elem_ref = result.get("ref", "")
-        elem_type = result.get("type", "")
-        msg = result.get("message", "")
+        elem_type = escape(result.get("type", ""))
+        msg = escape(result.get("message", ""))
         console.print(f"{elem_ref} {elem_type}: {msg}")
 
     except UnityCLIError as e:
@@ -2046,7 +2048,7 @@ def uitree_scroll(
             to_child=to,
         )
 
-        elem_ref = result.get("ref", "")
+        elem_ref = escape(result.get("ref", ""))
         offset = result.get("scrollOffset", {})
         ox = offset.get("x", 0)
         oy = offset.get("y", 0)
@@ -2095,8 +2097,8 @@ def uitree_text(
         )
 
         elem_ref = result.get("ref", "")
-        elem_type = result.get("type", "")
-        text = result.get("text", "")
+        elem_type = escape(result.get("type", ""))
+        text = escape(result.get("text", ""))
         console.print(f"{elem_ref} {elem_type}: {text}")
 
     except UnityCLIError as e:
@@ -2666,11 +2668,11 @@ def selection(
             active_go = result.get("activeGameObject")
             if active_go:
                 console.print("[cyan]Active GameObject:[/cyan]")
-                console.print(f"  Name: {active_go.get('name')}")
+                console.print(f"  Name: {escape(str(active_go.get('name', '')))}")
                 console.print(f"  Instance ID: {active_go.get('instanceID')}")
-                console.print(f"  Tag: {active_go.get('tag')}")
-                console.print(f"  Layer: {active_go.get('layerName')} ({active_go.get('layer')})")
-                console.print(f"  Path: {active_go.get('scenePath')}")
+                console.print(f"  Tag: {escape(str(active_go.get('tag', '')))}")
+                console.print(f"  Layer: {escape(str(active_go.get('layerName', '')))} ({active_go.get('layer')})")
+                console.print(f"  Path: {escape(str(active_go.get('scenePath', '')))}")
 
             active_transform = result.get("activeTransform")
             if active_transform:
@@ -2689,7 +2691,7 @@ def selection(
             if len(game_objects) > 1:
                 console.print(f"\n[cyan]All Selected GameObjects ({len(game_objects)}):[/cyan]")
                 for go in game_objects:
-                    console.print(f"  - {go.get('name')} (ID: {go.get('instanceID')})")
+                    console.print(f"  - {escape(str(go.get('name', '')))} (ID: {go.get('instanceID')})")
 
     except UnityCLIError as e:
         print_error(e.message, e.code)
