@@ -15,6 +15,7 @@ import enum
 import json
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -421,7 +422,7 @@ def print_logs_table(logs: list[dict[str, Any]]) -> None:
 def _format_hierarchy_row(
     item: dict[str, Any],
     show_components: bool,
-    escape_fn: Any = None,
+    escape_fn: Callable[[str], str] | None = None,
 ) -> list[str]:
     """Build a single row for hierarchy table."""
     depth = item.get("depth", 0)
