@@ -40,23 +40,7 @@ namespace UnityBridge.Tools
         /// </summary>
         private static JObject ListComponents(JObject parameters)
         {
-            var target = parameters["target"]?.Value<string>();
-            var targetId = parameters["targetId"]?.Value<int>();
-
-            if (string.IsNullOrEmpty(target) && targetId == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "Either 'target' (name) or 'targetId' (instanceID) is required");
-            }
-
-            var gameObject = FindGameObject(target, targetId);
-            if (gameObject == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
-            }
+            var gameObject = ResolveTargetGameObject(parameters);
 
             var components = gameObject.GetComponents<UnityEngine.Component>();
             var componentList = new JArray();
@@ -85,30 +69,14 @@ namespace UnityBridge.Tools
         /// </summary>
         private static JObject InspectComponent(JObject parameters)
         {
-            var target = parameters["target"]?.Value<string>();
-            var targetId = parameters["targetId"]?.Value<int>();
+            var gameObject = ResolveTargetGameObject(parameters);
             var typeName = parameters["type"]?.Value<string>();
-
-            if (string.IsNullOrEmpty(target) && targetId == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "Either 'target' (name) or 'targetId' (instanceID) is required");
-            }
 
             if (string.IsNullOrEmpty(typeName))
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
                     "'type' parameter is required");
-            }
-
-            var gameObject = FindGameObject(target, targetId);
-            if (gameObject == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -142,30 +110,14 @@ namespace UnityBridge.Tools
         /// </summary>
         private static JObject AddComponent(JObject parameters)
         {
-            var target = parameters["target"]?.Value<string>();
-            var targetId = parameters["targetId"]?.Value<int>();
+            var gameObject = ResolveTargetGameObject(parameters);
             var typeName = parameters["type"]?.Value<string>();
-
-            if (string.IsNullOrEmpty(target) && targetId == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "Either 'target' (name) or 'targetId' (instanceID) is required");
-            }
 
             if (string.IsNullOrEmpty(typeName))
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
                     "'type' parameter is required");
-            }
-
-            var gameObject = FindGameObject(target, targetId);
-            if (gameObject == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -211,30 +163,14 @@ namespace UnityBridge.Tools
         /// </summary>
         private static JObject RemoveComponent(JObject parameters)
         {
-            var target = parameters["target"]?.Value<string>();
-            var targetId = parameters["targetId"]?.Value<int>();
+            var gameObject = ResolveTargetGameObject(parameters);
             var typeName = parameters["type"]?.Value<string>();
-
-            if (string.IsNullOrEmpty(target) && targetId == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "Either 'target' (name) or 'targetId' (instanceID) is required");
-            }
 
             if (string.IsNullOrEmpty(typeName))
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
                     "'type' parameter is required");
-            }
-
-            var gameObject = FindGameObject(target, targetId);
-            if (gameObject == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -250,7 +186,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"Component '{typeName}' not found on '{gameObject.name}'");
+                    $"Component '{typeName}' not found on GameObject '{gameObject.name}'");
             }
 
             // Prevent removing Transform
@@ -277,18 +213,10 @@ namespace UnityBridge.Tools
         /// </summary>
         private static JObject ModifyComponent(JObject parameters)
         {
-            var target = parameters["target"]?.Value<string>();
-            var targetId = parameters["targetId"]?.Value<int>();
+            var gameObject = ResolveTargetGameObject(parameters);
             var typeName = parameters["type"]?.Value<string>();
             var propName = parameters["prop"]?.Value<string>();
             var valueToken = parameters["value"];
-
-            if (string.IsNullOrEmpty(target) && targetId == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "Either 'target' (name) or 'targetId' (instanceID) is required");
-            }
 
             if (string.IsNullOrEmpty(typeName))
             {
@@ -309,14 +237,6 @@ namespace UnityBridge.Tools
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
                     "'value' parameter is required");
-            }
-
-            var gameObject = FindGameObject(target, targetId);
-            if (gameObject == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
             }
 
             var componentType = FindType(typeName);
@@ -500,8 +420,28 @@ namespace UnityBridge.Tools
                 "Color value must be [r, g, b, a?] array or {r, g, b, a?} object");
         }
 
-        private static GameObject FindGameObject(string name, int? instanceId)
-            => GameObjectFinder.Find(name, instanceId);
+        private static UnityEngine.GameObject ResolveTargetGameObject(JObject parameters)
+        {
+            var target = parameters["target"]?.Value<string>();
+            var targetId = parameters["targetId"]?.Value<int>();
+
+            if (string.IsNullOrEmpty(target) && targetId == null)
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "Either 'target' (name) or 'targetId' (instanceID) is required");
+            }
+
+            var gameObject = GameObjectFinder.Find(target, targetId);
+            if (gameObject == null)
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    $"GameObject not found: {(!string.IsNullOrEmpty(target) ? target : targetId!.Value.ToString())}");
+            }
+
+            return gameObject;
+        }
 
         private static Type FindType(string typeName)
             => TypeResolver.FindType(typeName);

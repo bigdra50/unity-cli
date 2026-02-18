@@ -42,8 +42,9 @@ namespace UnityBridge.Helpers
                 var json = File.ReadAllText(path);
                 return JsonConvert.DeserializeObject<T>(json);
             }
-            catch (Exception)
+            catch (JsonException ex)
             {
+                BridgeLog.Warn($"[BridgeJobStateStore] Failed to load state for '{toolName}': {ex.Message}");
                 return default;
             }
         }

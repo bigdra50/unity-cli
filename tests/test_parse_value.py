@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from unity_cli.cli.app import _parse_cli_value
+from unity_cli.cli.helpers import _parse_cli_value
 
 
 @pytest.mark.parametrize(

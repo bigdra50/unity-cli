@@ -504,6 +504,7 @@ namespace UnityBridge.Tools
                         Passed++;
                         break;
                     case "Failed":
+                    case "Inconclusive":
                         Failed++;
                         FailedTests.Add(new FailedTestInfo
                         {
@@ -516,6 +517,10 @@ namespace UnityBridge.Tools
                     case "Skipped":
                     case "Ignored":
                         Skipped++;
+                        break;
+                    default:
+                        BridgeLog.Warn($"[Tests] Unknown ResultState: {result.ResultState} for {result.FullName}");
+                        Failed++;
                         break;
                 }
             }

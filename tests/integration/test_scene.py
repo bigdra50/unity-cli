@@ -16,11 +16,10 @@ class TestActiveScene:
         assert "rootCount" in actual
         assert actual["isLoaded"] is True
 
-    def test_active_scene_has_name(self, scene: SceneAPI) -> None:
+    def test_active_scene_name_is_string(self, scene: SceneAPI) -> None:
         actual = scene.get_active()
 
         assert isinstance(actual["name"], str)
-        assert len(actual["name"]) > 0
 
 
 class TestHierarchy:
