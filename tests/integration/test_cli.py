@@ -18,34 +18,38 @@ class TestExitCodes:
 
     def test_play_stop_returns_zero(self, cli_runner: CliRunner, cli_args: list[str]) -> None:
         result = cli_runner.invoke(app, [*cli_args, "play"])
-        assert result.exit_code == 0
-
-        result = cli_runner.invoke(app, [*cli_args, "stop"])
+        try:
+            assert result.exit_code == 0
+        finally:
+            result = cli_runner.invoke(app, [*cli_args, "stop"])
         assert result.exit_code == 0
 
 
 class TestQuiet:
     def test_quiet_suppresses_success(self, cli_runner: CliRunner, cli_args: list[str]) -> None:
         result = cli_runner.invoke(app, [*cli_args, "--quiet", "play"])
-        assert "[OK]" not in result.output
-
-        # Cleanup: stop play mode
-        cli_runner.invoke(app, [*cli_args, "stop"])
+        try:
+            assert "[OK]" not in result.output
+        finally:
+            cli_runner.invoke(app, [*cli_args, "stop"])
 
     def test_quiet_preserves_data_output(self, cli_runner: CliRunner, cli_args: list[str]) -> None:
         result = cli_runner.invoke(app, [*cli_args, "--quiet", "state"])
         assert result.exit_code == 0
         # state should still produce data output even in quiet mode
-        assert len(result.output.strip()) > 0
+        assert result.output.strip()
 
 
 class TestVerbose:
     def test_verbose_shows_request_response(self, cli_runner: CliRunner, cli_args: list[str]) -> None:
         result = cli_runner.invoke(app, [*cli_args, "--verbose", "state"])
         assert result.exit_code == 0
-        # verbose dumps request/response to stderr (mixed into output in CliRunner)
-        assert ">>>" in result.output
-        assert "<<<" in result.output
+        # verbose dumps request/response to stderr.
+        # Click <8.2: mix_stderr=True (default) merges stderr into output.
+        # Click >=8.2: stderr is always separate.
+        combined = result.output + getattr(result, "stderr", "")
+        assert ">>>" in combined
+        assert "<<<" in combined
 
 
 class TestConsoleGet:
