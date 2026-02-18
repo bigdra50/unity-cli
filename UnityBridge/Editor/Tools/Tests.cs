@@ -22,6 +22,7 @@ namespace UnityBridge.Tools
     {
         private static TestRunnerApi _testRunnerApi;
         private static TestResultCollector _activeCollector;
+        private static JObject _lastCompletedResult;
 
         // SemaphoreSlim for exclusive access (prevents concurrent test runs)
         private static readonly SemaphoreSlim OperationLock = new(1, 1);
@@ -69,11 +70,25 @@ namespace UnityBridge.Tools
 
         private static Task<JObject> RunTestsAsync(JObject parameters)
         {
+            _lastCompletedResult = null;
+
             if (_activeCollector != null && !_activeCollector.IsComplete)
             {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "Tests are already running. Use 'status' action to check progress.");
+                // Allow force-reset of stale collector (cancelled via GUI etc.)
+                const int staleTimeoutSeconds = 120;
+                var inactiveSeconds = (DateTime.UtcNow - _activeCollector.LastActivity).TotalSeconds;
+                if (inactiveSeconds > staleTimeoutSeconds)
+                {
+                    BridgeLog.Warn("[Tests] Force-resetting stale test collector");
+                    Api.UnregisterCallbacks(_activeCollector);
+                    _activeCollector = null;
+                }
+                else
+                {
+                    throw new ProtocolException(
+                        ErrorCode.InvalidParams,
+                        "Tests are already running. Use 'status' action to check progress.");
+                }
             }
 
             if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
@@ -157,6 +172,7 @@ namespace UnityBridge.Tools
                 {
                     var result = BuildResultJson(_activeCollector);
                     Api.UnregisterCallbacks(_activeCollector);
+                    _lastCompletedResult = result;
                     _activeCollector = null;
                     tcs.TrySetResult(result);
                 };
@@ -299,12 +315,16 @@ namespace UnityBridge.Tools
             return tcs.Task;
         }
 
+        internal static bool IsLeafTest(ITestAdaptor test)
+        {
+            return !test.HasChildren && !test.IsSuite;
+        }
+
         private static void CollectTests(ITestAdaptor test, List<JObject> tests)
         {
             if (test == null) return;
 
-            // Only include actual test methods (leaf nodes)
-            if (!test.HasChildren && !test.IsSuite)
+            if (IsLeafTest(test))
             {
                 tests.Add(new JObject
                 {
@@ -328,6 +348,14 @@ namespace UnityBridge.Tools
         {
             if (_activeCollector == null)
             {
+                // Return completed result if tests finished between polling intervals
+                if (_lastCompletedResult != null)
+                {
+                    var result = _lastCompletedResult;
+                    _lastCompletedResult = null;
+                    return result;
+                }
+
                 return new JObject
                 {
                     ["running"] = false,
@@ -339,8 +367,33 @@ namespace UnityBridge.Tools
             {
                 var result = BuildResultJson(_activeCollector);
                 Api.UnregisterCallbacks(_activeCollector);
+                _lastCompletedResult = null;
                 _activeCollector = null;
                 return result;
+            }
+
+            // Detect stale collector (cancelled via GUI or stuck)
+            const int staleTimeoutSeconds = 120;
+            var inactiveSeconds = (DateTime.UtcNow - _activeCollector.LastActivity).TotalSeconds;
+            if (inactiveSeconds > staleTimeoutSeconds)
+            {
+                BridgeLog.Warn(
+                    $"[Tests] Test run appears stale (no activity for {inactiveSeconds:F0}s). Resetting.");
+                Api.UnregisterCallbacks(_activeCollector);
+
+                if (_activeCollector.NeedsRestorePlayModeOptions)
+                {
+                    RestoreEnterPlayModeOptions(
+                        _activeCollector.OriginalEnterPlayModeOptionsEnabled,
+                        _activeCollector.OriginalEnterPlayModeOptions);
+                }
+
+                _activeCollector = null;
+                return new JObject
+                {
+                    ["running"] = false,
+                    ["message"] = "Test run was stale and has been reset"
+                };
             }
 
             return new JObject
@@ -356,6 +409,16 @@ namespace UnityBridge.Tools
 
         private static JObject BuildResultJson(TestResultCollector collector)
         {
+            var total = collector.Passed + collector.Failed + collector.Skipped;
+
+            // Invariant: finished count must equal sum of categorized results
+            if (collector.TestsFinished != total)
+            {
+                BridgeLog.Warn(
+                    $"[Tests] Count mismatch: TestsFinished={collector.TestsFinished}, " +
+                    $"Passed+Failed+Skipped={total}");
+            }
+
             var failedTests = new JArray();
             foreach (var failure in collector.FailedTests)
             {
@@ -371,6 +434,7 @@ namespace UnityBridge.Tools
             {
                 ["running"] = false,
                 ["complete"] = true,
+                ["total"] = total,
                 ["passed"] = collector.Passed,
                 ["failed"] = collector.Failed,
                 ["skipped"] = collector.Skipped,
@@ -395,6 +459,7 @@ namespace UnityBridge.Tools
             public Action OnCompleted { get; set; }
 
             public bool IsComplete { get; private set; }
+            public DateTime LastActivity { get; private set; } = DateTime.UtcNow;
             public int TestsStarted { get; private set; }
             public int TestsFinished { get; private set; }
             public int Passed { get; private set; }
@@ -422,15 +487,16 @@ namespace UnityBridge.Tools
 
             public void TestStarted(ITestAdaptor test)
             {
+                LastActivity = DateTime.UtcNow;
+                if (!IsLeafTest(test)) return;
                 TestsStarted++;
             }
 
             public void TestFinished(ITestResultAdaptor result)
             {
-                TestsFinished++;
-
-                // Only count leaf nodes (actual tests, not fixtures)
+                LastActivity = DateTime.UtcNow;
                 if (result.HasChildren) return;
+                TestsFinished++;
 
                 switch (result.ResultState)
                 {
