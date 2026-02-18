@@ -767,7 +767,7 @@ def tests_run(
             print_key_value(final)
 
         if final.get("failed", 0) > 0:
-            raise typer.Exit(ExitCode.USAGE_ERROR)
+            raise typer.Exit(ExitCode.TEST_FAILURE)
     except UnityCLIError as e:
         _handle_error(e)
 
@@ -1169,7 +1169,7 @@ def menu_exec(
             print_success(result.get("message", f"Executed: {path}"))
         else:
             print_error(result.get("message", f"Failed: {path}"))
-            raise typer.Exit(ExitCode.INSTANCE_ERROR) from None
+            raise typer.Exit(ExitCode.OPERATION_ERROR) from None
     except UnityCLIError as e:
         _handle_error(e)
 
@@ -1467,7 +1467,7 @@ def build_run(
                     print_line(f"  [{style}]{msg_type}: {msg_content}[/{style}]")
 
             if build_result != "Succeeded":
-                raise typer.Exit(ExitCode.INSTANCE_ERROR) from None
+                raise typer.Exit(ExitCode.OPERATION_ERROR) from None
     except UnityCLIError as e:
         _handle_error(e)
 

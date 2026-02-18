@@ -24,12 +24,12 @@ from unity_cli.exceptions import (
         (TimeoutError("retry", "RETRY_TIMEOUT"), ExitCode.TRANSIENT_ERROR),
         (InstanceError("reloading", "INSTANCE_RELOADING"), ExitCode.TRANSIENT_ERROR),
         (InstanceError("busy", "INSTANCE_BUSY"), ExitCode.TRANSIENT_ERROR),
-        (InstanceError("not found", "INSTANCE_NOT_FOUND"), ExitCode.INSTANCE_ERROR),
-        (InstanceError("ambiguous", "AMBIGUOUS_INSTANCE"), ExitCode.INSTANCE_ERROR),
-        (ProtocolError("bad frame", "PROTOCOL_ERROR"), ExitCode.INSTANCE_ERROR),
-        (HubError("hub error"), ExitCode.INSTANCE_ERROR),
-        (ProjectError("project error"), ExitCode.INSTANCE_ERROR),
-        (UnityCLIError("unknown", "UNKNOWN"), ExitCode.INSTANCE_ERROR),
+        (InstanceError("not found", "INSTANCE_NOT_FOUND"), ExitCode.OPERATION_ERROR),
+        (InstanceError("ambiguous", "AMBIGUOUS_INSTANCE"), ExitCode.OPERATION_ERROR),
+        (ProtocolError("bad frame", "PROTOCOL_ERROR"), ExitCode.OPERATION_ERROR),
+        (HubError("hub error"), ExitCode.OPERATION_ERROR),
+        (ProjectError("project error"), ExitCode.OPERATION_ERROR),
+        (UnityCLIError("unknown", "UNKNOWN"), ExitCode.OPERATION_ERROR),
     ],
     ids=[
         "ConnectionError",
@@ -54,4 +54,5 @@ def test_exit_codes_are_ints() -> None:
     assert ExitCode.USAGE_ERROR == 1
     assert ExitCode.TRANSIENT_ERROR == 2
     assert ExitCode.CONNECTION_ERROR == 3
-    assert ExitCode.INSTANCE_ERROR == 4
+    assert ExitCode.OPERATION_ERROR == 4
+    assert ExitCode.TEST_FAILURE == 5

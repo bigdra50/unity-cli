@@ -18,7 +18,8 @@ class ExitCode(enum.IntEnum):
     USAGE_ERROR = 1
     TRANSIENT_ERROR = 2
     CONNECTION_ERROR = 3
-    INSTANCE_ERROR = 4
+    OPERATION_ERROR = 4
+    TEST_FAILURE = 5
 
 
 _TRANSIENT_CODES = frozenset({"INSTANCE_RELOADING", "INSTANCE_BUSY"})
@@ -35,5 +36,5 @@ def exit_code_for(exc: UnityCLIError) -> ExitCode:
     if isinstance(exc, InstanceError):
         if exc.code in _TRANSIENT_CODES:
             return ExitCode.TRANSIENT_ERROR
-        return ExitCode.INSTANCE_ERROR
-    return ExitCode.INSTANCE_ERROR
+        return ExitCode.OPERATION_ERROR
+    return ExitCode.OPERATION_ERROR
