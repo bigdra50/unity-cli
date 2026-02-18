@@ -24,7 +24,7 @@ Error Report / Bug Reproduction
   ▼
 ┌─────────────────────────────┐
 │ Step 1: Error Capture       │
-│ u console get -l E -v       │
+│ u console get -l E -s       │
 │ (stack trace 付き)          │
 └──────────┬──────────────────┘
            ▼
@@ -37,7 +37,7 @@ Error Report / Bug Reproduction
 ┌─────────────────────────────┐
 │ Step 3: Context Gathering   │
 │ u scene hierarchy           │
-│ u gameobject find <name>    │
+│ u gameobject find --name <> │
 │ u component inspect         │
 └──────────┬──────────────────┘
            ▼
@@ -57,15 +57,15 @@ Error Report / Bug Reproduction
 スタックトレース付きでエラーログを取得:
 
 ```bash
-u console get -l E -v
+u console get -l E -s
 ```
 
 エラーが大量の場合は絞り込む:
 
 ```bash
-u console get -l E -c 10                          # 最新10件
-u console get -l +E+X -f "NullReference"           # NullRef のみ
-u console get -l +E+X -f "MissingReference"        # Missing のみ
+u console get -l E | head -10                      # 最新10件
+u console get -l +E+X | grep "NullReference"       # NullRef のみ
+u console get -l +E+X | grep "MissingReference"    # Missing のみ
 ```
 
 ### Step 2: Error Classification
@@ -128,7 +128,7 @@ Play Mode 中なら追加情報:
 
 ```bash
 u state                      # isPlaying, isPaused 等
-u console get -l +W -c 5     # 直近の Warning も確認
+u console get -l +W | head -5  # 直近の Warning も確認
 ```
 
 ## Investigation Rules
@@ -136,15 +136,15 @@ u console get -l +W -c 5     # 直近の Warning も確認
 - 1回の調査で解決しない場合、収集した情報をまとめてユーザーに報告する
 - コード修正が必要な場合は修正後 /unity-preflight を実行
 - 推測による修正は避け、エビデンスに基づく
-- `console get` のトークンコストに注意: `-c` で件数制限、`-f` でフィルタ
+- `console get` のトークンコストに注意: `| head -N` で件数制限、`| grep` でフィルタ
 
 ## Token-Saving Strategies
 
 | 状況 | 対応 |
 |------|------|
-| スタックトレースが長い | `-v` で1回取得し、関連フレームのみ抽出 |
+| スタックトレースが長い | `-s` で1回取得し、関連フレームのみ抽出 |
 | scene hierarchy が巨大 | `-d 2` で浅く取得、必要な枝だけ深掘り |
-| 同一エラーの繰り返し | `-c 1` で1件だけ取得 |
+| 同一エラーの繰り返し | `| head -1` で1件だけ取得 |
 
 ## Result Report Format
 

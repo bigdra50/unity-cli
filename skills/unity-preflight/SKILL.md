@@ -98,7 +98,7 @@ u console get -l E
 エラー出力が多い場合:
 
 ```bash
-u console get -l E -c 5    # 最初の5件だけ取得
+u console get -l E | head -5    # 最初の5件だけ取得
 ```
 
 ### Step 3: EditMode Tests
@@ -159,7 +159,7 @@ u stop
 
 | 状況 | 対応 |
 |------|------|
-| エラーが大量 | `-c 5` で最初の5件に絞る |
+| エラーが大量 | `\| head -5` で最初の5件に絞る |
 | 同一エラーの繰り返し | 最初の1件を修正後、再検証 |
 | Warning が大量 | `-l +E+X` でError/Exceptionのみに絞る |
 | スタックトレース不要 | `-v` フラグを付けない（デフォルトで省略） |

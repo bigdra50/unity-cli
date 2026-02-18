@@ -156,21 +156,27 @@ u scene save -p "Assets/Scenes/Level2.unity"
 u scene active                              # アクティブシーン情報
 u scene hierarchy [-d DEPTH]                # 階層表示
 u scene save [-p PATH]                      # シーン保存
-u scene load --path PATH                    # シーン読み込み
+u scene load --path PATH                    # パスで読み込み
+u scene load --name NAME                    # シーン名で読み込み
 
 # GameObject
-u gameobject find -n NAME                   # 検索
+u gameobject find -n NAME                   # 名前で検索
+u gameobject find --id ID                   # Instance ID で検索
 u gameobject create -n NAME [-p PRIMITIVE]  # 作成
 u gameobject modify -n NAME [--position X Y Z] [--rotation X Y Z] [--scale X Y Z]
+u gameobject modify --id ID [--position X Y Z] [--rotation X Y Z] [--scale X Y Z]
 u gameobject active -n NAME --active/--no-active
-u gameobject delete -n NAME                 # 削除
+u gameobject delete -n NAME                 # 名前で削除
+u gameobject delete --id ID                 # Instance ID で削除
 
 # Component
-u component list -t TARGET                  # 一覧
+u component list -t TARGET                  # 名前で一覧
+u component list --target-id ID             # Instance ID で一覧
 u component inspect -t TARGET -T TYPE       # 詳細
 u component add -t TARGET -T TYPE           # 追加
 u component remove -t TARGET -T TYPE        # 削除
 u component modify -t TARGET -T TYPE --prop NAME --value VALUE
+# -t の代わりに --target-id ID で Instance ID 指定も可
 
 # Asset
 u asset prefab -s SOURCE -p PATH            # Prefab作成

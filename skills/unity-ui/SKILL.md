@@ -84,7 +84,7 @@ u uitree dump                 # パネル一覧
 
 ```bash
 u uitree dump -p "GameView"            # テキスト形式
-u uitree dump -p "GameView" -o json    # JSON形式
+u uitree dump -p "GameView" --json     # JSON形式
 u uitree dump -p "GameView" -d 3       # 深さ3まで
 ```
 
@@ -209,7 +209,7 @@ u uitree inspect ref_N --style
 ```bash
 u uitree query -p "GameView" -n "Button"     # 名前で広く
 u uitree query -p "GameView" -t Button       # タイプで
-u uitree dump -p "GameView" -o json          # 全ツリー
+u uitree dump -p "GameView" --json           # 全ツリー
 ```
 
 ### スタイル競合
@@ -255,7 +255,8 @@ UI Issue / Layout Question (uGUI)
   ▼
 ┌─────────────────────────────┐
 │ Step 1: Find Canvas         │
-│ u gameobject find "Canvas"  │
+│ u gameobject find           │
+│   --name "Canvas"           │
 │ u scene hierarchy -d 3      │
 └──────────┬──────────────────┘
            ▼
@@ -276,7 +277,7 @@ UI Issue / Layout Question (uGUI)
 ### Step 1: Canvas の発見
 
 ```bash
-u gameobject find "Canvas"           # Canvas を検索
+u gameobject find --name "Canvas"    # Canvas を検索
 u scene hierarchy -d 3               # 上位3階層で UI 構造を把握
 ```
 
