@@ -417,16 +417,16 @@ class InstanceRegistry:
     def _fuzzy_match(self, query: str) -> UnityInstance | None:
         """Stage 2-4: project_name exact → path suffix → name prefix."""
         all_inst = list(self._instances.values())
-        stages = [
-            [i for i in all_inst if i.project_name == query],
-            [i for i in all_inst if self._is_path_suffix(i.instance_id, query)],
-            [i for i in all_inst if i.project_name.startswith(query)],
-        ]
-        for matches in stages:
-            result = self._unique_match(matches, query)
-            if result:
-                return result
-        return None
+
+        result = self._unique_match([i for i in all_inst if i.project_name == query], query)
+        if result:
+            return result
+
+        result = self._unique_match([i for i in all_inst if self._is_path_suffix(i.instance_id, query)], query)
+        if result:
+            return result
+
+        return self._unique_match([i for i in all_inst if i.project_name.startswith(query)], query)
 
     def _resolve_instance(self, query: str) -> UnityInstance | None:
         """Resolve an instance by 5-stage matching.
