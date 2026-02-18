@@ -434,9 +434,13 @@ def console_get(
         str | None,
         typer.Option("--filter", "-f", help="Text to filter logs"),
     ] = None,
-    verbose: Annotated[
+    stacktrace: Annotated[
         bool,
-        typer.Option("--verbose", "-v", help="Include stack traces in output"),
+        typer.Option("--stacktrace", "-s", help="Include stack traces in output"),
+    ] = False,
+    verbose_legacy: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", hidden=True, help="[Deprecated] Use --stacktrace/-s"),
     ] = False,
     json_flag: Annotated[
         bool,
@@ -450,13 +454,18 @@ def console_get(
     Examples:
         u console get              # All logs (plain text)
         u console get --json       # All logs (JSON format)
-        u console get -v           # All logs with stack traces
+        u console get -s           # All logs with stack traces
         u console get -l E         # Error and above (error + exception)
         u console get -l W         # Warning and above
         u console get -l +W        # Warning only
         u console get -l +E+X      # Error and exception only
     """
     context: CLIContext = ctx.obj
+
+    include_stacktrace = stacktrace or verbose_legacy
+    if verbose_legacy:
+        print_warning("--verbose/-v is deprecated for 'console get'. Use --stacktrace/-s instead.")
+
     try:
         # Parse level option to types list
         types = _parse_level(level) if level else None
@@ -464,7 +473,7 @@ def console_get(
             types=types,
             count=count,
             filter_text=filter_text,
-            include_stacktrace=verbose,
+            include_stacktrace=include_stacktrace,
         )
 
         if _should_json(context, json_flag):
@@ -477,7 +486,7 @@ def console_get(
                 log_type = entry.get("type", "log")
                 msg = entry.get("message", "")
                 print_line(f"{ts} {log_type} {msg}")
-                if verbose and entry.get("stackTrace"):
+                if include_stacktrace and entry.get("stackTrace"):
                     for st_line in entry["stackTrace"].split("\n"):
                         print_line(f"  {st_line}")
     except UnityCLIError as e:
