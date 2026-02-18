@@ -346,12 +346,22 @@ def refresh(ctx: typer.Context) -> None:
 # =============================================================================
 
 
-def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any] | str:
+def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any] | str | None:
     """Parse a CLI string value into an appropriate Python type.
 
-    Handles: int, float, bool, JSON array, JSON object, or plain string.
+    Parse order (JSON-first):
+      1. json.loads  — handles true/false, numbers, quoted strings, arrays, objects
+      2. Legacy bool — Python-style "True"/"False" (case-insensitive)
+      3. int / float
+      4. bare string
     """
     import json
+
+    try:
+        parsed: int | float | bool | list[Any] | dict[str, Any] | str | None = json.loads(raw)
+        return parsed
+    except (ValueError, json.JSONDecodeError):
+        pass
 
     if raw.lower() == "true":
         return True
@@ -367,13 +377,6 @@ def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any
         return float(raw)
     except ValueError:
         pass
-
-    if raw.startswith(("[", "{")):
-        try:
-            parsed: list[Any] | dict[str, Any] = json.loads(raw)
-            return parsed
-        except json.JSONDecodeError:
-            pass
 
     return raw
 
