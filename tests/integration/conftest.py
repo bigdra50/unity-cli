@@ -67,12 +67,12 @@ def uitree(conn: RelayConnection) -> UITreeAPI:
 
 
 @pytest.fixture(scope="session")
-def cli_runner(_conn: RelayConnection) -> CliRunner:
-    """CliRunner that depends on _conn (auto-skips if no Relay)."""
+def cli_runner(conn: RelayConnection) -> CliRunner:
+    """CliRunner that depends on conn (auto-skips if no Relay)."""
     return CliRunner()
 
 
 @pytest.fixture(scope="session")
-def cli_args(_conn: RelayConnection) -> list[str]:
+def cli_args(conn: RelayConnection) -> list[str]:
     """Base CLI args targeting TestProject."""
     return ["--instance", INSTANCE]
