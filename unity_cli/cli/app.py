@@ -126,8 +126,6 @@ class CLIContext:
     config: UnityCLIConfig
     client: UnityClient
     output: OutputConfig = OutputConfig(mode=OutputMode.PRETTY)
-    quiet: bool = False
-    verbose: bool = False
 
 
 # =============================================================================
@@ -248,8 +246,6 @@ def main(
         config=config,
         client=client,
         output=output_config,
-        quiet=quiet,
-        verbose=verbose,
     )
 
 
