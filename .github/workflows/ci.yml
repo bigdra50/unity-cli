@@ -61,9 +61,6 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run xenon complexity gate
-        run: uv run pre-commit run xenon --all-files
-
       - name: Run radon complexity report
         run: |
           echo "## Cyclomatic Complexity"
@@ -71,6 +68,9 @@ jobs:
           echo ""
           echo "## Maintainability Index"
           uv run radon mi relay/ unity_cli/ -s -n B
+
+      - name: Run xenon complexity gate
+        run: uv run pre-commit run xenon --all-files
 
   architecture:
     runs-on: ubuntu-latest
