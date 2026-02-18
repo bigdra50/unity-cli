@@ -370,6 +370,9 @@ def refresh(ctx: typer.Context) -> None:
 # =============================================================================
 
 
+_JSON_START_CHARS = frozenset('"[{tnf')  # true, null, false, or structured
+
+
 def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any] | str | None:
     """Parse a CLI string value into an appropriate Python type.
 
@@ -381,11 +384,14 @@ def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any
     """
     import json
 
-    try:
-        parsed: int | float | bool | list[Any] | dict[str, Any] | str | None = json.loads(raw)
-        return parsed
-    except (ValueError, json.JSONDecodeError):
-        pass
+    # Skip json.loads for bare strings that cannot be valid JSON.
+    # Valid JSON values start with: digit, '-', '"', '[', '{', 't', 'n', 'f'
+    if raw and (raw[0].isdigit() or raw[0] == "-" or raw[0] in _JSON_START_CHARS):
+        try:
+            parsed: int | float | bool | list[Any] | dict[str, Any] | str | None = json.loads(raw)
+            return parsed
+        except (ValueError, json.JSONDecodeError):
+            pass
 
     if raw.lower() == "true":
         return True
