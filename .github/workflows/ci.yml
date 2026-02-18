@@ -45,6 +45,25 @@ jobs:
             uvx ruff format --check $DIRS
           fi
 
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run import-linter
+        run: uv run lint-imports
+
   type-check:
     runs-on: ubuntu-latest
     steps:
