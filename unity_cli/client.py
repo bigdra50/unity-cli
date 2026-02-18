@@ -232,10 +232,10 @@ class RelayConnection:
         retry_max_time_ms: int | None = None,
     ) -> dict[str, Any]:
         """Send REQUEST message with exponential backoff retry."""
-        t_ms = timeout_ms if timeout_ms is not None else self.timeout_ms
-        r_init = retry_initial_ms if retry_initial_ms is not None else self.retry_initial_ms
-        r_max = retry_max_ms if retry_max_ms is not None else self.retry_max_ms
-        r_total = retry_max_time_ms if retry_max_time_ms is not None else self.retry_max_time_ms
+        timeout_ms = timeout_ms if timeout_ms is not None else self.timeout_ms
+        retry_initial_ms = retry_initial_ms if retry_initial_ms is not None else self.retry_initial_ms
+        retry_max_ms = retry_max_ms if retry_max_ms is not None else self.retry_max_ms
+        retry_max_time_ms = retry_max_time_ms if retry_max_time_ms is not None else self.retry_max_time_ms
 
         request_id = _generate_request_id(self._client_id)
         start_time = time.time()
@@ -244,16 +244,16 @@ class RelayConnection:
         while True:
             elapsed_ms = (time.time() - start_time) * 1000
 
-            if attempt > 0 and elapsed_ms >= r_total:
+            if attempt > 0 and elapsed_ms >= retry_max_time_ms:
                 raise TimeoutError(
-                    f"Max retry time exceeded ({r_total}ms) for '{command}'",
+                    f"Max retry time exceeded ({retry_max_time_ms}ms) for '{command}'",
                     "RETRY_TIMEOUT",
                 )
 
             try:
-                return self._send_request_once(request_id, command, params, t_ms)
+                return self._send_request_once(request_id, command, params, timeout_ms)
             except (InstanceError, TimeoutError) as e:
-                self._maybe_retry(e, command, elapsed_ms, r_init, r_max, r_total, attempt)
+                self._maybe_retry(e, command, elapsed_ms, retry_initial_ms, retry_max_ms, retry_max_time_ms, attempt)
                 attempt += 1
 
     def _maybe_retry(
