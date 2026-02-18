@@ -28,14 +28,11 @@ from unity_cli.cli.output import (
 
 
 class TestResolveOutputMode:
-    def test_json_flag_wins_over_everything(self) -> None:
-        assert resolve_output_mode(json_flag=True, pretty_flag=True) is OutputMode.JSON
-
     def test_pretty_flag_true(self) -> None:
-        assert resolve_output_mode(json_flag=False, pretty_flag=True) is OutputMode.PRETTY
+        assert resolve_output_mode(pretty_flag=True) is OutputMode.PRETTY
 
     def test_pretty_flag_false(self) -> None:
-        assert resolve_output_mode(json_flag=False, pretty_flag=False) is OutputMode.PLAIN
+        assert resolve_output_mode(pretty_flag=False) is OutputMode.PLAIN
 
     def test_env_unity_cli_json(self) -> None:
         with patch.dict(os.environ, {"UNITY_CLI_JSON": "1"}, clear=False):
@@ -64,10 +61,6 @@ class TestResolveOutputMode:
         env = {k: v for k, v in os.environ.items() if k not in ("UNITY_CLI_JSON", "UNITY_CLI_NO_PRETTY", "NO_COLOR")}
         with patch.dict(os.environ, env, clear=True), patch.object(sys.stdout, "isatty", return_value=False):
             assert resolve_output_mode() is OutputMode.PLAIN
-
-    def test_json_flag_overrides_env_no_pretty(self) -> None:
-        with patch.dict(os.environ, {"UNITY_CLI_NO_PRETTY": "1"}, clear=False):
-            assert resolve_output_mode(json_flag=True) is OutputMode.JSON
 
     def test_pretty_flag_overrides_env_no_color(self) -> None:
         with patch.dict(os.environ, {"NO_COLOR": ""}, clear=False):

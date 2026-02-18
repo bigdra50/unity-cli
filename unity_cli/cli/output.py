@@ -6,7 +6,7 @@ Supports three modes:
   - JSON: Machine-readable JSON
 
 Mode resolution priority:
-  --json > --pretty/--no-pretty > UNITY_CLI_JSON/UNITY_CLI_NO_PRETTY/NO_COLOR > isatty()
+  per-command --json > UNITY_CLI_JSON > --pretty/--no-pretty > UNITY_CLI_NO_PRETTY/NO_COLOR > isatty()
 """
 
 from __future__ import annotations
@@ -57,16 +57,15 @@ class OutputConfig:
 
 
 def resolve_output_mode(
-    json_flag: bool = False,
     pretty_flag: bool | None = None,
 ) -> OutputMode:
     """Determine output mode from flags, environment, and TTY detection.
 
-    Priority: --json > --pretty/--no-pretty > env vars > isatty()
-    """
-    if json_flag:
-        return OutputMode.JSON
+    Priority: --pretty/--no-pretty > env vars > isatty()
 
+    Note: per-command --json is handled separately in _should_json().
+    UNITY_CLI_JSON env var is checked here for global default.
+    """
     if pretty_flag is True:
         return OutputMode.PRETTY
     if pretty_flag is False:
