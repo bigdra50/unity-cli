@@ -447,7 +447,7 @@ class InstanceRegistry:
     def get_instance_for_request(self, instance_id: str | None = None) -> UnityInstance | None:
         """Get the instance to handle a request.
 
-        If instance_id is provided, resolves via 4-stage matching.
+        If instance_id is provided, resolves via 5-stage matching.
         Otherwise, returns the default instance.
 
         Raises:

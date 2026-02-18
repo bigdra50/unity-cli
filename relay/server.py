@@ -444,7 +444,6 @@ class RelayServer:
         self,
         request_id: str,
         instance_id: str | None,
-        error_detail: str,
     ) -> UnityInstance | None | dict[str, Any]:
         """Resolve instance; returns instance, None (not found), or error dict (ambiguous)."""
         try:
@@ -471,7 +470,7 @@ class RelayServer:
         waited_ms = 0
 
         while waited_ms < max_wait_ms:
-            result = self._get_instance_or_error(request_id, instance_id, "")
+            result = self._get_instance_or_error(request_id, instance_id)
             if isinstance(result, dict):
                 return result
 
@@ -499,7 +498,7 @@ class RelayServer:
         waited_ms: int,
     ) -> UnityInstance | dict[str, Any]:
         """Final check after polling loop."""
-        result = self._get_instance_or_error(request_id, instance_id, "")
+        result = self._get_instance_or_error(request_id, instance_id)
         if isinstance(result, dict):
             return result
         if result is None:
@@ -508,11 +507,14 @@ class RelayServer:
                 ErrorCode.INSTANCE_NOT_FOUND,
                 f"Instance not found after waiting {waited_ms}ms. Ensure Unity Editor has UnityBridge connected. Check with 'u instances'.",
             ).to_dict()
-        if result.status == InstanceStatus.RELOADING:
+        if self._instance_needs_wait(result):
+            status_label = result.status.value if hasattr(result.status, "value") else str(result.status)
             return ErrorMessage.from_code(
                 request_id,
-                ErrorCode.INSTANCE_RELOADING,
-                f"Instance still reloading after {waited_ms}ms: {result.instance_id}. The instance is reloading scripts. Retry the command after a few seconds.",
+                ErrorCode.INSTANCE_RELOADING
+                if result.status == InstanceStatus.RELOADING
+                else ErrorCode.INSTANCE_NOT_FOUND,
+                f"Instance not ready after {waited_ms}ms: {result.instance_id} ({status_label}). Retry after a few seconds.",
             ).to_dict()
         if waited_ms > 0:
             logger.info(f"[{request_id}] Instance ready after {waited_ms}ms wait")
