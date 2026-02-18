@@ -440,6 +440,143 @@ class RelayServer:
             lambda: self._execute_command(request_id, instance_id, command, params, timeout_ms),
         )
 
+    def _get_instance_or_error(
+        self,
+        request_id: str,
+        instance_id: str | None,
+        error_detail: str,
+    ) -> UnityInstance | None | dict[str, Any]:
+        """Resolve instance; returns instance, None (not found), or error dict (ambiguous)."""
+        try:
+            instance = self.registry.get_instance_for_request(instance_id)
+        except AmbiguousInstanceError as e:
+            return ErrorMessage.from_code(
+                request_id,
+                ErrorCode.AMBIGUOUS_INSTANCE,
+                str(e),
+            ).to_dict()
+        return instance
+
+    def _instance_needs_wait(self, instance: UnityInstance) -> bool:
+        return instance.status in (InstanceStatus.RELOADING, InstanceStatus.DISCONNECTED) or not instance.is_connected
+
+    async def _wait_for_instance(
+        self,
+        request_id: str,
+        instance_id: str | None,
+    ) -> UnityInstance | dict[str, Any]:
+        """Wait for a Unity instance to become ready."""
+        max_wait_ms = 15000
+        poll_interval_ms = 250
+        waited_ms = 0
+
+        while waited_ms < max_wait_ms:
+            result = self._get_instance_or_error(request_id, instance_id, "")
+            if isinstance(result, dict):
+                return result
+
+            if result is None:
+                if not self._should_wait_for_missing(request_id, instance_id, waited_ms):
+                    return ErrorMessage.from_code(
+                        request_id,
+                        ErrorCode.INSTANCE_NOT_FOUND,
+                        f"Instance not found: {instance_id}. Check available instances with 'u instances'.",
+                    ).to_dict()
+            elif not self._instance_needs_wait(result):
+                break
+            elif waited_ms == 0:
+                logger.info(f"[{request_id}] Instance not ready ({result.status}), waiting...")
+
+            await asyncio.sleep(poll_interval_ms / 1000)
+            waited_ms += poll_interval_ms
+
+        return self._validate_waited_instance(request_id, instance_id, waited_ms)
+
+    def _validate_waited_instance(
+        self,
+        request_id: str,
+        instance_id: str | None,
+        waited_ms: int,
+    ) -> UnityInstance | dict[str, Any]:
+        """Final check after polling loop."""
+        result = self._get_instance_or_error(request_id, instance_id, "")
+        if isinstance(result, dict):
+            return result
+        if result is None:
+            return ErrorMessage.from_code(
+                request_id,
+                ErrorCode.INSTANCE_NOT_FOUND,
+                f"Instance not found after waiting {waited_ms}ms. Ensure Unity Editor has UnityBridge connected. Check with 'u instances'.",
+            ).to_dict()
+        if result.status == InstanceStatus.RELOADING:
+            return ErrorMessage.from_code(
+                request_id,
+                ErrorCode.INSTANCE_RELOADING,
+                f"Instance still reloading after {waited_ms}ms: {result.instance_id}. The instance is reloading scripts. Retry the command after a few seconds.",
+            ).to_dict()
+        if waited_ms > 0:
+            logger.info(f"[{request_id}] Instance ready after {waited_ms}ms wait")
+        return result
+
+    def _should_wait_for_missing(
+        self,
+        request_id: str,
+        instance_id: str | None,
+        waited_ms: int,
+    ) -> bool:
+        """Check if we should wait for a missing instance."""
+        if instance_id and is_instance_reloading(instance_id):
+            if waited_ms == 0:
+                logger.info(f"[{request_id}] Instance {instance_id} is reloading (via status file), waiting...")
+            return True
+        if not instance_id:
+            if waited_ms == 0:
+                logger.info(f"[{request_id}] No instances, waiting for reconnection...")
+            return True
+        return False
+
+    async def _enqueue_command(
+        self,
+        request_id: str,
+        instance: UnityInstance,
+        command: str,
+        params: dict[str, Any],
+        timeout_ms: int,
+    ) -> dict[str, Any]:
+        """Handle BUSY instance by enqueuing or returning error."""
+        if not instance.queue_enabled:
+            return ErrorMessage.from_code(
+                request_id,
+                ErrorCode.INSTANCE_BUSY,
+                f"Instance is busy: {instance.instance_id}. The instance is processing another command. Retry the command after a few seconds.",
+            ).to_dict()
+
+        future: asyncio.Future[dict[str, Any]] = asyncio.Future()
+        queued_cmd = QueuedCommand(
+            request_id=request_id,
+            command=command,
+            params=params,
+            timeout_ms=timeout_ms,
+            future=future,
+        )
+
+        if not instance.enqueue_command(queued_cmd):
+            return ErrorMessage.from_code(
+                request_id,
+                ErrorCode.QUEUE_FULL,
+                f"Command queue is full (max: {QUEUE_MAX_SIZE}): {instance.instance_id}. Wait for current commands to complete before sending new ones.",
+            ).to_dict()
+
+        logger.info(f"[{request_id}] Command queued for {instance.instance_id} (queue size: {instance.queue_size})")
+        try:
+            return await asyncio.wait_for(future, timeout=timeout_ms / 1000)
+        except TimeoutError:
+            return ErrorMessage.from_code(
+                request_id,
+                ErrorCode.TIMEOUT,
+                f"Queued command timed out after {timeout_ms}ms. The command was queued but did not complete in time. Consider increasing --timeout or retrying.",
+            ).to_dict()
+
     async def _execute_command(
         self,
         request_id: str,
@@ -449,80 +586,11 @@ class RelayServer:
         timeout_ms: int,
     ) -> dict[str, Any]:
         """Execute a command on a Unity instance"""
-        # Coplay-style: wait for instance to become ready (max 15 seconds)
-        max_wait_ms = 15000
-        poll_interval_ms = 250
-        waited_ms = 0
+        result = await self._wait_for_instance(request_id, instance_id)
+        if isinstance(result, dict):
+            return result
+        instance = result
 
-        while waited_ms < max_wait_ms:
-            # Get target instance
-            try:
-                instance = self.registry.get_instance_for_request(instance_id)
-            except AmbiguousInstanceError as e:
-                return ErrorMessage.from_code(
-                    request_id,
-                    ErrorCode.AMBIGUOUS_INSTANCE,
-                    str(e),
-                ).to_dict()
-
-            if not instance:
-                # ファイルベースでリロード中かチェック
-                if instance_id and is_instance_reloading(instance_id):
-                    if waited_ms == 0:
-                        logger.info(f"[{request_id}] Instance {instance_id} is reloading (via status file), waiting...")
-                    await asyncio.sleep(poll_interval_ms / 1000)
-                    waited_ms += poll_interval_ms
-                    continue
-
-                if instance_id:
-                    return ErrorMessage.from_code(
-                        request_id,
-                        ErrorCode.INSTANCE_NOT_FOUND,
-                        f"Instance not found: {instance_id}. Check available instances with 'u instances'.",
-                    ).to_dict()
-                else:
-                    # No instances - wait and retry (Unity might be restarting)
-                    if waited_ms == 0:
-                        logger.info(f"[{request_id}] No instances, waiting for reconnection...")
-                    await asyncio.sleep(poll_interval_ms / 1000)
-                    waited_ms += poll_interval_ms
-                    continue
-
-            # Check instance status
-            if instance.status == InstanceStatus.RELOADING:
-                if waited_ms == 0:
-                    logger.info(f"[{request_id}] Instance is reloading, waiting...")
-                await asyncio.sleep(poll_interval_ms / 1000)
-                waited_ms += poll_interval_ms
-                continue
-
-            if instance.status == InstanceStatus.DISCONNECTED or not instance.is_connected:
-                if waited_ms == 0:
-                    logger.info(f"[{request_id}] Instance disconnected, waiting for reconnection...")
-                await asyncio.sleep(poll_interval_ms / 1000)
-                waited_ms += poll_interval_ms
-                continue
-
-            # Instance is ready or busy - break out of wait loop
-            break
-
-        # Re-check after waiting
-        try:
-            instance = self.registry.get_instance_for_request(instance_id)
-        except AmbiguousInstanceError as e:
-            return ErrorMessage.from_code(
-                request_id,
-                ErrorCode.AMBIGUOUS_INSTANCE,
-                str(e),
-            ).to_dict()
-        if not instance:
-            return ErrorMessage.from_code(
-                request_id,
-                ErrorCode.INSTANCE_NOT_FOUND,
-                f"Instance not found after waiting {waited_ms}ms. Ensure Unity Editor has UnityBridge connected. Check with 'u instances'.",
-            ).to_dict()
-
-        # Check capability support
         if instance.capabilities and command not in instance.capabilities:
             return ErrorMessage.from_code(
                 request_id,
@@ -530,60 +598,8 @@ class RelayServer:
                 f"Command '{command}' not supported by instance. Available: {', '.join(instance.capabilities)}",
             ).to_dict()
 
-        if instance.status == InstanceStatus.RELOADING:
-            return ErrorMessage.from_code(
-                request_id,
-                ErrorCode.INSTANCE_RELOADING,
-                f"Instance still reloading after {waited_ms}ms: {instance.instance_id}. The instance is reloading scripts. Retry the command after a few seconds.",
-            ).to_dict()
-
-        if waited_ms > 0:
-            logger.info(f"[{request_id}] Instance ready after {waited_ms}ms wait")
-
-        # Handle BUSY state with queue support
         if instance.status == InstanceStatus.BUSY:
-            # Try to enqueue if queue is enabled
-            if instance.queue_enabled:
-                future: asyncio.Future[dict[str, Any]] = asyncio.Future()
-                queued_cmd = QueuedCommand(
-                    request_id=request_id,
-                    command=command,
-                    params=params,
-                    timeout_ms=timeout_ms,
-                    future=future,
-                )
-
-                if instance.enqueue_command(queued_cmd):
-                    logger.info(
-                        f"[{request_id}] Command queued for {instance.instance_id} (queue size: {instance.queue_size})"
-                    )
-                    # Wait for result from queue processing
-                    try:
-                        result = await asyncio.wait_for(
-                            future,
-                            timeout=timeout_ms / 1000,
-                        )
-                        return result
-                    except TimeoutError:
-                        return ErrorMessage.from_code(
-                            request_id,
-                            ErrorCode.TIMEOUT,
-                            f"Queued command timed out after {timeout_ms}ms. The command was queued but did not complete in time. Consider increasing --timeout or retrying.",
-                        ).to_dict()
-
-                # Queue full
-                return ErrorMessage.from_code(
-                    request_id,
-                    ErrorCode.QUEUE_FULL,
-                    f"Command queue is full (max: {QUEUE_MAX_SIZE}): {instance.instance_id}. Wait for current commands to complete before sending new ones.",
-                ).to_dict()
-
-            # Queue disabled - return BUSY error
-            return ErrorMessage.from_code(
-                request_id,
-                ErrorCode.INSTANCE_BUSY,
-                f"Instance is busy: {instance.instance_id}. The instance is processing another command. Retry the command after a few seconds.",
-            ).to_dict()
+            return await self._enqueue_command(request_id, instance, command, params, timeout_ms)
 
         # Send command to Unity
         cmd_msg = CommandMessage(

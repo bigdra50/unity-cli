@@ -276,41 +276,39 @@ class TagLayerSettings:
     def from_file(cls, project_path: Path) -> TagLayerSettings:
         """Parse ProjectSettings/TagManager.asset."""
         tag_file = project_path / "ProjectSettings/TagManager.asset"
-
         if not tag_file.exists():
             return cls()
-
         content = tag_file.read_text(encoding="utf-8")
+        return cls(
+            tags=cls._parse_tags(content),
+            layers=cls._parse_layers(content),
+            sorting_layers=cls._parse_sorting_layers(content),
+        )
 
-        # Parse tags
-        tags: list[str] = []
-        tags_match = re.search(r"tags:\s*\n((?:\s+-\s*.+\n)*)", content)
-        if tags_match:
-            for tag in re.findall(r"-\s*(.+)", tags_match.group(1)):
-                tag = tag.strip()
-                if tag:
-                    tags.append(tag)
+    @staticmethod
+    def _parse_tags(content: str) -> list[str]:
+        match = re.search(r"tags:\s*\n((?:\s+-\s*.+\n)*)", content)
+        if not match:
+            return []
+        return [t.strip() for t in re.findall(r"-\s*(.+)", match.group(1)) if t.strip()]
 
-        # Parse layers (32 slots, many empty)
-        layers: list[tuple[int, str]] = []
-        layers_match = re.search(r"layers:\s*\n((?:\s+-.*\n)*)", content)
-        if layers_match:
-            # Each line is "  - LayerName" or "  - " (empty)
-            layer_lines = layers_match.group(1).strip().split("\n")
-            for i, line in enumerate(layer_lines):
-                # Remove "  - " prefix
-                layer = line.strip().lstrip("-").strip()
-                if layer:
-                    layers.append((i, layer))
+    @staticmethod
+    def _parse_layers(content: str) -> list[tuple[int, str]]:
+        match = re.search(r"layers:\s*\n((?:\s+-.*\n)*)", content)
+        if not match:
+            return []
+        return [
+            (i, layer)
+            for i, line in enumerate(match.group(1).strip().split("\n"))
+            if (layer := line.strip().lstrip("-").strip())
+        ]
 
-        # Parse sorting layers
-        sorting_layers: list[str] = []
-        sorting_match = re.search(r"m_SortingLayers:\s*\n((?:\s+-.*\n)*)", content)
-        if sorting_match:
-            for name in re.findall(r"name:\s*(.+)", sorting_match.group(1)):
-                sorting_layers.append(name.strip())
-
-        return cls(tags=tags, layers=layers, sorting_layers=sorting_layers)
+    @staticmethod
+    def _parse_sorting_layers(content: str) -> list[str]:
+        match = re.search(r"m_SortingLayers:\s*\n((?:\s+-.*\n)*)", content)
+        if not match:
+            return []
+        return [name.strip() for name in re.findall(r"name:\s*(.+)", match.group(1))]
 
 
 # =============================================================================
