@@ -7,20 +7,20 @@ from unity_cli.cli.app import _VERBOSE_MAX_LEN, _mask_sensitive, _truncate_json
 
 class TestMaskSensitive:
     def test_masks_password_key(self) -> None:
-        assert _mask_sensitive({"password": "s3cret"}) == {"password": "***"}
+        assert _mask_sensitive({"password": "FAKE_VALUE"}) == {"password": "***"}
 
     def test_masks_token_key(self) -> None:
-        assert _mask_sensitive({"Token": "abc123"}) == {"Token": "***"}
+        assert _mask_sensitive({"Token": "FAKE_VALUE"}) == {"Token": "***"}
 
     def test_masks_api_key_key(self) -> None:
-        assert _mask_sensitive({"api_key": "xyz"}) == {"api_key": "***"}
+        assert _mask_sensitive({"api_key": "FAKE_VALUE"}) == {"api_key": "***"}
 
     def test_preserves_normal_keys(self) -> None:
         data = {"command": "play", "id": "123"}
         assert _mask_sensitive(data) == data
 
     def test_nested_dict(self) -> None:
-        data = {"params": {"secret": "hidden", "name": "visible"}}
+        data = {"params": {"secret": "FAKE_VALUE", "name": "visible"}}
         assert _mask_sensitive(data) == {"params": {"secret": "***", "name": "visible"}}
 
     def test_list_of_dicts(self) -> None:
