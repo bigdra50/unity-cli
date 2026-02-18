@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityBridge;
@@ -9,15 +10,14 @@ namespace Game.Tests.Editor
 {
     /// <summary>
     /// RelayClient の IAsyncDisposable 実装を検証するテスト。
-    ///
-    /// 修正前: Dispose() が fire-and-forget で DisconnectInternalAsync を呼び、
-    /// ソケット解放完了が保証されない。
-    /// 修正後: DisposeAsync() で DisconnectInternalAsync を await し、
-    /// 呼び出し後にソケットが確実にクローズされる。
+    /// DisposeAsync() で DisconnectInternalAsync を await し、
+    /// 呼び出し後にソケットが確実にクローズされることを保証する。
     /// </summary>
     [TestFixture]
     public class RelayClientDisposeAsyncTests
     {
+        private const int ServerTimeoutMs = 5000;
+
         /// <summary>
         /// DisposeAsync 後にクライアントが Disconnected 状態であることを検証。
         /// </summary>
@@ -29,13 +29,14 @@ namespace Game.Tests.Editor
             try
             {
                 var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                using var cts = new CancellationTokenSource(ServerTimeoutMs);
 
                 var serverTask = Task.Run(async () =>
                 {
                     using var serverClient = await listener.AcceptTcpClientAsync();
                     using var serverStream = serverClient.GetStream();
 
-                    await Framing.ReadFrameAsync(serverStream);
+                    await Framing.ReadFrameAsync(serverStream, cts.Token);
 
                     var registered = new Newtonsoft.Json.Linq.JObject
                     {
@@ -47,14 +48,8 @@ namespace Game.Tests.Editor
 
                     try
                     {
-                        while (serverClient.Connected)
-                        {
-                            await Task.Delay(100);
-                            if (serverStream.DataAvailable)
-                            {
-                                await Framing.ReadFrameAsync(serverStream);
-                            }
-                        }
+                        while (true)
+                            await Framing.ReadFrameAsync(serverStream, cts.Token);
                     }
                     catch { }
                 });
@@ -84,7 +79,6 @@ namespace Game.Tests.Editor
         {
             var client = new RelayClient("127.0.0.1", 0);
 
-            // 未接続状態で DisposeAsync を呼んでも例外にならないこと
             Assert.DoesNotThrowAsync(async () => await client.DisposeAsync());
         }
 
@@ -99,13 +93,14 @@ namespace Game.Tests.Editor
             try
             {
                 var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                using var cts = new CancellationTokenSource(ServerTimeoutMs);
 
                 var serverTask = Task.Run(async () =>
                 {
                     using var serverClient = await listener.AcceptTcpClientAsync();
                     using var serverStream = serverClient.GetStream();
 
-                    await Framing.ReadFrameAsync(serverStream);
+                    await Framing.ReadFrameAsync(serverStream, cts.Token);
 
                     var registered = new Newtonsoft.Json.Linq.JObject
                     {
@@ -118,10 +113,7 @@ namespace Game.Tests.Editor
                     try
                     {
                         while (true)
-                        {
-                            await Task.Delay(100);
-                            if (!serverClient.Connected) break;
-                        }
+                            await Framing.ReadFrameAsync(serverStream, cts.Token);
                     }
                     catch { }
                 });

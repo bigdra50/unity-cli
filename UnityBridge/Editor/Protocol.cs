@@ -24,6 +24,9 @@ namespace UnityBridge
         public const int HeartbeatTimeoutMs = 15000;
         public const int CommandTimeoutMs = 30000;
         public const int ReloadTimeoutMs = 30000;
+        public const int PortReleaseWaitMs = 500;
+        public const int DisposeTaskWaitMs = 500;
+        public const int PortWaitTimeoutMs = 5000;
     }
 
     /// <summary>

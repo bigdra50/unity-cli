@@ -125,10 +125,8 @@ namespace UnityBridge.Tools
             var classFilter = parameters["class_name"]?.Value<string>();
 
             // Strip leading # from name and . from class_name
-            if (nameFilter != null && nameFilter.StartsWith("#"))
-                nameFilter = nameFilter.Substring(1);
-            if (classFilter != null && classFilter.StartsWith("."))
-                classFilter = classFilter.Substring(1);
+            nameFilter = StripSelectorPrefix(nameFilter, '#');
+            classFilter = StripSelectorPrefix(classFilter, '.');
 
             var (root, resolvedPanelName) = FindPanelRoot(panelName);
             if (root == null)
@@ -190,8 +188,7 @@ namespace UnityBridge.Tools
             }
             else if (!string.IsNullOrEmpty(panelName) && !string.IsNullOrEmpty(nameFilter))
             {
-                if (nameFilter.StartsWith("#"))
-                    nameFilter = nameFilter.Substring(1);
+                nameFilter = StripSelectorPrefix(nameFilter, '#');
 
                 var (root, _) = FindPanelRoot(panelName);
                 if (root == null)
@@ -674,6 +671,8 @@ namespace UnityBridge.Tools
                 ? typeName
                 : $"{parentPath} > {typeName}";
 
+            // Type filter uses partial match (IndexOf) for convenience (e.g., "Button" matches "RepeatButton")
+            // Name and class filters use exact match (Equals) to match CSS selector semantics
             var matchesType = string.IsNullOrEmpty(typeFilter) ||
                               typeName.IndexOf(typeFilter, StringComparison.OrdinalIgnoreCase) >= 0;
             var matchesName = string.IsNullOrEmpty(nameFilter) ||
@@ -848,6 +847,8 @@ namespace UnityBridge.Tools
             if (!RefMap.TryGetValue(refId, out var weakRef) || !weakRef.TryGetTarget(out var element))
                 return null;
 
+            // Only check panel attachment (not enabledInHierarchy) -
+            // callers like HandleClick add their own interaction-readiness checks
             if (element.panel == null)
             {
                 RefMap.Remove(refId);
@@ -891,6 +892,13 @@ namespace UnityBridge.Tools
         #endregion
 
         #region Helpers
+
+        private static string StripSelectorPrefix(string value, char prefix)
+        {
+            if (value != null && value.Length > 0 && value[0] == prefix)
+                return value.Substring(1);
+            return value;
+        }
 
         private static ScrollView FindScrollView(VisualElement element)
         {
