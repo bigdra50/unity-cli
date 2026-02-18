@@ -167,7 +167,7 @@ def project_packages(
 
     import json
 
-    deps = json.loads(manifest_file.read_text()).get("dependencies", {})
+    deps = json.loads(manifest_file.read_text(encoding="utf-8")).get("dependencies", {})
     packages = [
         {"name": n, "version": v, "local": v.startswith("file:")}
         for n, v in sorted(deps.items())

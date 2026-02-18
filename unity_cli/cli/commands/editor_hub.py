@@ -71,7 +71,7 @@ def editor_install(
     try:
         hub = HubCLI()
         hub.install_editor(version=version, modules=modules, changeset=changeset)
-        print_success(f"Installing Unity {version}")
+        print_success(f"Installed Unity {version}")
         if modules:
             print_success(f"With modules: {', '.join(modules)}")
     except HubError as e:

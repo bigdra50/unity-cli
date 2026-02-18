@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import typer
+from rich.markup import escape
 
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.exit_codes import ExitCode
@@ -67,9 +68,9 @@ def register(app: typer.Typer) -> None:
 
             print_success(f"Screenshot captured: {result.get('path')}")
             if result.get("note"):
-                print_line(f"[dim]{result.get('note')}[/dim]")
+                print_line(f"[dim]{escape(str(result.get('note')))}[/dim]")
             if result.get("camera"):
-                print_line(f"[dim]Camera: {result.get('camera')}[/dim]")
+                print_line(f"[dim]Camera: {escape(str(result.get('camera')))}[/dim]")
 
         except UnityCLIError as e:
             _handle_error(e)

@@ -40,12 +40,12 @@ def build_settings(
             print_json(result)
         else:
             rows_data = [
-                ("Target", result.get("target", "")),
-                ("Target Group", result.get("targetGroup", "")),
-                ("Product Name", result.get("productName", "")),
-                ("Company Name", result.get("companyName", "")),
-                ("Bundle Version", result.get("bundleVersion", "")),
-                ("Scripting Backend", result.get("scriptingBackend", "")),
+                ("Target", str(result.get("target", ""))),
+                ("Target Group", str(result.get("targetGroup", ""))),
+                ("Product Name", str(result.get("productName", ""))),
+                ("Company Name", str(result.get("companyName", ""))),
+                ("Bundle Version", str(result.get("bundleVersion", ""))),
+                ("Scripting Backend", str(result.get("scriptingBackend", ""))),
             ]
             scenes = result.get("scenes", [])
             rows_data.append(("Scenes", str(len(scenes))))
