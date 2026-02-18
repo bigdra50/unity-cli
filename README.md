@@ -98,7 +98,7 @@ unity state        # Short alias
 u state            # Shortest alias
 
 u play
-u console get -l E -c 10       # Last 10 error+ logs
+u console get -l E | head -10  # Last 10 error+ logs
 
 # Run Relay Server standalone
 unity-relay --port 6500
@@ -193,13 +193,13 @@ u pause
 # Console logs
 u console get                  # All logs (plain text)
 u console get -o json          # All logs (JSON format)
-u console get -v               # All logs with stack traces
+u console get -s               # All logs with stack traces
 u console get -l W             # Warning and above (warning, error, exception)
 u console get -l E             # Error and above (error, exception)
 u console get -l +W            # Warning only
 u console get -l +E+X          # Error and exception only
-u console get -c 20            # Last 20 entries
-u console get -f "error"       # Filter by text
+u console get | head -20       # Last 20 entries
+u console get | grep "error"   # Filter by text
 u console clear                # Clear console
 
 # Asset refresh
@@ -392,6 +392,8 @@ u config init --force                  # Overwrite existing
 | `--instance`, `-i` | Target Unity instance | default |
 | `--timeout`, `-t` | Timeout (seconds) | 10.0 |
 | `--json`, `-j` | Output JSON format | false |
+| `--quiet`, `-q` | Suppress success messages | false |
+| `--verbose` | Show request/response on stderr | false |
 
 ### Tests Options
 
@@ -410,6 +412,33 @@ u config init --force                  # Overwrite existing
 | `--depth`, `-d` | Hierarchy depth | 1 (root only) |
 | `--page-size` | Page size | 50 |
 | `--cursor` | Pagination cursor | 0 |
+
+## Exit Codes
+
+| Code | Name | Description |
+|------|------|-------------|
+| 0 | SUCCESS | Command completed successfully |
+| 1 | USAGE_ERROR | Invalid arguments or validation failure |
+| 2 | TRANSIENT_ERROR | Retryable: instance reloading, busy, timeout |
+| 3 | CONNECTION_ERROR | Relay Server not running or unreachable |
+| 4 | OPERATION_ERROR | Command failed (instance not found, protocol error, etc.) |
+| 5 | TEST_FAILURE | Tests ran but some failed |
+
+```bash
+u state; echo $?              # 0 = connected, 3 = relay not running
+u tests run edit; echo $?     # 0 = all passed, 5 = some failed
+u play --quiet 2>/dev/null; echo $?  # Suppress output, check exit code only
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `UNITY_CLI_QUIET` | Set to `1` to suppress success messages |
+| `UNITY_CLI_VERBOSE` | Set to `1` to log request/response to stderr |
+| `UNITY_CLI_JSON` | Set to `1` for JSON output by default |
+| `UNITY_CLI_NO_PRETTY` | Set to `1` to disable Rich formatting |
+| `NO_COLOR` | Set to disable colors (standard) |
 
 ## Claude Code Plugin (Experimental)
 

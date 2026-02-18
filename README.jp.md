@@ -98,7 +98,7 @@ unity state        # 短縮形
 u state            # 最短形
 
 u play
-u console get -l E -c 10       # 最新10件のエラー以上
+u console get -l E | head -10  # 最新10件のエラー以上
 
 # Relay Server 単体起動
 unity-relay --port 6500
@@ -191,13 +191,15 @@ u stop
 u pause
 
 # コンソールログ
-u console get                  # 全件
+u console get                  # 全件（プレーンテキスト）
+u console get -o json          # 全件（JSON形式）
+u console get -s               # スタックトレース付き
 u console get -l W             # warning以上（warning, error, exception）
 u console get -l E             # error以上（error, exception）
 u console get -l +W            # warningのみ
 u console get -l +E+X          # errorとexceptionのみ
-u console get -c 20            # 最新20件
-u console get -f "error"       # テキストでフィルタ
+u console get | head -20       # 最新20件
+u console get | grep "error"   # テキストでフィルタ
 u console clear                # コンソールクリア
 
 # アセットリフレッシュ
@@ -390,6 +392,8 @@ u config init --force                  # 既存を上書き
 | `--instance`, `-i` | 対象Unityインスタンス | デフォルト |
 | `--timeout`, `-t` | タイムアウト（秒） | 10.0 |
 | `--json`, `-j` | JSON形式で出力 | false |
+| `--quiet`, `-q` | 成功メッセージを抑制 | false |
+| `--verbose` | リクエスト/レスポンスをstderrに出力 | false |
 
 ### tests専用オプション
 
@@ -408,6 +412,33 @@ u config init --force                  # 既存を上書き
 | `--depth`, `-d` | 階層の深さ | 1（ルートのみ） |
 | `--page-size` | ページサイズ | 50 |
 | `--cursor` | ページネーションカーソル | 0 |
+
+## 終了コード
+
+| コード | 名前 | 説明 |
+|--------|------|------|
+| 0 | SUCCESS | コマンド成功 |
+| 1 | USAGE_ERROR | 不正な引数、バリデーション失敗 |
+| 2 | TRANSIENT_ERROR | リトライ可能: リロード中、ビジー、タイムアウト |
+| 3 | CONNECTION_ERROR | Relay Server未起動・接続不可 |
+| 4 | OPERATION_ERROR | コマンド失敗（インスタンス未検出、プロトコルエラー等） |
+| 5 | TEST_FAILURE | テスト実行は完了したが一部失敗 |
+
+```bash
+u state; echo $?              # 0 = 接続中, 3 = relay未起動
+u tests run edit; echo $?     # 0 = 全通過, 5 = 一部失敗
+u play --quiet 2>/dev/null; echo $?  # 出力抑制、終了コードのみ確認
+```
+
+## 環境変数
+
+| 変数 | 説明 |
+|------|------|
+| `UNITY_CLI_QUIET` | `1` で成功メッセージを抑制 |
+| `UNITY_CLI_VERBOSE` | `1` でリクエスト/レスポンスをstderrに出力 |
+| `UNITY_CLI_JSON` | `1` でデフォルトJSON出力 |
+| `UNITY_CLI_NO_PRETTY` | `1` でRich装飾を無効化 |
+| `NO_COLOR` | 設定でカラーを無効化（標準） |
 
 ## Claude Code プラグイン（試験的）
 

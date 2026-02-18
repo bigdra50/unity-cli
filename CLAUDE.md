@@ -31,12 +31,13 @@ u screenshot -s game -p ./out.png
 # Console commands (adb logcat style levels)
 u console get                             # All logs (plain text)
 u console get -o json                     # All logs (JSON format)
-u console get -v                          # All logs with stack traces
+u console get -s                          # All logs with stack traces
 u console get -l W                        # Warning and above
 u console get -l E                        # Error and above
 u console get -l +W                       # Warning only
 u console get -l +E+X                     # Error and exception only
-u console get -l E -c 10                  # Last 10 error+ logs
+u console get -l E | head -10             # Last 10 error+ logs
+u console get | grep "NullRef"            # Filter by text
 u console clear                           # Clear console
 
 # Scene commands
