@@ -27,8 +27,14 @@ UI Toolkit および uGUI によるUI開発を支援する。ツリー検査と�
 ## CLI Setup
 
 ```bash
+# グローバルインストール済みの場合
 u <command>
+
+# uvx 経由（インストール不要）
+uvx --from git+https://github.com/bigdra50/unity-cli u <command>
 ```
+
+以下のワークフロー内では `u` コマンドを使用する。
 
 ## Decision Criteria
 
@@ -84,7 +90,7 @@ u uitree dump                 # パネル一覧
 
 ```bash
 u uitree dump -p "GameView"            # テキスト形式
-u uitree dump -p "GameView" -o json    # JSON形式
+u uitree dump -p "GameView" --json     # JSON形式
 u uitree dump -p "GameView" -d 3       # 深さ3まで
 ```
 
@@ -209,7 +215,7 @@ u uitree inspect ref_N --style
 ```bash
 u uitree query -p "GameView" -n "Button"     # 名前で広く
 u uitree query -p "GameView" -t Button       # タイプで
-u uitree dump -p "GameView" -o json          # 全ツリー
+u uitree dump -p "GameView" --json           # 全ツリー
 ```
 
 ### スタイル競合
@@ -255,7 +261,8 @@ UI Issue / Layout Question (uGUI)
   ▼
 ┌─────────────────────────────┐
 │ Step 1: Find Canvas         │
-│ u gameobject find "Canvas"  │
+│ u gameobject find           │
+│   --name "Canvas"           │
 │ u scene hierarchy -d 3      │
 └──────────┬──────────────────┘
            ▼
@@ -276,7 +283,7 @@ UI Issue / Layout Question (uGUI)
 ### Step 1: Canvas の発見
 
 ```bash
-u gameobject find "Canvas"           # Canvas を検索
+u gameobject find --name "Canvas"    # Canvas を検索
 u scene hierarchy -d 3               # 上位3階層で UI 構造を把握
 ```
 

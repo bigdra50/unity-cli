@@ -30,7 +30,7 @@ u screenshot -s game -p ./out.png
 
 # Console commands (adb logcat style levels)
 u console get                             # All logs (plain text)
-u console get -o json                     # All logs (JSON format)
+u console get --json                      # All logs (JSON format)
 u console get -s                          # All logs with stack traces
 u console get -l W                        # Warning and above
 u console get -l E                        # Error and above
@@ -43,7 +43,8 @@ u console clear                           # Clear console
 # Scene commands
 u scene active                            # Get active scene info
 u scene hierarchy                         # Get scene hierarchy
-u scene load <path>                       # Load a scene
+u scene load --path <path>                # Load by path
+u scene load --name <name>                # Load by name
 u scene save                              # Save current scene
 
 # Test commands
@@ -53,26 +54,30 @@ u tests list edit                         # List EditMode tests
 u tests status                            # Check test status
 
 # GameObject commands
-u gameobject find <name>                  # Find GameObjects
-u gameobject create <name>                # Create GameObject
+u gameobject find --name <name>           # Find by name
+u gameobject find --id <id>               # Find by instance ID
+u gameobject create --name <name>         # Create GameObject
 u gameobject modify -n <name> --position 0 1 0  # Modify transform
 u gameobject active -n <name> --active    # Activate GameObject
 u gameobject active -n <name> --no-active # Deactivate GameObject
-u gameobject delete <name>                # Delete GameObject
+u gameobject delete --name <name>         # Delete GameObject
 
 # Component commands
-u component list <gameobject>             # List components
-u component inspect <gameobject> <type>   # Inspect properties
-u component add <gameobject> <type>       # Add component
+u component list --target <gameobject>    # List components
+u component inspect --target <gameobject> --type <type>  # Inspect properties
+u component add --target <gameobject> --type <type>      # Add component
 u component modify -t <go> -T <type> --prop <name> --value <val>  # Modify property
-u component remove <gameobject> <type>    # Remove component
+u component remove --target <gameobject> --type <type>   # Remove component
 
 # Menu commands
 u menu exec "Window/General/Console"      # Execute menu item
+u menu list                               # List menu items
+u menu list -f "Window"                   # Filter menu items
+u menu context <method>                   # Execute context menu
 
 # Asset commands
-u asset prefab <gameobject> <path>        # Create prefab
-u asset scriptable-object <type> <path>   # Create ScriptableObject
+u asset prefab --source <gameobject> --path <path>        # Create prefab
+u asset scriptable-object --type <type> --path <path>     # Create ScriptableObject
 u asset info <path>                       # Get asset info
 u asset deps <path>                       # Get dependencies
 u asset deps <path> --no-recursive        # Direct dependencies only
@@ -121,6 +126,11 @@ u uitree text ref_7                      # Get element text
 # Standalone tools (no Relay required)
 u config show                             # Show configuration
 u project info                            # Project info
+u project version                         # Project Unity version
+u project packages                        # List manifest packages
+u project assemblies                      # List assembly definitions
+u project quality                         # Quality settings
+u project tags                            # Tags, layers, sorting layers
 u editor list                             # List installed editors
 u editor install <version>                # Install via Hub
 u open                                    # Open project
