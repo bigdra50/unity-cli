@@ -27,8 +27,14 @@ UI Toolkit および uGUI によるUI開発を支援する。ツリー検査と�
 ## CLI Setup
 
 ```bash
+# グローバルインストール済みの場合
 u <command>
+
+# uvx 経由（インストール不要）
+uvx --from git+https://github.com/bigdra50/unity-cli u <command>
 ```
+
+以下のワークフロー内では `u` コマンドを使用する。
 
 ## Decision Criteria
 

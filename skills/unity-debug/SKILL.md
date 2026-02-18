@@ -13,8 +13,14 @@ user-invocable: true
 ## CLI Setup
 
 ```bash
+# グローバルインストール済みの場合
 u <command>
+
+# uvx 経由（インストール不要）
+uvx --from git+https://github.com/bigdra50/unity-cli u <command>
 ```
+
+以下のワークフロー内では `u` コマンドを使用する。
 
 ## Investigation Flow
 
