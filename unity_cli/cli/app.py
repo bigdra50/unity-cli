@@ -448,11 +448,11 @@ def console_get(
     ] = None,
     count: Annotated[
         int | None,
-        typer.Option("--count", "-c", help="Number of logs to retrieve (default: all)"),
+        typer.Option("--count", "-c", hidden=True, help="[Deprecated] Use: u console get | head -N"),
     ] = None,
     filter_text: Annotated[
         str | None,
-        typer.Option("--filter", "-f", help="Text to filter logs"),
+        typer.Option("--filter", "-f", hidden=True, help="[Deprecated] Use: u console get | grep PATTERN"),
     ] = None,
     stacktrace: Annotated[
         bool,
@@ -485,6 +485,10 @@ def console_get(
     include_stacktrace = stacktrace or verbose_legacy
     if verbose_legacy:
         print_warning("--verbose/-v is deprecated for 'console get'. Use --stacktrace/-s instead.")
+    if count is not None:
+        print_warning("--count/-c is deprecated. Use: u console get | head -N")
+    if filter_text is not None:
+        print_warning("--filter/-f is deprecated. Use: u console get | grep PATTERN")
 
     try:
         # Parse level option to types list
