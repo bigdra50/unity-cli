@@ -509,11 +509,16 @@ class RelayServer:
             ).to_dict()
         if self._instance_needs_wait(result):
             status_label = result.status.value if hasattr(result.status, "value") else str(result.status)
-            return ErrorMessage.from_code(
-                request_id,
+            error_code = (
                 ErrorCode.INSTANCE_RELOADING
                 if result.status == InstanceStatus.RELOADING
-                else ErrorCode.INSTANCE_NOT_FOUND,
+                else ErrorCode.INSTANCE_DISCONNECTED
+                if result.status == InstanceStatus.DISCONNECTED
+                else ErrorCode.INSTANCE_NOT_FOUND
+            )
+            return ErrorMessage.from_code(
+                request_id,
+                error_code,
                 f"Instance not ready after {waited_ms}ms: {result.instance_id} ({status_label}). Retry after a few seconds.",
             ).to_dict()
         if waited_ms > 0:

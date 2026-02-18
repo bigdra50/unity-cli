@@ -220,7 +220,7 @@ class RelayConnection:
         except json.JSONDecodeError as e:
             raise ProtocolError(f"Invalid JSON response: {e}", "MALFORMED_JSON") from e
 
-    _RETRYABLE_CODES = frozenset({"INSTANCE_RELOADING", "INSTANCE_BUSY", "TIMEOUT"})
+    _RETRYABLE_CODES = frozenset({"INSTANCE_RELOADING", "INSTANCE_BUSY", "TIMEOUT", "INSTANCE_DISCONNECTED"})
 
     def send_request(
         self,
@@ -358,6 +358,7 @@ class RelayConnection:
             "AMBIGUOUS_INSTANCE",
             "INSTANCE_RELOADING",
             "INSTANCE_BUSY",
+            "INSTANCE_DISCONNECTED",
         }
     )
 
