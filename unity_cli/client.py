@@ -118,6 +118,7 @@ class RelayConnection:
         retry_max_time_ms: int = 30000,
         on_retry: RetryCallback | None = None,
         on_version_info: Callable[[str, str], None] | None = None,
+        on_send: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
     ) -> None:
         """Initialize relay connection.
 
@@ -132,6 +133,7 @@ class RelayConnection:
             retry_max_time_ms: Maximum total retry time in milliseconds (default: 30000).
             on_retry: Optional callback(code, message, attempt, backoff_ms) for retry events.
             on_version_info: Optional callback(relay_version, bridge_version) called once on first success.
+            on_send: Optional callback(request, response) called after each successful exchange.
         """
         self.host = host
         self.port = port
@@ -143,6 +145,7 @@ class RelayConnection:
         self.retry_max_time_ms = retry_max_time_ms
         self.on_retry = on_retry
         self.on_version_info = on_version_info
+        self.on_send = on_send
         self._version_info_called = False
         self._client_id = _generate_client_id()
 
@@ -351,7 +354,15 @@ class RelayConnection:
                     "TIMEOUT",
                 ) from e
 
-            return self._handle_response(response, command)
+            result = self._handle_response(response, command)
+
+            if self.on_send:
+                try:
+                    self.on_send(message, response)
+                except Exception:
+                    pass
+
+            return result
 
         finally:
             sock.close()
@@ -570,6 +581,7 @@ class UnityClient:
         retry_max_time_ms: int = 30000,
         on_retry: RetryCallback | None = None,
         on_version_info: Callable[[str, str], None] | None = None,
+        on_send: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
     ) -> None:
         """Initialize Unity client.
 
@@ -584,6 +596,7 @@ class UnityClient:
             retry_max_time_ms: Maximum total retry time in milliseconds (default: 30000).
             on_retry: Optional callback(code, message, attempt, backoff_ms) for retry events.
             on_version_info: Optional callback(relay_version, bridge_version) called once on first success.
+            on_send: Optional callback(request, response) called after each successful exchange.
         """
         self._conn = RelayConnection(
             host=relay_host,
@@ -596,6 +609,7 @@ class UnityClient:
             retry_max_time_ms=retry_max_time_ms,
             on_retry=on_retry,
             on_version_info=on_version_info,
+            on_send=on_send,
         )
 
         # Lazy import to avoid circular dependencies

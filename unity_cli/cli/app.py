@@ -77,6 +77,15 @@ def _on_retry_callback(code: str, message: str, attempt: int, backoff_ms: int) -
         )
 
 
+def _on_send_verbose(request: dict[str, Any], response: dict[str, Any]) -> None:
+    """Callback for --verbose: dump request/response to stderr."""
+    import json
+    import sys
+
+    sys.stderr.write(f">>> {json.dumps(request, ensure_ascii=False)}\n")
+    sys.stderr.write(f"<<< {json.dumps(response, ensure_ascii=False)}\n")
+
+
 # =============================================================================
 # Context Object
 # =============================================================================
@@ -90,6 +99,7 @@ class CLIContext:
     client: UnityClient
     output: OutputConfig = OutputConfig(mode=OutputMode.PRETTY)
     quiet: bool = False
+    verbose: bool = False
 
 
 # =============================================================================
@@ -161,6 +171,14 @@ def main(
             envvar="UNITY_CLI_QUIET",
         ),
     ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            help="Show request/response on stderr",
+            envvar="UNITY_CLI_VERBOSE",
+        ),
+    ] = False,
 ) -> None:
     """Unity CLI - Control Unity Editor via Relay Server."""
     # Resolve output mode and configure consoles
@@ -194,6 +212,7 @@ def main(
         retry_max_ms=config.retry_max_ms,
         retry_max_time_ms=config.retry_max_time_ms,
         on_retry=_on_retry_callback,
+        on_send=_on_send_verbose if verbose else None,
     )
 
     # Store in context for sub-commands
@@ -202,6 +221,7 @@ def main(
         client=client,
         output=output_config,
         quiet=quiet,
+        verbose=verbose,
     )
 
 
