@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unity_cli.cli.app import _VERBOSE_MAX_LEN, _mask_sensitive, _truncate_json
+from unity_cli.cli.context import _VERBOSE_MAX_LEN, _mask_sensitive, _truncate_json
 
 
 class TestMaskSensitive:
