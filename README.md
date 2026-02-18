@@ -6,6 +6,8 @@
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com/)
 [![openupm](https://img.shields.io/npm/v/com.bigdra50.unity-bridge?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.bigdra50.unity-bridge/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bigdra50/unity-cli)
+[![Complexity](https://img.shields.io/badge/complexity-A%2FB-brightgreen)](https://github.com/bigdra50/unity-cli/actions/workflows/ci.yml)
+[![Maintainability](https://img.shields.io/badge/maintainability-A-brightgreen)](https://github.com/bigdra50/unity-cli/actions/workflows/ci.yml)
 
 [日本語版](README.jp.md)
 
