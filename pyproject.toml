@@ -38,6 +38,8 @@ dev = [
     "ruff>=0.14.13",
     "pre-commit>=4.0",
     "import-linter>=2.1",
+    "radon>=6.0",
+    "xenon>=0.9",
 ]
 
 [tool.pytest.ini_options]

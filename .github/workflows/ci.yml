@@ -45,6 +45,33 @@ jobs:
             uvx ruff format --check $DIRS
           fi
 
+  complexity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run radon complexity report
+        run: |
+          echo "## Cyclomatic Complexity"
+          uv run radon cc relay/ unity_cli/ -a -s -n C
+          echo ""
+          echo "## Maintainability Index"
+          uv run radon mi relay/ unity_cli/ -s -n B
+
+      - name: Run xenon complexity gate
+        run: uv run pre-commit run xenon --all-files
+
   architecture:
     runs-on: ubuntu-latest
     steps:

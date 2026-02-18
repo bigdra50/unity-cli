@@ -220,6 +220,8 @@ class RelayConnection:
         except json.JSONDecodeError as e:
             raise ProtocolError(f"Invalid JSON response: {e}", "MALFORMED_JSON") from e
 
+    _RETRYABLE_CODES = frozenset({"INSTANCE_RELOADING", "INSTANCE_BUSY", "TIMEOUT", "INSTANCE_DISCONNECTED"})
+
     def send_request(
         self,
         command: str,
@@ -229,32 +231,7 @@ class RelayConnection:
         retry_max_ms: int | None = None,
         retry_max_time_ms: int | None = None,
     ) -> dict[str, Any]:
-        """Send REQUEST message with exponential backoff retry.
-
-        Implements retry for transient errors:
-        - INSTANCE_RELOADING: Unity is reloading
-        - INSTANCE_BUSY: Unity is processing another command
-        - TIMEOUT: Command timed out
-
-        Args:
-            command: Command name.
-            params: Command parameters.
-            timeout_ms: Command timeout in milliseconds (default: instance setting).
-            retry_initial_ms: Initial retry interval (default: instance setting).
-            retry_max_ms: Maximum retry interval (default: instance setting).
-            retry_max_time_ms: Maximum total retry time (default: instance setting).
-
-        Returns:
-            Response data dictionary.
-
-        Raises:
-            TimeoutError: If max retry time exceeded.
-            ConnectionError: If cannot connect to relay server.
-            ProtocolError: If protocol error occurs.
-            InstanceError: If instance error (non-retryable).
-            UnityCLIError: If command fails.
-        """
-        # Use instance defaults if not specified
+        """Send REQUEST message with exponential backoff retry."""
         timeout_ms = timeout_ms if timeout_ms is not None else self.timeout_ms
         retry_initial_ms = retry_initial_ms if retry_initial_ms is not None else self.retry_initial_ms
         retry_max_ms = retry_max_ms if retry_max_ms is not None else self.retry_max_ms
@@ -263,8 +240,6 @@ class RelayConnection:
         request_id = _generate_request_id(self._client_id)
         start_time = time.time()
         attempt = 0
-
-        retryable_codes = {"INSTANCE_RELOADING", "INSTANCE_BUSY", "TIMEOUT"}
 
         while True:
             elapsed_ms = (time.time() - start_time) * 1000
@@ -277,28 +252,36 @@ class RelayConnection:
 
             try:
                 return self._send_request_once(request_id, command, params, timeout_ms)
-
             except (InstanceError, TimeoutError) as e:
-                error_code = getattr(e, "code", "UNKNOWN")
-
-                if error_code not in retryable_codes:
-                    raise
-
-                backoff_ms = min(retry_initial_ms * (2**attempt), retry_max_ms)
-
-                if elapsed_ms + backoff_ms >= retry_max_time_ms:
-                    raise TimeoutError(
-                        f"Max retry time would be exceeded for '{command}' "
-                        f"(elapsed: {elapsed_ms:.0f}ms, next backoff: {backoff_ms}ms)",
-                        "RETRY_TIMEOUT",
-                    ) from e
-
-                # Notify via callback if provided (no direct stderr output)
-                if self.on_retry:
-                    self.on_retry(error_code, e.message, attempt + 1, backoff_ms)
-
-                time.sleep(backoff_ms / 1000)
+                self._maybe_retry(e, command, elapsed_ms, retry_initial_ms, retry_max_ms, retry_max_time_ms, attempt)
                 attempt += 1
+
+    def _maybe_retry(
+        self,
+        error: InstanceError | TimeoutError,
+        command: str,
+        elapsed_ms: float,
+        retry_initial_ms: int,
+        retry_max_ms: int,
+        retry_max_time_ms: int,
+        attempt: int,
+    ) -> None:
+        """Check if error is retryable and sleep, or re-raise."""
+        error_code = getattr(error, "code", "UNKNOWN")
+        if error_code not in self._RETRYABLE_CODES:
+            raise error
+
+        backoff_ms = min(retry_initial_ms * (2**attempt), retry_max_ms)
+        if elapsed_ms + backoff_ms >= retry_max_time_ms:
+            raise TimeoutError(
+                f"Max retry time would be exceeded for '{command}' "
+                f"(elapsed: {elapsed_ms:.0f}ms, next backoff: {backoff_ms}ms)",
+                "RETRY_TIMEOUT",
+            ) from error
+
+        if self.on_retry:
+            self.on_retry(error_code, error.message, attempt + 1, backoff_ms)
+        time.sleep(backoff_ms / 1000)
 
     def _send_request_once(
         self,
@@ -369,65 +352,68 @@ class RelayConnection:
         finally:
             sock.close()
 
+    _INSTANCE_ERROR_CODES = frozenset(
+        {
+            "INSTANCE_NOT_FOUND",
+            "AMBIGUOUS_INSTANCE",
+            "INSTANCE_RELOADING",
+            "INSTANCE_BUSY",
+            "INSTANCE_DISCONNECTED",
+        }
+    )
+
     def _handle_response(self, response: dict[str, Any], command: str) -> dict[str, Any]:
-        """Handle RESPONSE or ERROR message from relay server.
-
-        Args:
-            response: Response message dictionary.
-            command: Original command name (for error messages).
-
-        Returns:
-            Response data dictionary.
-
-        Raises:
-            InstanceError: For instance-related errors.
-            TimeoutError: For timeout errors.
-            ProtocolError: For unexpected message types.
-            UnityCLIError: For other errors.
-        """
+        """Handle RESPONSE or ERROR message from relay server."""
         msg_type = response.get("type")
 
         if msg_type == "ERROR":
-            error = response.get("error", {})
-            code = error.get("code", "UNKNOWN_ERROR")
-            message = error.get("message", "Unknown error")
-
-            if code == "INSTANCE_NOT_FOUND":
-                raise InstanceError(message, code)
-            if code == "AMBIGUOUS_INSTANCE":
-                raise InstanceError(message, code)
-            if code == "INSTANCE_RELOADING":
-                raise InstanceError(message, code)
-            if code == "INSTANCE_BUSY":
-                raise InstanceError(message, code)
-            if code == "TIMEOUT":
-                raise TimeoutError(message, code)
-            raise UnityCLIError(message, code)
+            self._raise_error(response)
 
         if msg_type == "RESPONSE":
-            if not response.get("success", False):
-                error_info = response.get("error", {})
-                error_msg = error_info.get("message", f"{command} failed") if error_info else f"{command} failed"
-                error_code = error_info.get("code", "COMMAND_FAILED") if error_info else "COMMAND_FAILED"
-                raise UnityCLIError(error_msg, error_code)
-            # Version info callback (once per RelayConnection instance)
-            if self.on_version_info and not self._version_info_called:
-                relay_version = response.get("relay_version", "")
-                bridge_version = response.get("bridge_version", "")
-                if relay_version or bridge_version:
-                    try:
-                        self.on_version_info(relay_version, bridge_version)
-                    except Exception:
-                        pass
-                    self._version_info_called = True
+            return self._handle_success_response(response, command)
+
+        if msg_type == "INSTANCES":
             data: dict[str, Any] = response.get("data", {})
             return data
 
-        if msg_type == "INSTANCES":
-            data = response.get("data", {})
-            return data
-
         raise ProtocolError(f"Unexpected response type: {msg_type}", "PROTOCOL_ERROR")
+
+    def _raise_error(self, response: dict[str, Any]) -> None:
+        """Raise appropriate exception from ERROR response."""
+        error = response.get("error", {})
+        code = error.get("code", "UNKNOWN_ERROR")
+        message = error.get("message", "Unknown error")
+
+        if code in self._INSTANCE_ERROR_CODES:
+            raise InstanceError(message, code)
+        if code == "TIMEOUT":
+            raise TimeoutError(message, code)
+        raise UnityCLIError(message, code)
+
+    def _handle_success_response(self, response: dict[str, Any], command: str) -> dict[str, Any]:
+        """Handle successful RESPONSE message."""
+        if not response.get("success", False):
+            error_info = response.get("error", {})
+            error_msg = error_info.get("message", f"{command} failed") if error_info else f"{command} failed"
+            error_code = error_info.get("code", "COMMAND_FAILED") if error_info else "COMMAND_FAILED"
+            raise UnityCLIError(error_msg, error_code)
+
+        self._try_version_info_callback(response)
+        data: dict[str, Any] = response.get("data", {})
+        return data
+
+    def _try_version_info_callback(self, response: dict[str, Any]) -> None:
+        """Invoke version info callback once."""
+        if not self.on_version_info or self._version_info_called:
+            return
+        relay_version = response.get("relay_version", "")
+        bridge_version = response.get("bridge_version", "")
+        if relay_version or bridge_version:
+            try:
+                self.on_version_info(relay_version, bridge_version)
+            except Exception:
+                pass
+            self._version_info_called = True
 
     def _send_admin_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Send an admin message (LIST_INSTANCES, SET_DEFAULT) without retry.

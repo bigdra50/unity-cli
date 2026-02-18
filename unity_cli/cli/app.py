@@ -516,15 +516,9 @@ def console_get(
     context: CLIContext = ctx.obj
 
     include_stacktrace = stacktrace or verbose_legacy
-    if verbose_legacy:
-        print_warning("--verbose/-v is deprecated for 'console get'. Use --stacktrace/-s instead.")
-    if count is not None:
-        print_warning("--count/-c is deprecated. Use: u console get | head -N")
-    if filter_text is not None:
-        print_warning("--filter/-f is deprecated. Use: u console get | grep PATTERN")
+    _warn_deprecated_console_opts(verbose_legacy, count, filter_text)
 
     try:
-        # Parse level option to types list
         types = _parse_level(level) if level else None
         result = context.client.console.get(
             types=types,
@@ -536,18 +530,28 @@ def console_get(
         if _should_json(context, json_flag):
             print_json(result, None)
         else:
-            # Plain text output: timestamp type message
-            entries = result.get("entries", [])
-            for entry in entries:
-                ts = entry.get("timestamp", "")
-                log_type = entry.get("type", "log")
-                msg = entry.get("message", "")
-                print_line(f"{ts} {log_type} {msg}")
-                if include_stacktrace and entry.get("stackTrace"):
-                    for st_line in entry["stackTrace"].split("\n"):
-                        print_line(f"  {st_line}")
+            _print_console_entries(result.get("entries", []), include_stacktrace)
     except UnityCLIError as e:
         _handle_error(e)
+
+
+def _warn_deprecated_console_opts(verbose_legacy: bool, count: int | None, filter_text: str | None) -> None:
+    deprecations = [
+        (verbose_legacy, "--verbose/-v is deprecated for 'console get'. Use --stacktrace/-s instead."),
+        (count is not None, "--count/-c is deprecated. Use: u console get | head -N"),
+        (filter_text is not None, "--filter/-f is deprecated. Use: u console get | grep PATTERN"),
+    ]
+    for cond, msg in deprecations:
+        if cond:
+            print_warning(msg)
+
+
+def _print_console_entries(entries: list[dict[str, Any]], include_stacktrace: bool) -> None:
+    for entry in entries:
+        print_line(f"{entry.get('timestamp', '')} {entry.get('type', 'log')} {entry.get('message', '')}")
+        if include_stacktrace and entry.get("stackTrace"):
+            for st_line in entry["stackTrace"].split("\n"):
+                print_line(f"  {st_line}")
 
 
 @console_app.command("clear")
@@ -1975,87 +1979,74 @@ def uitree_inspect(
         if _should_json(context, json_flag):
             print_json(result, None)
         else:
-            elem = result
-
-            # Header: ref Type "name"
-            elem_ref = elem.get("ref", "")
-            elem_type = elem.get("type", "VisualElement")
-            elem_name = elem.get("name", "")
-            header_parts = []
-            if elem_ref:
-                header_parts.append(elem_ref)
-            header_parts.append(elem_type)
-            if elem_name:
-                header_parts.append(f'"{elem_name}"')
-            print_line(" ".join(header_parts))
-
-            # Classes
-            classes = elem.get("classes", [])
-            if classes:
-                print_line(f"  classes: {' '.join('.' + c for c in classes)}")
-
-            # Properties
-            if "visible" in elem:
-                print_line(f"  visible: {elem['visible']}")
-            if "enabledSelf" in elem:
-                hierarchy = elem.get("enabledInHierarchy")
-                if hierarchy is not None:
-                    print_line(f"  enabled: {elem['enabledSelf']} (hierarchy: {hierarchy})")
-                else:
-                    print_line(f"  enabled: {elem['enabledSelf']}")
-            if "focusable" in elem:
-                print_line(f"  focusable: {elem['focusable']}")
-
-            # Layout
-            layout = elem.get("layout")
-            if layout:
-                x = layout.get("x", 0)
-                y = layout.get("y", 0)
-                w = layout.get("width", 0)
-                h = layout.get("height", 0)
-                print_line(f"  layout: ({x}, {y}, {w}x{h})")
-
-            # WorldBound
-            world_bound = elem.get("worldBound")
-            if world_bound:
-                x = world_bound.get("x", 0)
-                y = world_bound.get("y", 0)
-                w = world_bound.get("width", 0)
-                h = world_bound.get("height", 0)
-                print_line(f"  worldBound: ({x}, {y}, {w}x{h})")
-
-            # Child count
-            child_count = elem.get("childCount")
-            if child_count is not None:
-                print_line(f"  childCount: {child_count}")
-
-            # Path
-            path = elem.get("path", "")
-            if path:
-                print_line(f"  path: {path}")
-
-            # Style section
-            style_data = elem.get("resolvedStyle")
-            if style_data and isinstance(style_data, dict):
-                print_line("\n  resolvedStyle:")
-                for k, v in style_data.items():
-                    print_line(f"  {k}: {v}")
-
-            # Children section
-            children_data = elem.get("children")
-            if children_data and isinstance(children_data, list):
-                print_line("\n  children:")
-                for child in children_data:
-                    child_ref = child.get("ref", "")
-                    child_type = child.get("type", "VisualElement")
-                    child_name = child.get("name", "")
-                    parts = ["  " + child_ref, child_type]
-                    if child_name:
-                        parts.append(f'"{child_name}"')
-                    print_line(" ".join(parts))
+            _print_uitree_element(result)
 
     except UnityCLIError as e:
         _handle_error(e)
+
+
+def _format_rect(rect: dict[str, Any], label: str) -> str:
+    return f"  {label}: ({rect.get('x', 0)}, {rect.get('y', 0)}, {rect.get('width', 0)}x{rect.get('height', 0)})"
+
+
+def _print_uitree_element(elem: dict[str, Any]) -> None:
+    """Print a UI Toolkit element in human-readable format."""
+    _print_uitree_header(elem)
+    _print_uitree_properties(elem)
+    _print_uitree_style(elem.get("resolvedStyle"))
+    _print_uitree_children(elem.get("children"))
+
+
+def _print_uitree_header(elem: dict[str, Any]) -> None:
+    header_parts = [p for p in [elem.get("ref", ""), elem.get("type", "VisualElement")] if p]
+    elem_name = elem.get("name", "")
+    if elem_name:
+        header_parts.append(f'"{elem_name}"')
+    print_line(" ".join(header_parts))
+
+    classes = elem.get("classes", [])
+    if classes:
+        print_line(f"  classes: {' '.join('.' + c for c in classes)}")
+
+
+def _print_uitree_properties(elem: dict[str, Any]) -> None:
+    for key in ("visible", "focusable"):
+        if key in elem:
+            print_line(f"  {key}: {elem[key]}")
+
+    if "enabledSelf" in elem:
+        suffix = f" (hierarchy: {elem['enabledInHierarchy']})" if "enabledInHierarchy" in elem else ""
+        print_line(f"  enabled: {elem['enabledSelf']}{suffix}")
+
+    for key, label in [("layout", "layout"), ("worldBound", "worldBound")]:
+        rect = elem.get(key)
+        if rect:
+            print_line(_format_rect(rect, label))
+
+    for key in ("childCount", "path"):
+        val = elem.get(key)
+        if val is not None and val != "":
+            print_line(f"  {key}: {val}")
+
+
+def _print_uitree_style(style_data: Any) -> None:
+    if not style_data or not isinstance(style_data, dict):
+        return
+    print_line("\n  resolvedStyle:")
+    for k, v in style_data.items():
+        print_line(f"  {k}: {v}")
+
+
+def _print_uitree_children(children_data: Any) -> None:
+    if not children_data or not isinstance(children_data, list):
+        return
+    print_line("\n  children:")
+    for child in children_data:
+        parts = ["  " + child.get("ref", ""), child.get("type", "VisualElement")]
+        child_name = child.get("name", "")
+        if child_name:
+            parts.append(f'"{child_name}"')
+        print_line(" ".join(parts))
 
 
 @uitree_app.command("click")
@@ -2331,62 +2322,65 @@ def project_info(
         if _should_json(context, json_flag):
             print_json(info.to_dict())
         else:
-            from rich.panel import Panel
-            from rich.table import Table
-
-            # Basic info
-            if is_no_color():
-                print_line(f"{info.settings.product_name} ({info.path})")
-            else:
-                get_console().print(Panel(f"[bold]{info.settings.product_name}[/bold]", subtitle=str(info.path)))
-            print_line(f"Company: {info.settings.company_name}")
-            print_line(f"Version: {info.settings.version}")
-            print_line(f"Unity: {info.unity_version.version}")
-            if info.unity_version.revision:
-                print_line(f"Revision: [dim]{info.unity_version.revision}[/dim]")
-            print_line(f"Screen: {info.settings.default_screen_width}x{info.settings.default_screen_height}")
-            print_line("")
-
-            # Build scenes
-            if info.build_settings.scenes:
-                if is_no_color():
-                    rows = [
-                        [str(i), scene.path, "yes" if scene.enabled else "no"]
-                        for i, scene in enumerate(info.build_settings.scenes)
-                    ]
-                    _print_plain_table(["#", "Path", "Enabled"], rows, "Build Scenes")
-                else:
-                    scene_table = Table(title="Build Scenes")
-                    scene_table.add_column("#", style="dim")
-                    scene_table.add_column("Path")
-                    scene_table.add_column("Enabled")
-                    for i, scene in enumerate(info.build_settings.scenes):
-                        enabled = "[green]✓[/green]" if scene.enabled else "[red]✗[/red]"
-                        scene_table.add_row(str(i), scene.path, enabled)
-                    get_console().print(scene_table)
-                print_line("")
-
-            # Packages
-            if info.packages.dependencies:
-                if is_no_color():
-                    rows = [
-                        [pkg.name, pkg.version, "local" if pkg.is_local else ""] for pkg in info.packages.dependencies
-                    ]
-                    _print_plain_table(
-                        ["Name", "Version", "Local"], rows, f"Packages ({len(info.packages.dependencies)})"
-                    )
-                else:
-                    pkg_table = Table(title=f"Packages ({len(info.packages.dependencies)})")
-                    pkg_table.add_column("Name", style="cyan")
-                    pkg_table.add_column("Version")
-                    pkg_table.add_column("Local")
-                    for pkg in info.packages.dependencies:
-                        local = "[yellow]local[/yellow]" if pkg.is_local else ""
-                        pkg_table.add_row(pkg.name, pkg.version, local)
-                    get_console().print(pkg_table)
+            _print_project_info(info)
 
     except ProjectError as e:
         _handle_error(e)
+
+
+def _print_project_info(info: Any) -> None:
+    from rich.panel import Panel
+
+    if is_no_color():
+        print_line(f"{info.settings.product_name} ({info.path})")
+    else:
+        get_console().print(Panel(f"[bold]{info.settings.product_name}[/bold]", subtitle=str(info.path)))
+    print_line(f"Company: {info.settings.company_name}")
+    print_line(f"Version: {info.settings.version}")
+    print_line(f"Unity: {info.unity_version.version}")
+    if info.unity_version.revision:
+        print_line(f"Revision: [dim]{info.unity_version.revision}[/dim]")
+    print_line(f"Screen: {info.settings.default_screen_width}x{info.settings.default_screen_height}")
+    print_line("")
+
+    if info.build_settings.scenes:
+        _print_build_scenes_table(info.build_settings.scenes)
+        print_line("")
+
+    if info.packages.dependencies:
+        _print_packages_info_table(info.packages.dependencies)
+
+
+def _print_build_scenes_table(scenes: list[Any]) -> None:
+    if is_no_color():
+        rows = [[str(i), s.path, "yes" if s.enabled else "no"] for i, s in enumerate(scenes)]
+        _print_plain_table(["#", "Path", "Enabled"], rows, "Build Scenes")
+    else:
+        from rich.table import Table
+
+        t = Table(title="Build Scenes")
+        t.add_column("#", style="dim")
+        t.add_column("Path")
+        t.add_column("Enabled")
+        for i, s in enumerate(scenes):
+            t.add_row(str(i), s.path, "[green]✓[/green]" if s.enabled else "[red]✗[/red]")
+        get_console().print(t)
+
+
+def _print_packages_info_table(deps: list[Any]) -> None:
+    if is_no_color():
+        rows = [[p.name, p.version, "local" if p.is_local else ""] for p in deps]
+        _print_plain_table(["Name", "Version", "Local"], rows, f"Packages ({len(deps)})")
+    else:
+        from rich.table import Table
+
+        t = Table(title=f"Packages ({len(deps)})")
+        t.add_column("Name", style="cyan")
+        t.add_column("Version")
+        t.add_column("Local")
+        for p in deps:
+            t.add_row(p.name, p.version, "[yellow]local[/yellow]" if p.is_local else "")
+        get_console().print(t)
 
 
 @project_app.command("version")
@@ -2453,32 +2447,34 @@ def project_packages(
 
     import json
 
-    data = json.loads(manifest_file.read_text())
-    deps = data.get("dependencies", {})
-
-    packages = []
-    for name, version in sorted(deps.items()):
-        if not include_modules and name.startswith("com.unity.modules."):
-            continue
-        is_local = version.startswith("file:")
-        packages.append({"name": name, "version": version, "local": is_local})
+    deps = json.loads(manifest_file.read_text()).get("dependencies", {})
+    packages = [
+        {"name": n, "version": v, "local": v.startswith("file:")}
+        for n, v in sorted(deps.items())
+        if include_modules or not n.startswith("com.unity.modules.")
+    ]
 
     if _should_json(context, json_flag):
         print_json(packages)
     else:
-        if is_no_color():
-            rows = [[pkg["name"], pkg["version"]] for pkg in packages]
-            _print_plain_table(["Name", "Version"], rows, f"Packages ({len(packages)})")
-        else:
-            from rich.table import Table
+        _print_manifest_packages(packages)
 
-            table = Table(title=f"Packages ({len(packages)})")
-            table.add_column("Name", style="cyan")
-            table.add_column("Version")
-            for pkg in packages:
-                version_str = f"[yellow]{pkg['version']}[/yellow]" if pkg["local"] else pkg["version"]
-                table.add_row(pkg["name"], version_str)
-            get_console().print(table)
+
+def _print_manifest_packages(packages: list[dict[str, Any]]) -> None:
+    title = f"Packages ({len(packages)})"
+    if is_no_color():
+        rows = [[pkg["name"], pkg["version"]] for pkg in packages]
+        _print_plain_table(["Name", "Version"], rows, title)
+    else:
+        from rich.table import Table
+
+        table = Table(title=title)
+        table.add_column("Name", style="cyan")
+        table.add_column("Version")
+        for pkg in packages:
+            v = f"[yellow]{pkg['version']}[/yellow]" if pkg["local"] else pkg["version"]
+            table.add_row(pkg["name"], v)
+        get_console().print(table)
 
 
 @project_app.command("tags")
@@ -2514,36 +2510,36 @@ def project_tags(
             }
         )
     else:
-        from rich.table import Table
+        _print_tag_layer_settings(settings)
 
-        # Tags
-        if settings.tags:
-            print_line("[bold]Tags:[/bold]")
-            for tag in settings.tags:
-                print_line(f"  - {tag}")
-            print_line("")
-        else:
-            print_line("[dim]No custom tags[/dim]")
-            print_line("")
 
-        # Layers
-        if is_no_color():
-            rows = [[str(idx), name] for idx, name in settings.layers]
-            _print_plain_table(["#", "Name"], rows, "Layers")
-        else:
-            layer_table = Table(title="Layers")
-            layer_table.add_column("#", style="dim", width=3)
-            layer_table.add_column("Name", style="cyan")
-            for idx, name in settings.layers:
-                layer_table.add_row(str(idx), name)
-            get_console().print(layer_table)
-        print_line("")
+def _print_tag_layer_settings(settings: Any) -> None:
+    from rich.table import Table
 
-        # Sorting Layers
-        if settings.sorting_layers:
-            print_line("[bold]Sorting Layers:[/bold]")
-            for i, layer in enumerate(settings.sorting_layers):
-                print_line(f"  {i}: {layer}")
+    if settings.tags:
+        print_line("[bold]Tags:[/bold]")
+        for tag in settings.tags:
+            print_line(f"  - {tag}")
+    else:
+        print_line("[dim]No custom tags[/dim]")
+    print_line("")
+
+    if is_no_color():
+        rows = [[str(idx), name] for idx, name in settings.layers]
+        _print_plain_table(["#", "Name"], rows, "Layers")
+    else:
+        layer_table = Table(title="Layers")
+        layer_table.add_column("#", style="dim", width=3)
+        layer_table.add_column("Name", style="cyan")
+        for idx, name in settings.layers:
+            layer_table.add_row(str(idx), name)
+        get_console().print(layer_table)
+    print_line("")
+
+    if settings.sorting_layers:
+        print_line("[bold]Sorting Layers:[/bold]")
+        for i, layer in enumerate(settings.sorting_layers):
+            print_line(f"  {i}: {layer}")
 
 
 @project_app.command("quality")
@@ -2831,43 +2827,45 @@ def selection(
         if _should_json(context, json_flag):
             print_json(result)
         else:
-            count = result.get("count", 0)
-            if count == 0:
-                print_line("[dim]No objects selected[/dim]")
-                return
-
-            print_line(f"[bold]Selected: {count} object(s)[/bold]\n")
-
-            active_go = result.get("activeGameObject")
-            if active_go:
-                print_line("[cyan]Active GameObject:[/cyan]")
-                print_line(f"  Name: {escape(str(active_go.get('name', '')))}")
-                print_line(f"  Instance ID: {active_go.get('instanceID')}")
-                print_line(f"  Tag: {escape(str(active_go.get('tag', '')))}")
-                print_line(f"  Layer: {escape(str(active_go.get('layerName', '')))} ({active_go.get('layer')})")
-                print_line(f"  Path: {escape(str(active_go.get('scenePath', '')))}")
-
-            active_transform = result.get("activeTransform")
-            if active_transform:
-                pos = active_transform.get("position", [])
-                rot = active_transform.get("rotation", [])
-                scale = active_transform.get("scale", [])
-                print_line("\n[cyan]Transform:[/cyan]")
-                if pos:
-                    print_line(f"  Position: ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})")
-                if rot:
-                    print_line(f"  Rotation: ({rot[0]:.2f}, {rot[1]:.2f}, {rot[2]:.2f})")
-                if scale:
-                    print_line(f"  Scale: ({scale[0]:.2f}, {scale[1]:.2f}, {scale[2]:.2f})")
-
-            game_objects = result.get("gameObjects", [])
-            if len(game_objects) > 1:
-                print_line(f"\n[cyan]All Selected GameObjects ({len(game_objects)}):[/cyan]")
-                for go in game_objects:
-                    print_line(f"  - {escape(str(go.get('name', '')))} (ID: {go.get('instanceID')})")
+            _print_selection(result)
 
     except UnityCLIError as e:
         _handle_error(e)
+
+
+def _print_selection(result: dict[str, Any]) -> None:
+    count = result.get("count", 0)
+    if count == 0:
+        print_line("[dim]No objects selected[/dim]")
+        return
+
+    print_line(f"[bold]Selected: {count} object(s)[/bold]\n")
+
+    active_go = result.get("activeGameObject")
+    if active_go:
+        print_line("[cyan]Active GameObject:[/cyan]")
+        for label, key in [("Name", "name"), ("Instance ID", "instanceID"), ("Tag", "tag")]:
+            print_line(f"  {label}: {escape(str(active_go.get(key, '')))}")
+        print_line(f"  Layer: {escape(str(active_go.get('layerName', '')))} ({active_go.get('layer')})")
+        print_line(f"  Path: {escape(str(active_go.get('scenePath', '')))}")
+
+    _print_transform(result.get("activeTransform"))
+
+    game_objects = result.get("gameObjects", [])
+    if len(game_objects) > 1:
+        print_line(f"\n[cyan]All Selected GameObjects ({len(game_objects)}):[/cyan]")
+        for go in game_objects:
+            print_line(f"  - {escape(str(go.get('name', '')))} (ID: {go.get('instanceID')})")
+
+
+def _print_transform(transform: dict[str, Any] | None) -> None:
+    if not transform:
+        return
+    print_line("\n[cyan]Transform:[/cyan]")
+    for label, key in [("Position", "position"), ("Rotation", "rotation"), ("Scale", "scale")]:
+        vec = transform.get(key, [])
+        if vec:
+            print_line(f"  {label}: ({vec[0]:.2f}, {vec[1]:.2f}, {vec[2]:.2f})")
 
 
 # =============================================================================

@@ -15,6 +15,7 @@ import enum
 import json
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -298,34 +299,51 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
         print_line("No Unity instances connected")
         return
 
-    # Detect duplicate project names to decide whether to show path
     project_names = [inst.get("project_name", "") for inst in instances]
     has_duplicates = len(project_names) != len(set(project_names))
-    cwd = os.getcwd()
 
     if console.no_color:
-        headers = ["#", "Project"]
+        _print_instances_plain(instances, has_duplicates)
+    else:
+        _print_instances_rich(instances, has_duplicates)
+
+
+def _print_instances_plain(instances: list[dict[str, Any]], has_duplicates: bool) -> None:
+    cwd = os.getcwd()
+    headers = ["#", "Project"]
+    if has_duplicates:
+        headers.append("Path")
+    headers.extend(["Version", "Status", "Default"])
+
+    rows: list[list[str]] = []
+    for inst in instances:
+        row: list[str] = [
+            str(inst.get("ref_id", "")),
+            inst.get("project_name", inst.get("instance_id", "Unknown")),
+        ]
         if has_duplicates:
-            headers.append("Path")
-        headers.extend(["Version", "Status", "Default"])
+            row.append(os.path.relpath(inst.get("instance_id", ""), cwd))
+        row.extend(
+            [
+                inst.get("unity_version", "Unknown"),
+                inst.get("status", "unknown"),
+                "*" if inst.get("is_default") else "",
+            ]
+        )
+        rows.append(row)
+    _print_plain_table(headers, rows, f"Connected Instances ({len(instances)})")
 
-        rows: list[list[str]] = []
-        for inst in instances:
-            ref_id = str(inst.get("ref_id", ""))
-            project = inst.get("project_name", inst.get("instance_id", "Unknown"))
-            version = inst.get("unity_version", "Unknown")
-            status = inst.get("status", "unknown")
-            is_default = "*" if inst.get("is_default") else ""
 
-            row = [ref_id, project]
-            if has_duplicates:
-                row.append(os.path.relpath(inst.get("instance_id", ""), cwd))
-            row.extend([version, status, is_default])
-            rows.append(row)
+_STATUS_STYLES: dict[str, str] = {
+    "ready": "green",
+    "busy": "yellow",
+    "reloading": "magenta",
+    "disconnected": "red",
+}
 
-        _print_plain_table(headers, rows, f"Connected Instances ({len(instances)})")
-        return
 
+def _print_instances_rich(instances: list[dict[str, Any]], has_duplicates: bool) -> None:
+    cwd = os.getcwd()
     table = Table(title=f"Connected Instances ({len(instances)})")
     table.add_column("#", style="dim", justify="right", no_wrap=True)
     table.add_column("Project", style="cyan", no_wrap=True)
@@ -336,26 +354,20 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
     table.add_column("Default", justify="center")
 
     for inst in instances:
-        ref_id = str(inst.get("ref_id", ""))
-        project = escape(inst.get("project_name", inst.get("instance_id", "Unknown")))
-        instance_id = inst.get("instance_id", "")
-        version = escape(inst.get("unity_version", "Unknown"))
         status = inst.get("status", "unknown")
-        is_default = "[green]*[/green]" if inst.get("is_default") else ""
-
-        status_style = {
-            "ready": "green",
-            "busy": "yellow",
-            "reloading": "magenta",
-            "disconnected": "red",
-        }.get(status.lower(), "dim")
-
-        row_items: list[str | Text] = [ref_id, project]
+        row_items: list[str | Text] = [
+            str(inst.get("ref_id", "")),
+            escape(inst.get("project_name", inst.get("instance_id", "Unknown"))),
+        ]
         if has_duplicates:
-            rel_path = os.path.relpath(instance_id, cwd)
-            row_items.append(escape(rel_path))
-        row_items.extend([version, Text(escape(status), style=status_style), is_default])
-
+            row_items.append(escape(os.path.relpath(inst.get("instance_id", ""), cwd)))
+        row_items.extend(
+            [
+                escape(inst.get("unity_version", "Unknown")),
+                Text(escape(status), style=_STATUS_STYLES.get(status.lower(), "dim")),
+                "[green]*[/green]" if inst.get("is_default") else "",
+            ]
+        )
         table.add_row(*row_items)
 
     console.print(table)
@@ -407,56 +419,48 @@ def print_logs_table(logs: list[dict[str, Any]]) -> None:
     console.print(table)
 
 
+def _format_hierarchy_row(
+    item: dict[str, Any],
+    show_components: bool,
+    escape_fn: Callable[[str], str] | None = None,
+) -> list[str]:
+    """Build a single row for hierarchy table."""
+    depth = item.get("depth", 0)
+    indent = "  " * depth
+    raw_name = f"{indent}{item.get('name', 'Unknown')}"
+    name = escape_fn(raw_name) if escape_fn else raw_name
+    row = [name, str(item.get("instanceID", "")), str(item.get("childCount", 0))]
+    if show_components:
+        components = item.get("components", [])
+        parts = [escape_fn(str(c)) for c in components[:3]] if escape_fn else [str(c) for c in components[:3]]
+        row.append(", ".join(parts) + ("..." if len(components) > 3 else ""))
+    return row
+
+
 def print_hierarchy_table(items: list[dict[str, Any]], show_components: bool = False) -> None:
     """Print scene hierarchy as a formatted table."""
     if not items:
         print_line("No GameObjects in hierarchy")
         return
 
+    title = f"Scene Hierarchy ({len(items)} objects)"
+
     if console.no_color:
         headers = ["Name", "ID", "Children"]
         if show_components:
             headers.append("Components")
-
-        rows: list[list[str]] = []
-        for item in items:
-            depth = item.get("depth", 0)
-            indent = "  " * depth
-            name = f"{indent}{item.get('name', 'Unknown')}"
-            instance_id = str(item.get("instanceID", ""))
-            child_count = str(item.get("childCount", 0))
-            row = [name, instance_id, child_count]
-            if show_components:
-                components = item.get("components", [])
-                comp_str = ", ".join(components[:3])
-                row.append(comp_str + ("..." if len(components) > 3 else ""))
-            rows.append(row)
-
-        _print_plain_table(headers, rows, f"Scene Hierarchy ({len(items)} objects)")
+        rows = [_format_hierarchy_row(item, show_components) for item in items]
+        _print_plain_table(headers, rows, title)
         return
 
-    table = Table(title=f"Scene Hierarchy ({len(items)} objects)")
+    table = Table(title=title)
     table.add_column("Name", style="cyan")
     table.add_column("ID", style="dim", justify="right")
     table.add_column("Children", justify="center")
     if show_components:
         table.add_column("Components", style="green")
-
     for item in items:
-        depth = item.get("depth", 0)
-        indent = "  " * depth
-        name = escape(f"{indent}{item.get('name', 'Unknown')}")
-        instance_id = str(item.get("instanceID", ""))
-        child_count = str(item.get("childCount", 0))
-
-        row = [name, instance_id, child_count]
-        if show_components:
-            components = item.get("components", [])
-            comp_str = ", ".join(escape(c) for c in components[:3])
-            row.append(comp_str + ("..." if len(components) > 3 else ""))
-
-        table.add_row(*row)
-
+        table.add_row(*_format_hierarchy_row(item, show_components, escape))
     console.print(table)
 
 
@@ -494,52 +498,46 @@ def print_components_table(components: list[dict[str, Any]]) -> None:
     console.print(table)
 
 
+def _format_duration(duration: Any) -> str:
+    return f"{duration:.3f}s" if isinstance(duration, float) else str(duration)
+
+
+_TEST_RESULT_STYLES: dict[str, str] = {
+    "Passed": "green",
+    "Failed": "red",
+    "Skipped": "yellow",
+    "Inconclusive": "magenta",
+}
+
+
 def print_test_results_table(results: list[dict[str, Any]]) -> None:
     """Print test results as a formatted table."""
     if not results:
         print_line("No test results")
         return
 
-    passed = sum(1 for r in results if r.get("result") == "Passed")
-    failed = sum(1 for r in results if r.get("result") == "Failed")
-    skipped = sum(1 for r in results if r.get("result") == "Skipped")
-
-    title = f"Test Results (Passed: {passed}, Failed: {failed}, Skipped: {skipped})"
+    counts = {s: sum(1 for r in results if r.get("result") == s) for s in ("Passed", "Failed", "Skipped")}
+    title = f"Test Results (Passed: {counts['Passed']}, Failed: {counts['Failed']}, Skipped: {counts['Skipped']})"
 
     if console.no_color:
-        headers = ["Test", "Result", "Duration"]
-        rows: list[list[str]] = []
-        for test in results:
-            name = test.get("name", "Unknown")
-            result = test.get("result", "Unknown")
-            duration = test.get("duration", 0)
-            duration_str = f"{duration:.3f}s" if isinstance(duration, float) else str(duration)
-            rows.append([name, result, duration_str])
-        _print_plain_table(headers, rows, title)
+        rows = [
+            [t.get("name", "Unknown"), t.get("result", "Unknown"), _format_duration(t.get("duration", 0))]
+            for t in results
+        ]
+        _print_plain_table(["Test", "Result", "Duration"], rows, title)
         return
 
     table = Table(title=title)
     table.add_column("Test", style="cyan", overflow="fold")
     table.add_column("Result", justify="center")
     table.add_column("Duration", justify="right")
-
-    result_styles = {
-        "Passed": "green",
-        "Failed": "red",
-        "Skipped": "yellow",
-        "Inconclusive": "magenta",
-    }
-
     for test in results:
-        name = escape(test.get("name", "Unknown"))
         result = test.get("result", "Unknown")
-        duration = test.get("duration", 0)
-
-        style = result_styles.get(result, "dim")
-        duration_str = f"{duration:.3f}s" if isinstance(duration, float) else str(duration)
-
-        table.add_row(name, Text(escape(result), style=style), duration_str)
-
+        table.add_row(
+            escape(test.get("name", "Unknown")),
+            Text(escape(result), style=_TEST_RESULT_STYLES.get(result, "dim")),
+            _format_duration(test.get("duration", 0)),
+        )
     console.print(table)
 
 

@@ -624,6 +624,7 @@ Unity                          Relay                          CLI
 ### CLI Retry Strategy (Exponential Backoff)
 
 ```
+リトライ対象エラーコード: INSTANCE_RELOADING, INSTANCE_BUSY, TIMEOUT, INSTANCE_DISCONNECTED
 リトライ間隔: 500ms → 1000ms → 2000ms → 4000ms → 8000ms (max)
 最大リトライ時間: 30秒
 ```

@@ -391,66 +391,63 @@ class InstanceRegistry:
             for instance in self._instances.values()
         ]
 
+    def _unique_match(self, matches: list[UnityInstance], query: str) -> UnityInstance | None:
+        """Return single match, raise on ambiguity, return None on no match."""
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise AmbiguousInstanceError(query, matches)
+        return None
+
+    def _resolve_by_ref_id(self, query: str) -> UnityInstance | None:
+        """Stage 0: resolve by numeric ref_id."""
+        try:
+            query_ref_id = int(query)
+        except ValueError:
+            return None
+        for inst in self._instances.values():
+            if inst.ref_id == query_ref_id:
+                return inst
+        return None
+
+    @staticmethod
+    def _is_path_suffix(instance_id: str, query: str) -> bool:
+        return instance_id.endswith("/" + query) or instance_id.endswith("\\" + query)
+
+    def _fuzzy_match(self, query: str) -> UnityInstance | None:
+        """Stage 2-4: project_name exact → path suffix → name prefix."""
+        all_inst = list(self._instances.values())
+
+        result = self._unique_match([i for i in all_inst if i.project_name == query], query)
+        if result:
+            return result
+
+        result = self._unique_match([i for i in all_inst if self._is_path_suffix(i.instance_id, query)], query)
+        if result:
+            return result
+
+        return self._unique_match([i for i in all_inst if i.project_name.startswith(query)], query)
+
     def _resolve_instance(self, query: str) -> UnityInstance | None:
         """Resolve an instance by 5-stage matching.
 
-        Priority:
-            0. ref_id (integer query)
-            1. instance_id exact match
-            2. project_name exact match
-            3. instance_id suffix match (path ends with query)
-            4. project_name prefix match
-
-        Each stage: 1 match → return, multiple → AmbiguousInstanceError, 0 → next stage.
-
-        Raises:
-            AmbiguousInstanceError: When multiple instances match at the same priority level.
+        Priority: ref_id → exact id → exact name → path suffix → name prefix.
+        Each stage: 1 match → return, multiple → AmbiguousInstanceError, 0 → next.
         """
-        # Stage 0: ref_id match (integer query)
-        try:
-            query_ref_id = int(query)
-            for inst in self._instances.values():
-                if inst.ref_id == query_ref_id:
-                    return inst
-        except ValueError:
-            pass
+        ref_match = self._resolve_by_ref_id(query)
+        if ref_match:
+            return ref_match
 
-        # Stage 1: instance_id exact match
         exact = self._instances.get(query)
         if exact:
             return exact
 
-        # Stage 2: project_name exact match
-        name_matches = [i for i in self._instances.values() if i.project_name == query]
-        if len(name_matches) == 1:
-            return name_matches[0]
-        if len(name_matches) > 1:
-            raise AmbiguousInstanceError(query, name_matches)
-
-        # Stage 3: instance_id suffix match (path ending)
-        suffix_matches = [
-            i
-            for i in self._instances.values()
-            if i.instance_id.endswith("/" + query) or i.instance_id.endswith("\\" + query)
-        ]
-        if len(suffix_matches) == 1:
-            return suffix_matches[0]
-        if len(suffix_matches) > 1:
-            raise AmbiguousInstanceError(query, suffix_matches)
-
-        # Stage 4: project_name prefix match
-        prefix_matches = [i for i in self._instances.values() if i.project_name.startswith(query)]
-        if len(prefix_matches) == 1:
-            return prefix_matches[0]
-        if len(prefix_matches) > 1:
-            raise AmbiguousInstanceError(query, prefix_matches)
-
-        return None
+        return self._fuzzy_match(query)
 
     def get_instance_for_request(self, instance_id: str | None = None) -> UnityInstance | None:
         """Get the instance to handle a request.
 
-        If instance_id is provided, resolves via 4-stage matching.
+        If instance_id is provided, resolves via 5-stage matching.
         Otherwise, returns the default instance.
 
         Raises:
