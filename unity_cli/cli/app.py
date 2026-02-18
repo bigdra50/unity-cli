@@ -37,6 +37,7 @@ from unity_cli.cli.output import (
     print_validation_error,
     print_warning,
     resolve_output_mode,
+    set_quiet,
 )
 from unity_cli.client import UnityClient
 from unity_cli.config import CONFIG_FILE_NAME, UnityCLIConfig
@@ -88,6 +89,7 @@ class CLIContext:
     config: UnityCLIConfig
     client: UnityClient
     output: OutputConfig = OutputConfig(mode=OutputMode.PRETTY)
+    quiet: bool = False
 
 
 # =============================================================================
@@ -150,12 +152,22 @@ def main(
             help="Force pretty or plain output",
         ),
     ] = None,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+            "--quiet",
+            "-q",
+            help="Suppress success messages (errors still go to stderr)",
+            envvar="UNITY_CLI_QUIET",
+        ),
+    ] = False,
 ) -> None:
     """Unity CLI - Control Unity Editor via Relay Server."""
     # Resolve output mode and configure consoles
     output_mode = resolve_output_mode(pretty_flag=pretty_flag)
     configure_output(output_mode)
     output_config = OutputConfig(mode=output_mode)
+    set_quiet(quiet)
 
     # Load config from file
     config = UnityCLIConfig.load()
@@ -189,6 +201,7 @@ def main(
         config=config,
         client=client,
         output=output_config,
+        quiet=quiet,
     )
 
 

@@ -88,6 +88,18 @@ def resolve_output_mode(
 
 
 _current_mode: OutputMode = OutputMode.PRETTY
+_quiet: bool = False
+
+
+def set_quiet(quiet: bool) -> None:
+    """Enable or disable quiet mode (suppresses print_success)."""
+    global _quiet
+    _quiet = quiet
+
+
+def is_quiet() -> bool:
+    """Return True when quiet mode is active."""
+    return _quiet
 
 
 def configure_output(mode: OutputMode) -> None:
@@ -234,11 +246,10 @@ def print_validation_error(message: str, help_command: str) -> None:
 
 
 def print_success(message: str) -> None:
-    """Print success message.
+    """Print success message. Suppressed when quiet mode is active."""
+    if _quiet:
+        return
 
-    Args:
-        message: Success message
-    """
     if console.no_color:
         print(f"[OK] {message}")
         return
