@@ -37,6 +37,7 @@ dev = [
     "mypy>=1.19.1",
     "ruff>=0.14.13",
     "pre-commit>=4.0",
+    "import-linter>=2.1",
 ]
 
 [tool.pytest.ini_options]
@@ -102,3 +103,34 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.importlinter]
+root_packages = ["relay", "unity_cli"]
+
+[[tool.importlinter.contracts]]
+name = "relay and unity_cli are independent"
+type = "independence"
+modules = ["relay", "unity_cli"]
+
+[[tool.importlinter.contracts]]
+name = "unity_cli layer ordering"
+type = "layers"
+layers = [
+    "unity_cli.cli",
+    "unity_cli.hub | unity_cli.api | unity_cli.client",
+    "unity_cli.models | unity_cli.config | unity_cli.exceptions",
+]
+# client <-> api は TYPE_CHECKING + 遅延importによる意図的な相互参照
+ignore_imports = [
+    "unity_cli.client -> unity_cli.api",
+    "unity_cli.api.* -> unity_cli.client",
+]
+
+[[tool.importlinter.contracts]]
+name = "relay layer ordering"
+type = "layers"
+layers = [
+    "relay.server",
+    "relay.instance_registry | relay.request_cache",
+    "relay.status_file | relay.protocol",
+]
