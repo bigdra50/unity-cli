@@ -54,6 +54,12 @@ def _handle_error(e: UnityCLIError) -> None:
     raise typer.Exit(exit_code_for(e)) from None
 
 
+def _exit_usage(message: str, usage: str) -> None:
+    """Print a validation error and exit with USAGE_ERROR."""
+    print_validation_error(message, usage)
+    raise typer.Exit(ExitCode.USAGE_ERROR) from None
+
+
 # =============================================================================
 # Retry Callback
 # =============================================================================
@@ -619,8 +625,7 @@ def scene_load(
     context: CLIContext = ctx.obj
 
     if not path and not name:
-        print_validation_error("--path or --name required", "u scene load")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--path or --name required", "u scene load")
 
     try:
         result = context.client.scene.load(path=path, name=name, additive=additive)
@@ -870,8 +875,7 @@ def gameobject_find(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject find")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--name or --id required", "u gameobject find")
 
     try:
         result = context.client.gameobject.find(name=name, instance_id=id)
@@ -946,8 +950,7 @@ def gameobject_modify(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject modify")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--name or --id required", "u gameobject modify")
 
     try:
         result = context.client.gameobject.modify(
@@ -976,8 +979,7 @@ def gameobject_active(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject active")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--name or --id required", "u gameobject active")
 
     try:
         result = context.client.gameobject.set_active(
@@ -1000,8 +1002,7 @@ def gameobject_delete(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject delete")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--name or --id required", "u gameobject delete")
 
     try:
         result = context.client.gameobject.delete(name=name, instance_id=id)
@@ -1032,8 +1033,7 @@ def component_list(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component list")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--target or --target-id required", "u component list")
 
     try:
         result = context.client.component.list(target=target, target_id=target_id)
@@ -1060,8 +1060,7 @@ def component_inspect(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component inspect")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--target or --target-id required", "u component inspect")
 
     try:
         result = context.client.component.inspect(
@@ -1088,8 +1087,7 @@ def component_add(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component add")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--target or --target-id required", "u component add")
 
     try:
         result = context.client.component.add(
@@ -1127,8 +1125,7 @@ def component_modify(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component modify")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--target or --target-id required", "u component modify")
 
     parsed_value = _parse_cli_value(value)
 
@@ -1156,8 +1153,7 @@ def component_remove(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component remove")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--target or --target-id required", "u component remove")
 
     try:
         result = context.client.component.remove(
@@ -1264,8 +1260,7 @@ def asset_prefab(
     context: CLIContext = ctx.obj
 
     if not source and source_id is None:
-        print_validation_error("--source or --source-id required", "u asset prefab")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--source or --source-id required", "u asset prefab")
 
     try:
         result = context.client.asset.create_prefab(
@@ -1964,8 +1959,7 @@ def uitree_inspect(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree inspect")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree inspect")
 
     try:
         result = context.client.uitree.inspect(
@@ -2099,16 +2093,13 @@ def uitree_click(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree click")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree click")
 
     if button not in (0, 1, 2):
-        print_validation_error("--button must be 0 (left), 1 (right), or 2 (middle)", "u uitree click")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--button must be 0 (left), 1 (right), or 2 (middle)", "u uitree click")
 
     if count < 1:
-        print_validation_error("--count must be a positive integer (>= 1)", "u uitree click")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--count must be a positive integer (>= 1)", "u uitree click")
 
     try:
         result = context.client.uitree.click(
@@ -2170,12 +2161,10 @@ def uitree_scroll(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree scroll")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree scroll")
 
     if to is None and x is None and y is None:
-        print_validation_error("--x/--y or --to parameter required", "u uitree scroll")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("--x/--y or --to parameter required", "u uitree scroll")
 
     try:
         result = context.client.uitree.scroll(
@@ -2224,8 +2213,7 @@ def uitree_text(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree text")
-        raise typer.Exit(ExitCode.USAGE_ERROR) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree text")
 
     try:
         result = context.client.uitree.text(
