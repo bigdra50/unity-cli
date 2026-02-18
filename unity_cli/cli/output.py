@@ -6,7 +6,7 @@ Supports three modes:
   - JSON: Machine-readable JSON
 
 Mode resolution priority:
-  per-command --json > UNITY_CLI_JSON > --pretty/--no-pretty > UNITY_CLI_NO_PRETTY/NO_COLOR > isatty()
+  per-command --json > --pretty/--no-pretty > UNITY_CLI_JSON > UNITY_CLI_NO_PRETTY/NO_COLOR > isatty()
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from __future__ import annotations
 import enum
 import json
 import os
-import re
 import sys
 from dataclasses import dataclass
 from typing import Any
@@ -128,13 +127,15 @@ def get_err_console() -> Console:
 # Plain-text helpers
 # =============================================================================
 
-_RICH_MARKUP_RE = re.compile(r"\[/?[a-zA-Z][^\]]*\]")
-
 
 def print_line(text: str) -> None:
-    """Print a line, stripping Rich markup in non-PRETTY mode."""
+    """Print a line, stripping Rich markup in non-PRETTY mode.
+
+    Uses Rich's own markup parser to avoid stripping legitimate bracket
+    content like ``[ERROR]`` or ``[Physics]`` from server data.
+    """
     if console.no_color:
-        print(_RICH_MARKUP_RE.sub("", text))
+        print(Text.from_markup(text).plain)
     else:
         console.print(text)
 

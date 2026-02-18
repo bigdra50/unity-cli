@@ -604,13 +604,12 @@ def _poll_test_results(context: CLIContext, interval: float = 1.5) -> dict[str, 
     """
     import time
 
-    from rich.live import Live
-    from rich.text import Text as RichText
-
     try:
-        with Live(
-            RichText("Waiting for tests...", style="dim"), console=get_err_console(), refresh_per_second=2
-        ) as live:
+        if is_no_color():
+            # PLAIN/JSON mode: simple stderr polling without Rich Live
+            import sys as _sys
+
+            _sys.stderr.write("Waiting for tests...\n")
             while True:
                 time.sleep(interval)
                 status = context.client.tests.status()
@@ -621,20 +620,47 @@ def _poll_test_results(context: CLIContext, interval: float = 1.5) -> dict[str, 
                     skipped = status.get("skipped", 0)
                     started = status.get("testsStarted", 0)
                     finished = status.get("testsFinished", 0)
-
-                    progress = RichText()
-                    progress.append("Running tests ", style="bold")
-                    progress.append(f"({finished}/{started}) ", style="dim")
-                    progress.append(f"Pass:{passed}", style="green")
-                    progress.append(" ")
-                    progress.append(f"Fail:{failed}", style="red" if failed else "dim")
-                    progress.append(" ")
-                    progress.append(f"Skip:{skipped}", style="yellow" if skipped else "dim")
-                    live.update(progress)
+                    _sys.stderr.write(
+                        f"\rRunning tests ({finished}/{started}) Pass:{passed} Fail:{failed} Skip:{skipped}"
+                    )
+                    _sys.stderr.flush()
                     continue
 
-                # Test run complete or no active run
+                _sys.stderr.write("\n")
                 return status
+        else:
+            from rich.live import Live
+            from rich.text import Text as RichText
+
+            with Live(
+                RichText("Waiting for tests...", style="dim"),
+                console=get_err_console(),
+                refresh_per_second=2,
+            ) as live:
+                while True:
+                    time.sleep(interval)
+                    status = context.client.tests.status()
+
+                    if status.get("running"):
+                        passed = status.get("passed", 0)
+                        failed = status.get("failed", 0)
+                        skipped = status.get("skipped", 0)
+                        started = status.get("testsStarted", 0)
+                        finished = status.get("testsFinished", 0)
+
+                        progress = RichText()
+                        progress.append("Running tests ", style="bold")
+                        progress.append(f"({finished}/{started}) ", style="dim")
+                        progress.append(f"Pass:{passed}", style="green")
+                        progress.append(" ")
+                        progress.append(f"Fail:{failed}", style="red" if failed else "dim")
+                        progress.append(" ")
+                        progress.append(f"Skip:{skipped}", style="yellow" if skipped else "dim")
+                        live.update(progress)
+                        continue
+
+                    # Test run complete or no active run
+                    return status
     except KeyboardInterrupt:
         print_warning("Polling interrupted. Tests may still be running in Unity.")
         print_info("Use 'u tests status' to check progress.")

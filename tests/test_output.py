@@ -55,11 +55,13 @@ class TestResolveOutputMode:
             assert resolve_output_mode() is OutputMode.PLAIN
 
     def test_env_unity_cli_no_pretty(self) -> None:
-        with patch.dict(os.environ, {"UNITY_CLI_NO_PRETTY": "1"}, clear=False):
+        env = {k: v for k, v in os.environ.items() if k not in ("UNITY_CLI_JSON", "UNITY_CLI_NO_PRETTY", "NO_COLOR")}
+        with patch.dict(os.environ, {**env, "UNITY_CLI_NO_PRETTY": "1"}, clear=True):
             assert resolve_output_mode() is OutputMode.PLAIN
 
     def test_env_no_color(self) -> None:
-        with patch.dict(os.environ, {"NO_COLOR": ""}, clear=False):
+        env = {k: v for k, v in os.environ.items() if k not in ("UNITY_CLI_JSON", "UNITY_CLI_NO_PRETTY", "NO_COLOR")}
+        with patch.dict(os.environ, {**env, "NO_COLOR": ""}, clear=True):
             assert resolve_output_mode() is OutputMode.PLAIN
 
     def test_tty_true_returns_pretty(self) -> None:
@@ -124,6 +126,13 @@ class TestPlainTextOutput:
     def test_print_line_no_markup(self, capsys: pytest.CaptureFixture[str]) -> None:
         print_line("plain text")
         assert capsys.readouterr().out.strip() == "plain text"
+
+    def test_print_line_preserves_non_markup_brackets(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Non-Rich brackets like [ERROR] and [Physics] should not be stripped."""
+        print_line("[ERROR] NullReferenceException in [Physics]")
+        out = capsys.readouterr().out
+        assert "[ERROR]" in out
+        assert "[Physics]" in out
 
     def test_print_plain_table(self, capsys: pytest.CaptureFixture[str]) -> None:
         _print_plain_table(
