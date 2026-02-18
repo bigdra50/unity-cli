@@ -27,6 +27,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: xenon
+        name: xenon
+        entry: uv run xenon
+        args: [--max-absolute, B, --max-modules, B, --max-average, A, relay/, unity_cli/]
+        language: system
+        pass_filenames: false
+        types: [python]
+
       - id: import-linter
         name: import-linter
         entry: uv run lint-imports
