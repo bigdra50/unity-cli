@@ -152,6 +152,9 @@ u editor install 2022.3.10f1
 
 # Install with modules
 u editor install 2022.3.10f1 --modules android ios webgl
+
+# Install non-release version with changeset
+u editor install 6000.1.0a1 --changeset abc123
 ```
 
 ### Project Information (No Relay Server Required)
@@ -165,6 +168,7 @@ u project version ./MyUnityProject
 
 # Package list
 u project packages ./MyUnityProject
+u project packages ./MyUnityProject --include-modules  # Include built-in modules
 
 # Tags & layers
 u project tags ./MyUnityProject
@@ -192,7 +196,7 @@ u pause
 
 # Console logs
 u console get                  # All logs (plain text)
-u console get -o json          # All logs (JSON format)
+u console get --json           # All logs (JSON format)
 u console get -s               # All logs with stack traces
 u console get -l W             # Warning and above (warning, error, exception)
 u console get -l E             # Error and above (error, exception)
@@ -213,6 +217,7 @@ u screenshot                           # GameView (default)
 u screenshot -s scene                  # SceneView
 u screenshot -s camera                 # Camera.Render
 u screenshot -p ./output.png           # Custom path
+u screenshot --super-size 2            # 2x resolution (game only)
 u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
 ```
 
@@ -238,8 +243,12 @@ u tests run play
 
 # Filtering
 u tests run edit --test-names "MyTests.SampleTest"
+u tests run edit --group-pattern ".*Integration.*"
 u tests run edit --categories "Unit" "Integration"
 u tests run edit --assemblies "MyGame.Tests"
+
+# Fire and forget
+u tests run edit --no-wait
 
 # List available tests
 u tests list edit
@@ -262,7 +271,9 @@ u scene hierarchy --page-size 100    # Custom page size
 
 # Scene operations
 u scene load --name MainScene
+u scene load --path "Assets/Scenes/Sub.unity" --additive
 u scene save
+u scene save --path "Assets/Scenes/NewScene.unity"
 ```
 
 ### GameObject Operations
@@ -349,7 +360,7 @@ u uitree dump -p "Toolbar"
 u uitree dump -p "Toolbar" -d 3
 
 # JSON output
-u uitree dump -p "Toolbar" -o json
+u uitree dump -p "Toolbar" --json
 
 # Query elements by type, name, or USS class (AND conditions)
 u uitree query -p "PanelSettings" -t Button
@@ -403,7 +414,7 @@ u config init --force                  # Overwrite existing
 | `--group-pattern`, `-g` | Regex pattern for test names |
 | `--categories`, `-c` | NUnit categories |
 | `--assemblies`, `-a` | Assembly names |
-| `--sync`, `-s` | Run synchronously (EditMode only) |
+| `--no-wait` | Return immediately without waiting for results |
 
 ### Scene Hierarchy Options
 

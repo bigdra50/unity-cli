@@ -152,6 +152,9 @@ u editor install 2022.3.10f1
 
 # モジュール付きでインストール
 u editor install 2022.3.10f1 --modules android ios webgl
+
+# 非リリース版をchangeset指定でインストール
+u editor install 6000.1.0a1 --changeset abc123
 ```
 
 ### プロジェクト情報（Relay Server不要）
@@ -165,6 +168,7 @@ u project version ./MyUnityProject
 
 # パッケージ一覧
 u project packages ./MyUnityProject
+u project packages ./MyUnityProject --include-modules  # 組み込みモジュールも含める
 
 # タグ・レイヤー
 u project tags ./MyUnityProject
@@ -192,7 +196,7 @@ u pause
 
 # コンソールログ
 u console get                  # 全件（プレーンテキスト）
-u console get -o json          # 全件（JSON形式）
+u console get --json           # 全件（JSON形式）
 u console get -s               # スタックトレース付き
 u console get -l W             # warning以上（warning, error, exception）
 u console get -l E             # error以上（error, exception）
@@ -213,6 +217,7 @@ u screenshot                           # GameView（デフォルト）
 u screenshot -s scene                  # SceneView
 u screenshot -s camera                 # Camera.Render
 u screenshot -p ./output.png           # 出力パス指定
+u screenshot --super-size 2            # 2倍解像度（game only）
 u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
 ```
 
@@ -238,8 +243,12 @@ u tests run play
 
 # フィルタリング
 u tests run edit --test-names "MyTests.SampleTest"
+u tests run edit --group-pattern ".*Integration.*"
 u tests run edit --categories "Unit" "Integration"
 u tests run edit --assemblies "MyGame.Tests"
+
+# 結果を待たず即時リターン
+u tests run edit --no-wait
 
 # テスト一覧
 u tests list edit
@@ -262,7 +271,9 @@ u scene hierarchy --page-size 100    # ページサイズ指定
 
 # シーン操作
 u scene load --name MainScene
+u scene load --path "Assets/Scenes/Sub.unity" --additive
 u scene save
+u scene save --path "Assets/Scenes/NewScene.unity"
 ```
 
 ### GameObject操作
@@ -349,7 +360,7 @@ u uitree dump -p "Toolbar"
 u uitree dump -p "Toolbar" -d 3
 
 # JSON出力
-u uitree dump -p "Toolbar" -o json
+u uitree dump -p "Toolbar" --json
 
 # type/name/USSクラスで検索（AND条件）
 u uitree query -p "PanelSettings" -t Button
@@ -403,7 +414,7 @@ u config init --force                  # 既存を上書き
 | `--group-pattern`, `-g` | テスト名の正規表現パターン |
 | `--categories`, `-c` | NUnitカテゴリ |
 | `--assemblies`, `-a` | アセンブリ名 |
-| `--sync`, `-s` | 同期実行（EditModeのみ） |
+| `--no-wait` | 結果を待たず即時リターン |
 
 ### scene hierarchy オプション
 
