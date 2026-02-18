@@ -16,6 +16,7 @@ from typing import Annotated, Any
 import typer
 from rich.markup import escape
 
+from unity_cli.cli.exit_codes import ExitCode, exit_code_for
 from unity_cli.cli.output import (
     OutputConfig,
     OutputMode,
@@ -36,10 +37,28 @@ from unity_cli.cli.output import (
     print_validation_error,
     print_warning,
     resolve_output_mode,
+    set_quiet,
 )
 from unity_cli.client import UnityClient
 from unity_cli.config import CONFIG_FILE_NAME, UnityCLIConfig
 from unity_cli.exceptions import UnityCLIError
+
+# =============================================================================
+# Error Handler
+# =============================================================================
+
+
+def _handle_error(e: UnityCLIError) -> None:
+    """Print error and raise typer.Exit with the mapped exit code."""
+    print_error(e.message, e.code)
+    raise typer.Exit(exit_code_for(e)) from None
+
+
+def _exit_usage(message: str, usage: str) -> None:
+    """Print a validation error and exit with USAGE_ERROR."""
+    print_validation_error(message, usage)
+    raise typer.Exit(ExitCode.USAGE_ERROR) from None
+
 
 # =============================================================================
 # Retry Callback
@@ -62,6 +81,37 @@ def _on_retry_callback(code: str, message: str, attempt: int, backoff_ms: int) -
             f"[dim][Retry][/dim] {code}: {message} (attempt {attempt}, waiting {backoff_ms}ms)",
             style="yellow",
         )
+
+
+_SENSITIVE_KEYS = frozenset({"password", "token", "secret", "apikey", "api_key", "credential"})
+_VERBOSE_MAX_LEN = 4096
+
+
+def _mask_sensitive(obj: Any) -> Any:
+    """Recursively mask values whose keys look sensitive."""
+    if isinstance(obj, dict):
+        return {k: "***" if k.lower() in _SENSITIVE_KEYS else _mask_sensitive(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_mask_sensitive(v) for v in obj]
+    return obj
+
+
+def _truncate_json(text: str) -> str:
+    """Truncate JSON string if it exceeds the verbose limit."""
+    if len(text) <= _VERBOSE_MAX_LEN:
+        return text
+    return text[:_VERBOSE_MAX_LEN] + f"... ({len(text)} bytes, truncated)"
+
+
+def _on_send_verbose(request: dict[str, Any], response: dict[str, Any]) -> None:
+    """Callback for --verbose: dump request/response to stderr."""
+    import json
+    import sys
+
+    req_text = _truncate_json(json.dumps(_mask_sensitive(request), ensure_ascii=False))
+    res_text = _truncate_json(json.dumps(_mask_sensitive(response), ensure_ascii=False))
+    sys.stderr.write(f">>> {req_text}\n")
+    sys.stderr.write(f"<<< {res_text}\n")
 
 
 # =============================================================================
@@ -138,12 +188,30 @@ def main(
             help="Force pretty or plain output",
         ),
     ] = None,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+            "--quiet",
+            "-q",
+            help="Suppress success messages (errors still go to stderr)",
+            envvar="UNITY_CLI_QUIET",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            help="Show request/response on stderr",
+            envvar="UNITY_CLI_VERBOSE",
+        ),
+    ] = False,
 ) -> None:
     """Unity CLI - Control Unity Editor via Relay Server."""
     # Resolve output mode and configure consoles
     output_mode = resolve_output_mode(pretty_flag=pretty_flag)
     configure_output(output_mode)
     output_config = OutputConfig(mode=output_mode)
+    set_quiet(quiet)
 
     # Load config from file
     config = UnityCLIConfig.load()
@@ -170,6 +238,7 @@ def main(
         retry_max_ms=config.retry_max_ms,
         retry_max_time_ms=config.retry_max_time_ms,
         on_retry=_on_retry_callback,
+        on_send=_on_send_verbose if verbose else None,
     )
 
     # Store in context for sub-commands
@@ -229,8 +298,7 @@ def instances(
         else:
             print_instances_table(result)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @app.command()
@@ -250,8 +318,7 @@ def state(
         else:
             print_key_value(result, "Editor State")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @app.command()
@@ -262,8 +329,7 @@ def play(ctx: typer.Context) -> None:
         context.client.editor.play()
         print_success("Entered play mode")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @app.command()
@@ -274,8 +340,7 @@ def stop(ctx: typer.Context) -> None:
         context.client.editor.stop()
         print_success("Exited play mode")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @app.command()
@@ -286,8 +351,7 @@ def pause(ctx: typer.Context) -> None:
         context.client.editor.pause()
         print_success("Toggled pause")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @app.command()
@@ -298,8 +362,7 @@ def refresh(ctx: typer.Context) -> None:
         context.client.editor.refresh()
         print_success("Asset database refreshed")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -307,12 +370,28 @@ def refresh(ctx: typer.Context) -> None:
 # =============================================================================
 
 
-def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any] | str:
+_JSON_START_CHARS = frozenset('"[{tnf')  # true, null, false, or structured
+
+
+def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any] | str | None:
     """Parse a CLI string value into an appropriate Python type.
 
-    Handles: int, float, bool, JSON array, JSON object, or plain string.
+    Parse order (JSON-first):
+      1. json.loads  — handles true/false, numbers, quoted strings, arrays, objects
+      2. Legacy bool — Python-style "True"/"False" (case-insensitive)
+      3. int / float
+      4. bare string
     """
     import json
+
+    # Skip json.loads for bare strings that cannot be valid JSON.
+    # Valid JSON values start with: digit, '-', '"', '[', '{', 't', 'n', 'f'
+    if raw and (raw[0].isdigit() or raw[0] == "-" or raw[0] in _JSON_START_CHARS):
+        try:
+            parsed: int | float | bool | list[Any] | dict[str, Any] | str | None = json.loads(raw)
+            return parsed
+        except (ValueError, json.JSONDecodeError):
+            pass
 
     if raw.lower() == "true":
         return True
@@ -328,13 +407,6 @@ def _parse_cli_value(raw: str) -> int | float | bool | list[Any] | dict[str, Any
         return float(raw)
     except ValueError:
         pass
-
-    if raw.startswith(("[", "{")):
-        try:
-            parsed: list[Any] | dict[str, Any] = json.loads(raw)
-            return parsed
-        except json.JSONDecodeError:
-            pass
 
     return raw
 
@@ -409,15 +481,19 @@ def console_get(
     ] = None,
     count: Annotated[
         int | None,
-        typer.Option("--count", "-c", help="Number of logs to retrieve (default: all)"),
+        typer.Option("--count", "-c", hidden=True, help="[Deprecated] Use: u console get | head -N"),
     ] = None,
     filter_text: Annotated[
         str | None,
-        typer.Option("--filter", "-f", help="Text to filter logs"),
+        typer.Option("--filter", "-f", hidden=True, help="[Deprecated] Use: u console get | grep PATTERN"),
     ] = None,
-    verbose: Annotated[
+    stacktrace: Annotated[
         bool,
-        typer.Option("--verbose", "-v", help="Include stack traces in output"),
+        typer.Option("--stacktrace", "-s", help="Include stack traces in output"),
+    ] = False,
+    verbose_legacy: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", hidden=True, help="[Deprecated] Use --stacktrace/-s"),
     ] = False,
     json_flag: Annotated[
         bool,
@@ -431,13 +507,22 @@ def console_get(
     Examples:
         u console get              # All logs (plain text)
         u console get --json       # All logs (JSON format)
-        u console get -v           # All logs with stack traces
+        u console get -s           # All logs with stack traces
         u console get -l E         # Error and above (error + exception)
         u console get -l W         # Warning and above
         u console get -l +W        # Warning only
         u console get -l +E+X      # Error and exception only
     """
     context: CLIContext = ctx.obj
+
+    include_stacktrace = stacktrace or verbose_legacy
+    if verbose_legacy:
+        print_warning("--verbose/-v is deprecated for 'console get'. Use --stacktrace/-s instead.")
+    if count is not None:
+        print_warning("--count/-c is deprecated. Use: u console get | head -N")
+    if filter_text is not None:
+        print_warning("--filter/-f is deprecated. Use: u console get | grep PATTERN")
+
     try:
         # Parse level option to types list
         types = _parse_level(level) if level else None
@@ -445,7 +530,7 @@ def console_get(
             types=types,
             count=count,
             filter_text=filter_text,
-            include_stacktrace=verbose,
+            include_stacktrace=include_stacktrace,
         )
 
         if _should_json(context, json_flag):
@@ -458,12 +543,11 @@ def console_get(
                 log_type = entry.get("type", "log")
                 msg = entry.get("message", "")
                 print_line(f"{ts} {log_type} {msg}")
-                if verbose and entry.get("stackTrace"):
+                if include_stacktrace and entry.get("stackTrace"):
                     for st_line in entry["stackTrace"].split("\n"):
                         print_line(f"  {st_line}")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @console_app.command("clear")
@@ -474,8 +558,7 @@ def console_clear(ctx: typer.Context) -> None:
         context.client.console.clear()
         print_success("Console cleared")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -503,8 +586,7 @@ def scene_active(
         else:
             print_key_value(result, "Active Scene")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @scene_app.command("hierarchy")
@@ -531,8 +613,7 @@ def scene_hierarchy(
         else:
             print_hierarchy_table(result.get("items", []))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @scene_app.command("load")
@@ -546,15 +627,13 @@ def scene_load(
     context: CLIContext = ctx.obj
 
     if not path and not name:
-        print_validation_error("--path or --name required", "u scene load")
-        raise typer.Exit(1) from None
+        _exit_usage("--path or --name required", "u scene load")
 
     try:
         result = context.client.scene.load(path=path, name=name, additive=additive)
         print_success(result.get("message", "Scene loaded"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @scene_app.command("save")
@@ -568,8 +647,7 @@ def scene_save(
         result = context.client.scene.save(path=path)
         print_success(result.get("message", "Scene saved"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -718,10 +796,9 @@ def tests_run(
             print_key_value(final)
 
         if final.get("failed", 0) > 0:
-            raise typer.Exit(1)
+            raise typer.Exit(ExitCode.TEST_FAILURE)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @tests_app.command("list")
@@ -745,8 +822,7 @@ def tests_list(
             for t in tests:
                 print_line(f"  {escape(str(t))}")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @tests_app.command("status")
@@ -776,8 +852,7 @@ def tests_status(
                 print_line(f"  Progress: {finished}/{started}")
                 print_line(f"  Passed: {passed}  Failed: {failed}  Skipped: {skipped}")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -802,8 +877,7 @@ def gameobject_find(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject find")
-        raise typer.Exit(1) from None
+        _exit_usage("--name or --id required", "u gameobject find")
 
     try:
         result = context.client.gameobject.find(name=name, instance_id=id)
@@ -817,8 +891,7 @@ def gameobject_find(
                 obj_id = obj.get("instanceID", "")
                 print_line(f"  {obj_name} (ID: {obj_id})")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @gameobject_app.command("create")
@@ -854,8 +927,7 @@ def gameobject_create(
         )
         print_success(result.get("message", f"Created: {name}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @gameobject_app.command("modify")
@@ -880,8 +952,7 @@ def gameobject_modify(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject modify")
-        raise typer.Exit(1) from None
+        _exit_usage("--name or --id required", "u gameobject modify")
 
     try:
         result = context.client.gameobject.modify(
@@ -893,8 +964,7 @@ def gameobject_modify(
         )
         print_success(result.get("message", "Transform modified"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @gameobject_app.command("active")
@@ -911,8 +981,7 @@ def gameobject_active(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject active")
-        raise typer.Exit(1) from None
+        _exit_usage("--name or --id required", "u gameobject active")
 
     try:
         result = context.client.gameobject.set_active(
@@ -922,8 +991,7 @@ def gameobject_active(
         )
         print_success(result.get("message", f"Active set to {active}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @gameobject_app.command("delete")
@@ -936,15 +1004,13 @@ def gameobject_delete(
     context: CLIContext = ctx.obj
 
     if not name and id is None:
-        print_validation_error("--name or --id required", "u gameobject delete")
-        raise typer.Exit(1) from None
+        _exit_usage("--name or --id required", "u gameobject delete")
 
     try:
         result = context.client.gameobject.delete(name=name, instance_id=id)
         print_success(result.get("message", "GameObject deleted"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -969,8 +1035,7 @@ def component_list(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component list")
-        raise typer.Exit(1) from None
+        _exit_usage("--target or --target-id required", "u component list")
 
     try:
         result = context.client.component.list(target=target, target_id=target_id)
@@ -979,8 +1044,7 @@ def component_list(
         else:
             print_components_table(result.get("components", []))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @component_app.command("inspect")
@@ -998,8 +1062,7 @@ def component_inspect(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component inspect")
-        raise typer.Exit(1) from None
+        _exit_usage("--target or --target-id required", "u component inspect")
 
     try:
         result = context.client.component.inspect(
@@ -1012,8 +1075,7 @@ def component_inspect(
         else:
             print_key_value(result, component_type)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @component_app.command("add")
@@ -1027,8 +1089,7 @@ def component_add(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component add")
-        raise typer.Exit(1) from None
+        _exit_usage("--target or --target-id required", "u component add")
 
     try:
         result = context.client.component.add(
@@ -1038,8 +1099,7 @@ def component_add(
         )
         print_success(result.get("message", "Component added"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @component_app.command("modify")
@@ -1067,8 +1127,7 @@ def component_modify(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component modify")
-        raise typer.Exit(1) from None
+        _exit_usage("--target or --target-id required", "u component modify")
 
     parsed_value = _parse_cli_value(value)
 
@@ -1082,8 +1141,7 @@ def component_modify(
         )
         print_success(result.get("message", "Property modified"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @component_app.command("remove")
@@ -1097,8 +1155,7 @@ def component_remove(
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
-        print_validation_error("--target or --target-id required", "u component remove")
-        raise typer.Exit(1) from None
+        _exit_usage("--target or --target-id required", "u component remove")
 
     try:
         result = context.client.component.remove(
@@ -1108,8 +1165,7 @@ def component_remove(
         )
         print_success(result.get("message", "Component removed"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -1133,10 +1189,9 @@ def menu_exec(
             print_success(result.get("message", f"Executed: {path}"))
         else:
             print_error(result.get("message", f"Failed: {path}"))
-            raise typer.Exit(1) from None
+            raise typer.Exit(ExitCode.OPERATION_ERROR) from None
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @menu_app.command("list")
@@ -1167,8 +1222,7 @@ def menu_list(
             for item in items:
                 print_line(f"  {escape(str(item))}")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @menu_app.command("context")
@@ -1186,8 +1240,7 @@ def menu_context(
         result = context.client.menu.context(method=method, target=target)
         print_success(result.get("message", f"Executed: {method}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -1209,8 +1262,7 @@ def asset_prefab(
     context: CLIContext = ctx.obj
 
     if not source and source_id is None:
-        print_validation_error("--source or --source-id required", "u asset prefab")
-        raise typer.Exit(1) from None
+        _exit_usage("--source or --source-id required", "u asset prefab")
 
     try:
         result = context.client.asset.create_prefab(
@@ -1220,8 +1272,7 @@ def asset_prefab(
         )
         print_success(result.get("message", f"Prefab created: {path}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @asset_app.command("scriptable-object")
@@ -1239,8 +1290,7 @@ def asset_scriptable_object(
         )
         print_success(result.get("message", f"ScriptableObject created: {path}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @asset_app.command("info")
@@ -1261,8 +1311,7 @@ def asset_info(
         else:
             print_key_value(result, path)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @asset_app.command("deps")
@@ -1295,8 +1344,7 @@ def asset_deps(
                 print_line(f"  {dep.get('path')}")
                 print_line(f"    [dim]type: {dep.get('type')}[/dim]")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @asset_app.command("refs")
@@ -1326,8 +1374,7 @@ def asset_refs(
                     print_line(f"  {ref.get('path')}")
                     print_line(f"    [dim]type: {ref.get('type')}[/dim]")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -1381,8 +1428,7 @@ def build_settings(
                 for i, s in enumerate(scenes):
                     print_line(f"  {i}: {s}")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @build_app.command("run")
@@ -1440,10 +1486,9 @@ def build_run(
                     print_line(f"  [{style}]{msg_type}: {msg_content}[/{style}]")
 
             if build_result != "Succeeded":
-                raise typer.Exit(1) from None
+                raise typer.Exit(ExitCode.OPERATION_ERROR) from None
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @build_app.command("scenes")
@@ -1482,8 +1527,7 @@ def build_scenes(
                     table.add_row(str(i), s.get("path", ""), enabled, s.get("guid", ""))
                 get_console().print(table)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -1534,8 +1578,7 @@ def package_list(
                     )
                 get_console().print(table)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @package_app.command("add")
@@ -1549,8 +1592,7 @@ def package_add(
         result = context.client.package.add(name)
         print_success(result.get("message", f"Package added: {name}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @package_app.command("remove")
@@ -1564,8 +1606,7 @@ def package_remove(
         result = context.client.package.remove(name)
         print_success(result.get("message", f"Package removed: {name}"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -1596,8 +1637,7 @@ def profiler_status(
             print_line(f"Profiler: {status_text}")
             print_line(f"Frame range: {result.get('firstFrameIndex', -1)} - {result.get('lastFrameIndex', -1)}")
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @profiler_app.command("start")
@@ -1611,8 +1651,7 @@ def profiler_start(ctx: typer.Context) -> None:
         if warning:
             print_warning(warning)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @profiler_app.command("stop")
@@ -1623,8 +1662,7 @@ def profiler_stop(ctx: typer.Context) -> None:
         result = context.client.profiler.stop()
         print_success(result.get("message", "Profiler stopped"))
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @profiler_app.command("snapshot")
@@ -1670,8 +1708,7 @@ def profiler_snapshot(
                     table.add_row(*r)
                 get_console().print(table)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @profiler_app.command("frames")
@@ -1725,8 +1762,7 @@ def profiler_frames(
                     table.add_row(*r)
                 get_console().print(table)
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -1796,8 +1832,7 @@ def uitree_dump(
                 print_line(f"  [{ctx_type}] {p_name} ({p_count} elements)")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @uitree_app.command("query")
@@ -1882,8 +1917,7 @@ def uitree_query(
                 print_line("")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @uitree_app.command("inspect")
@@ -1927,8 +1961,7 @@ def uitree_inspect(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree inspect")
-        raise typer.Exit(1) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree inspect")
 
     try:
         result = context.client.uitree.inspect(
@@ -2022,8 +2055,7 @@ def uitree_inspect(
                     print_line(" ".join(parts))
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @uitree_app.command("click")
@@ -2063,16 +2095,13 @@ def uitree_click(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree click")
-        raise typer.Exit(1) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree click")
 
     if button not in (0, 1, 2):
-        print_validation_error("--button must be 0 (left), 1 (right), or 2 (middle)", "u uitree click")
-        raise typer.Exit(1) from None
+        _exit_usage("--button must be 0 (left), 1 (right), or 2 (middle)", "u uitree click")
 
     if count < 1:
-        print_validation_error("--count must be a positive integer (>= 1)", "u uitree click")
-        raise typer.Exit(1) from None
+        _exit_usage("--count must be a positive integer (>= 1)", "u uitree click")
 
     try:
         result = context.client.uitree.click(
@@ -2089,8 +2118,7 @@ def uitree_click(
         print_line(f"{elem_ref} {elem_type}: {msg}")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @uitree_app.command("scroll")
@@ -2135,12 +2163,10 @@ def uitree_scroll(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree scroll")
-        raise typer.Exit(1) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree scroll")
 
     if to is None and x is None and y is None:
-        print_validation_error("--x/--y or --to parameter required", "u uitree scroll")
-        raise typer.Exit(1) from None
+        _exit_usage("--x/--y or --to parameter required", "u uitree scroll")
 
     try:
         result = context.client.uitree.scroll(
@@ -2159,8 +2185,7 @@ def uitree_scroll(
         print_line(f"{elem_ref} ScrollView: scrollOffset=({ox}, {oy})")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @uitree_app.command("text")
@@ -2190,8 +2215,7 @@ def uitree_text(
     context: CLIContext = ctx.obj
 
     if not ref and not (panel and name):
-        print_validation_error("ref argument or --panel + --name required", "u uitree text")
-        raise typer.Exit(1) from None
+        _exit_usage("ref argument or --panel + --name required", "u uitree text")
 
     try:
         result = context.client.uitree.text(
@@ -2206,8 +2230,7 @@ def uitree_text(
         print_line(f"{elem_ref} {elem_type}: {text}")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -2266,7 +2289,7 @@ def config_init(
 
     if output_path.exists() and not force:
         print_error(f"{output_path} already exists. Use --force to overwrite.")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     default_config = UnityCLIConfig()
     output_path.write_text(default_config.to_toml())
@@ -2363,8 +2386,7 @@ def project_info(
                     get_console().print(pkg_table)
 
     except ProjectError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @project_app.command("version")
@@ -2395,8 +2417,7 @@ def project_version(
                 print_line(f"Revision: [dim]{version.revision}[/dim]")
 
     except ProjectVersionError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 @project_app.command("packages")
@@ -2423,12 +2444,12 @@ def project_packages(
 
     if not is_unity_project(path):
         print_error(f"Not a valid Unity project: {path}", "INVALID_PROJECT")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     manifest_file = path / "Packages/manifest.json"
     if not manifest_file.exists():
         print_error("manifest.json not found", "MANIFEST_NOT_FOUND")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     import json
 
@@ -2480,7 +2501,7 @@ def project_tags(
 
     if not is_unity_project(path):
         print_error(f"Not a valid Unity project: {path}", "INVALID_PROJECT")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     settings = TagLayerSettings.from_file(path)
 
@@ -2545,7 +2566,7 @@ def project_quality(
 
     if not is_unity_project(path):
         print_error(f"Not a valid Unity project: {path}", "INVALID_PROJECT")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     settings = QualitySettings.from_file(path)
 
@@ -2629,7 +2650,7 @@ def project_assemblies(
 
     if not is_unity_project(path):
         print_error(f"Not a valid Unity project: {path}", "INVALID_PROJECT")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     assemblies = find_assembly_definitions(path)
 
@@ -2713,8 +2734,7 @@ def open_project(
         )
         print_success(f"Opened project: {path}")
     except (ProjectError, EditorNotFoundError) as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -2787,8 +2807,7 @@ def editor_install(
         if modules:
             print_success(f"With modules: {', '.join(modules)}")
     except HubError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -2848,8 +2867,7 @@ def selection(
                     print_line(f"  - {escape(str(go.get('name', '')))} (ID: {go.get('instanceID')})")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -2896,7 +2914,7 @@ def screenshot(
 
     if source not in ("game", "scene", "camera"):
         print_error(f"Invalid source: {source}. Use 'game', 'scene', or 'camera'", "INVALID_SOURCE")
-        raise typer.Exit(1) from None
+        raise typer.Exit(ExitCode.USAGE_ERROR) from None
 
     try:
         result = context.client.screenshot.capture(
@@ -2915,8 +2933,7 @@ def screenshot(
             print_line(f"[dim]Camera: {result.get('camera')}[/dim]")
 
     except UnityCLIError as e:
-        print_error(e.message, e.code)
-        raise typer.Exit(1) from None
+        _handle_error(e)
 
 
 # =============================================================================
@@ -2985,7 +3002,7 @@ def completion(
         else:
             get_err_console().print(f"[red]Unsupported shell: {shell}[/red]")
             get_err_console().print(f"Supported shells: {', '.join(_COMPLETION_SCRIPTS.keys())}")
-        raise typer.Exit(1)
+        raise typer.Exit(ExitCode.USAGE_ERROR)
 
     # Output script to stdout (no Rich formatting)
     print(_COMPLETION_SCRIPTS[shell], end="")

@@ -20,6 +20,7 @@ from unity_cli.cli.output import (
     print_success,
     print_warning,
     resolve_output_mode,
+    set_quiet,
 )
 
 # =============================================================================
@@ -192,3 +193,38 @@ class TestPlainTextOutput:
         print_key_value({"a": "b"})
         out = capsys.readouterr().out
         assert "a: b" in out
+
+
+# =============================================================================
+# Quiet mode
+# =============================================================================
+
+
+class TestQuietMode:
+    def setup_method(self) -> None:
+        configure_output(OutputMode.PLAIN)
+        set_quiet(True)
+
+    def teardown_method(self) -> None:
+        set_quiet(False)
+        configure_output(OutputMode.PRETTY)
+
+    def test_print_success_suppressed(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_success("should not appear")
+        out = capsys.readouterr().out
+        assert out == ""
+
+    def test_print_error_not_suppressed(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_error("visible error")
+        err = capsys.readouterr().err
+        assert "visible error" in err
+
+    def test_print_warning_not_suppressed(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_warning("visible warning")
+        out = capsys.readouterr().out
+        assert "visible warning" in out
+
+    def test_print_line_not_suppressed(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_line("data output")
+        out = capsys.readouterr().out
+        assert "data output" in out
