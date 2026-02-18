@@ -77,13 +77,35 @@ def _on_retry_callback(code: str, message: str, attempt: int, backoff_ms: int) -
         )
 
 
+_SENSITIVE_KEYS = frozenset({"password", "token", "secret", "apikey", "api_key", "credential"})
+_VERBOSE_MAX_LEN = 4096
+
+
+def _mask_sensitive(obj: Any) -> Any:
+    """Recursively mask values whose keys look sensitive."""
+    if isinstance(obj, dict):
+        return {k: "***" if k.lower() in _SENSITIVE_KEYS else _mask_sensitive(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_mask_sensitive(v) for v in obj]
+    return obj
+
+
+def _truncate_json(text: str) -> str:
+    """Truncate JSON string if it exceeds the verbose limit."""
+    if len(text) <= _VERBOSE_MAX_LEN:
+        return text
+    return text[:_VERBOSE_MAX_LEN] + f"... ({len(text)} bytes, truncated)"
+
+
 def _on_send_verbose(request: dict[str, Any], response: dict[str, Any]) -> None:
     """Callback for --verbose: dump request/response to stderr."""
     import json
     import sys
 
-    sys.stderr.write(f">>> {json.dumps(request, ensure_ascii=False)}\n")
-    sys.stderr.write(f"<<< {json.dumps(response, ensure_ascii=False)}\n")
+    req_text = _truncate_json(json.dumps(_mask_sensitive(request), ensure_ascii=False))
+    res_text = _truncate_json(json.dumps(_mask_sensitive(response), ensure_ascii=False))
+    sys.stderr.write(f">>> {req_text}\n")
+    sys.stderr.write(f"<<< {res_text}\n")
 
 
 # =============================================================================

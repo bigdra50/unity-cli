@@ -354,13 +354,15 @@ class RelayConnection:
                     "TIMEOUT",
                 ) from e
 
-            result = self._handle_response(response, command)
-
             if self.on_send:
                 try:
                     self.on_send(message, response)
-                except Exception:
-                    pass
+                except Exception as cb_err:
+                    import sys
+
+                    sys.stderr.write(f"[verbose callback error] {cb_err}\n")
+
+            result = self._handle_response(response, command)
 
             return result
 
