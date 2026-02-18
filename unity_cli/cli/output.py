@@ -432,7 +432,7 @@ def _format_hierarchy_row(
     row = [name, str(item.get("instanceID", "")), str(item.get("childCount", 0))]
     if show_components:
         components = item.get("components", [])
-        parts = [escape_fn(c) for c in components[:3]] if escape_fn else components[:3]
+        parts = [escape_fn(str(c)) for c in components[:3]] if escape_fn else [str(c) for c in components[:3]]
         row.append(", ".join(parts) + ("..." if len(components) > 3 else ""))
     return row
 
