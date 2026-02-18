@@ -437,7 +437,7 @@ namespace UnityBridge.Tools
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"GameObject not found: {target ?? targetId.Value.ToString()}");
+                    $"GameObject not found: {(!string.IsNullOrEmpty(target) ? target : targetId!.Value.ToString())}");
             }
 
             return gameObject;
