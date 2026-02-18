@@ -48,7 +48,7 @@ namespace UnityBridge
         /// <summary>
         /// Register the relay client to be managed during domain reloads
         /// </summary>
-        public static void RegisterClient(RelayClient client, string host, int port)
+        public static void RegisterClient(IRelayClient client, string host, int port)
         {
             if (client != null && client.IsConnected)
             {

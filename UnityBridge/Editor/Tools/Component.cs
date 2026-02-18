@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
+using UnityBridge.Helpers;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -499,89 +500,11 @@ namespace UnityBridge.Tools
                 "Color value must be [r, g, b, a?] array or {r, g, b, a?} object");
         }
 
-        /// <summary>
-        /// Finds a GameObject by name or instanceID.
-        /// </summary>
         private static GameObject FindGameObject(string name, int? instanceId)
-        {
-            if (instanceId.HasValue)
-            {
-                var obj = EditorUtility.InstanceIDToObject(instanceId.Value);
-                if (obj is GameObject go)
-                    return go;
-                if (obj is UnityEngine.Component comp)
-                    return comp.gameObject;
-                return null;
-            }
+            => GameObjectFinder.Find(name, instanceId);
 
-            if (!string.IsNullOrEmpty(name))
-            {
-                return FindGameObjectByName(name);
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Finds a GameObject by name in the active scene (including inactive objects).
-        /// </summary>
-        private static GameObject FindGameObjectByName(string name)
-        {
-            // Check prefab stage first
-            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
-            if (prefabStage?.prefabContentsRoot != null)
-            {
-                foreach (var transform in prefabStage.prefabContentsRoot.GetComponentsInChildren<Transform>(true))
-                {
-                    if (transform.name == name)
-                        return transform.gameObject;
-                }
-            }
-
-            // Search in active scene
-            var activeScene = SceneManager.GetActiveScene();
-            foreach (var root in activeScene.GetRootGameObjects())
-            {
-                foreach (var transform in root.GetComponentsInChildren<Transform>(true))
-                {
-                    if (transform.gameObject.name == name)
-                        return transform.gameObject;
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Finds a Type by full name or short name.
-        /// </summary>
         private static Type FindType(string typeName)
-        {
-            // Try full name first
-            var type = Type.GetType(typeName);
-            if (type != null) return type;
-
-            // Search in all assemblies
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                try
-                {
-                    type = assembly.GetType(typeName);
-                    if (type != null) return type;
-
-                    // Try short name match
-                    type = assembly.GetTypes().FirstOrDefault(t =>
-                        t.Name == typeName || t.FullName == typeName);
-                    if (type != null) return type;
-                }
-                catch (ReflectionTypeLoadException)
-                {
-                    // Skip assemblies that can't be loaded
-                }
-            }
-
-            return null;
-        }
+            => TypeResolver.FindType(typeName);
 
         /// <summary>
         /// Serializes component properties using reflection.

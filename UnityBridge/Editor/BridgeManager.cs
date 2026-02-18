@@ -18,6 +18,7 @@ namespace UnityBridge
         // Command queue for main thread execution
         private readonly ConcurrentQueue<CommandReceivedEventArgs> _commandQueue = new();
         private bool _updateRegistered;
+        private bool _isProcessing;
 
         /// <summary>
         /// Singleton instance
@@ -39,12 +40,12 @@ namespace UnityBridge
         /// <summary>
         /// The relay client instance
         /// </summary>
-        public RelayClient Client { get; private set; }
+        public IRelayClient Client { get; private set; }
 
         /// <summary>
         /// The command dispatcher instance
         /// </summary>
-        public CommandDispatcher Dispatcher { get; }
+        public ICommandDispatcher Dispatcher { get; }
 
         /// <summary>
         /// Current connection host
@@ -66,9 +67,19 @@ namespace UnityBridge
         /// </summary>
         public event EventHandler<ConnectionStatusChangedEventArgs> StatusChanged;
 
-        private BridgeManager()
+        private readonly Func<string, int, IRelayClient> _clientFactory;
+
+        private BridgeManager() : this(new CommandDispatcher(), (host, port) => new RelayClient(host, port))
         {
-            Dispatcher = new CommandDispatcher();
+        }
+
+        /// <summary>
+        /// Constructor with dependency injection for testability.
+        /// </summary>
+        internal BridgeManager(ICommandDispatcher dispatcher, Func<string, int, IRelayClient> clientFactory = null)
+        {
+            Dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+            _clientFactory = clientFactory ?? ((host, port) => new RelayClient(host, port));
         }
 
         /// <summary>
@@ -84,7 +95,7 @@ namespace UnityBridge
             Host = host;
             Port = port;
 
-            Client = new RelayClient(host, port);
+            Client = _clientFactory(host, port);
             Client.StatusChanged += OnClientStatusChanged;
             Client.CommandReceived += OnCommandReceived;
 
@@ -116,16 +127,7 @@ namespace UnityBridge
 
                 try
                 {
-                    await client.DisconnectAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    BridgeLog.Warn($"Disconnect error (ignored): {ex.Message}");
-                }
-
-                try
-                {
-                    client.Dispose();
+                    await client.DisposeAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -170,17 +172,29 @@ namespace UnityBridge
             _updateRegistered = false;
         }
 
-        private void ProcessCommandQueue()
+        private async void ProcessCommandQueue()
         {
-            // Process all queued commands
-            while (_commandQueue.TryDequeue(out var e))
+            // Prevent re-entrant processing: EditorApplication.update fires every frame,
+            // and previous await may not have completed yet.
+            if (_isProcessing)
+                return;
+
+            _isProcessing = true;
+            try
             {
-                BridgeLog.Verbose($"Processing command from queue: {e.Command} (id: {e.Id})");
-                ExecuteCommandOnMainThread(e);
+                while (_commandQueue.TryDequeue(out var e))
+                {
+                    BridgeLog.Verbose($"Processing command from queue: {e.Command} (id: {e.Id})");
+                    await ExecuteCommandOnMainThreadAsync(e);
+                }
+            }
+            finally
+            {
+                _isProcessing = false;
             }
         }
 
-        private async void ExecuteCommandOnMainThread(CommandReceivedEventArgs e)
+        internal async Task ExecuteCommandOnMainThreadAsync(CommandReceivedEventArgs e)
         {
             BridgeLog.Verbose($"Executing command on main thread: {e.Command} (id: {e.Id})");
 
@@ -192,10 +206,7 @@ namespace UnityBridge
 
             try
             {
-                // Execute command asynchronously - await allows EditorApplication.update to continue
                 var result = await Dispatcher.ExecuteAsync(e.Command, e.Parameters);
-
-                // Send result
                 await Client.SendCommandResultAsync(e.Id, result).ConfigureAwait(false);
             }
             catch (ProtocolException pex)

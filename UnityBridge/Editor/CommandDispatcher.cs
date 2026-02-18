@@ -26,7 +26,7 @@ namespace UnityBridge
     /// Dispatches commands to registered handlers.
     /// Handlers are discovered automatically via the [BridgeTool] attribute.
     /// </summary>
-    public class CommandDispatcher
+    public class CommandDispatcher : ICommandDispatcher
     {
         private readonly Dictionary<string, Func<JObject, Task<JObject>>> _handlers;
         private bool _initialized;
@@ -148,9 +148,19 @@ namespace UnityBridge
                         handlerCount++;
                     }
                 }
-                catch (ReflectionTypeLoadException)
+                catch (ReflectionTypeLoadException ex)
                 {
-                    // Skip assemblies that can't be loaded
+                    BridgeLog.Warn($"Failed to load types from assembly '{assembly.GetName().Name}': {ex.Message}");
+                    if (ex.LoaderExceptions != null)
+                    {
+                        foreach (var loaderEx in ex.LoaderExceptions)
+                        {
+                            if (loaderEx != null)
+                            {
+                                BridgeLog.Warn($"  LoaderException: {loaderEx.Message}");
+                            }
+                        }
+                    }
                 }
             }
 
