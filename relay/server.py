@@ -35,7 +35,7 @@ from .protocol import (
     write_frame,
 )
 from .request_cache import RequestCache
-from .status_file import is_instance_reloading
+from .status_file import is_any_instance_reloading
 
 logger = logging.getLogger(__name__)
 
@@ -532,7 +532,7 @@ class RelayServer:
         waited_ms: int,
     ) -> bool:
         """Check if we should wait for a missing instance."""
-        if instance_id and is_instance_reloading(instance_id):
+        if instance_id and is_any_instance_reloading(instance_id):
             if waited_ms == 0:
                 logger.info(f"[{request_id}] Instance {instance_id} is reloading (via status file), waiting...")
             return True

@@ -116,6 +116,28 @@ def read_all_status_files() -> list[StatusFileContent]:
     return results
 
 
+def is_any_instance_reloading(query: str, max_age_seconds: float = 120.0) -> bool:
+    """Check if any reloading instance matches a query (project_name, path suffix, or exact id).
+
+    Unlike is_instance_reloading which requires exact instance_id for hash lookup,
+    this scans all status files. Use when instance_id may be a ref_id or project name.
+    """
+    if is_instance_reloading(query, max_age_seconds):
+        return True
+
+    for status in read_all_status_files():
+        if status.status != "reloading":
+            continue
+        age = (datetime.now(UTC) - status.timestamp.replace(tzinfo=UTC)).total_seconds()
+        if age > max_age_seconds:
+            continue
+        if status.project_name == query:
+            return True
+        if status.instance_id.endswith("/" + query) or status.instance_id.endswith("\\" + query):
+            return True
+    return False
+
+
 def is_instance_reloading(instance_id: str, max_age_seconds: float = 120.0) -> bool:
     """
     Check if an instance is currently reloading.
