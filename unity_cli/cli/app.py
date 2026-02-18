@@ -21,8 +21,9 @@ from unity_cli.cli.output import (
     OutputMode,
     _print_plain_table,
     configure_output,
-    console,
-    err_console,
+    get_console,
+    get_err_console,
+    is_no_color,
     print_components_table,
     print_error,
     print_hierarchy_table,
@@ -57,7 +58,7 @@ def _on_retry_callback(code: str, message: str, attempt: int, backoff_ms: int) -
             file=sys.stderr,
         )
     else:
-        output.err_console.print(
+        output.get_err_console().print(
             f"[dim][Retry][/dim] {code}: {message} (attempt {attempt}, waiting {backoff_ms}ms)",
             style="yellow",
         )
@@ -607,7 +608,9 @@ def _poll_test_results(context: CLIContext, interval: float = 1.5) -> dict[str, 
     from rich.text import Text as RichText
 
     try:
-        with Live(RichText("Waiting for tests...", style="dim"), console=err_console, refresh_per_second=2) as live:
+        with Live(
+            RichText("Waiting for tests...", style="dim"), console=get_err_console(), refresh_per_second=2
+        ) as live:
             while True:
                 time.sleep(interval)
                 status = context.client.tests.status()
@@ -1335,7 +1338,7 @@ def build_settings(
             scenes = result.get("scenes", [])
             rows_data.append(("Scenes", str(len(scenes))))
 
-            if console.no_color:
+            if is_no_color():
                 _print_plain_table(["Key", "Value"], [list(r) for r in rows_data], "Build Settings")
             else:
                 from rich.table import Table
@@ -1345,7 +1348,7 @@ def build_settings(
                 table.add_column("Value")
                 for k, v in rows_data:
                     table.add_row(k, v)
-                console.print(table)
+                get_console().print(table)
 
             if scenes:
                 print_line("")
@@ -1434,7 +1437,7 @@ def build_scenes(
         else:
             scenes_list = result.get("scenes", [])
 
-            if console.no_color:
+            if is_no_color():
                 rows = []
                 for i, s in enumerate(scenes_list):
                     enabled = "yes" if s.get("enabled") else "no"
@@ -1451,7 +1454,7 @@ def build_scenes(
                 for i, s in enumerate(scenes_list):
                     enabled = "[green]yes[/green]" if s.get("enabled") else "[red]no[/red]"
                     table.add_row(str(i), s.get("path", ""), enabled, s.get("guid", ""))
-                console.print(table)
+                get_console().print(table)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1482,7 +1485,7 @@ def package_list(
         else:
             packages = result.get("packages", [])
 
-            if console.no_color:
+            if is_no_color():
                 rows = [
                     [pkg.get("name", ""), pkg.get("version", ""), pkg.get("displayName", ""), pkg.get("source", "")]
                     for pkg in packages
@@ -1503,7 +1506,7 @@ def package_list(
                         pkg.get("displayName", ""),
                         pkg.get("source", ""),
                     )
-                console.print(table)
+                get_console().print(table)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1629,7 +1632,7 @@ def profiler_snapshot(
 
             rows = [[label, str(result.get(key))] for key, label in display_keys if result.get(key) is not None]
 
-            if console.no_color:
+            if is_no_color():
                 _print_plain_table(["Metric", "Value"], rows, f"Frame {result.get('frameIndex', '?')}")
             else:
                 from rich.table import Table
@@ -1639,7 +1642,7 @@ def profiler_snapshot(
                 table.add_column("Value", justify="right")
                 for r in rows:
                     table.add_row(*r)
-                console.print(table)
+                get_console().print(table)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -1684,7 +1687,7 @@ def profiler_frames(
                 for f in frames
             ]
 
-            if console.no_color:
+            if is_no_color():
                 _print_plain_table(headers, rows, title)
             else:
                 from rich.table import Table
@@ -1694,7 +1697,7 @@ def profiler_frames(
                     table.add_column(h, justify="right")
                 for r in rows:
                     table.add_row(*r)
-                console.print(table)
+                get_console().print(table)
     except UnityCLIError as e:
         print_error(e.message, e.code)
         raise typer.Exit(1) from None
@@ -2283,10 +2286,10 @@ def project_info(
             from rich.table import Table
 
             # Basic info
-            if console.no_color:
+            if is_no_color():
                 print_line(f"{info.settings.product_name} ({info.path})")
             else:
-                console.print(Panel(f"[bold]{info.settings.product_name}[/bold]", subtitle=str(info.path)))
+                get_console().print(Panel(f"[bold]{info.settings.product_name}[/bold]", subtitle=str(info.path)))
             print_line(f"Company: {info.settings.company_name}")
             print_line(f"Version: {info.settings.version}")
             print_line(f"Unity: {info.unity_version.version}")
@@ -2297,7 +2300,7 @@ def project_info(
 
             # Build scenes
             if info.build_settings.scenes:
-                if console.no_color:
+                if is_no_color():
                     rows = [
                         [str(i), scene.path, "yes" if scene.enabled else "no"]
                         for i, scene in enumerate(info.build_settings.scenes)
@@ -2311,12 +2314,12 @@ def project_info(
                     for i, scene in enumerate(info.build_settings.scenes):
                         enabled = "[green]✓[/green]" if scene.enabled else "[red]✗[/red]"
                         scene_table.add_row(str(i), scene.path, enabled)
-                    console.print(scene_table)
+                    get_console().print(scene_table)
                 print_line("")
 
             # Packages
             if info.packages.dependencies:
-                if console.no_color:
+                if is_no_color():
                     rows = [
                         [pkg.name, pkg.version, "local" if pkg.is_local else ""] for pkg in info.packages.dependencies
                     ]
@@ -2331,7 +2334,7 @@ def project_info(
                     for pkg in info.packages.dependencies:
                         local = "[yellow]local[/yellow]" if pkg.is_local else ""
                         pkg_table.add_row(pkg.name, pkg.version, local)
-                    console.print(pkg_table)
+                    get_console().print(pkg_table)
 
     except ProjectError as e:
         print_error(e.message, e.code)
@@ -2416,7 +2419,7 @@ def project_packages(
     if _should_json(context, json_flag):
         print_json(packages)
     else:
-        if console.no_color:
+        if is_no_color():
             rows = [[pkg["name"], pkg["version"]] for pkg in packages]
             _print_plain_table(["Name", "Version"], rows, f"Packages ({len(packages)})")
         else:
@@ -2428,7 +2431,7 @@ def project_packages(
             for pkg in packages:
                 version_str = f"[yellow]{pkg['version']}[/yellow]" if pkg["local"] else pkg["version"]
                 table.add_row(pkg["name"], version_str)
-            console.print(table)
+            get_console().print(table)
 
 
 @project_app.command("tags")
@@ -2477,7 +2480,7 @@ def project_tags(
             print_line("")
 
         # Layers
-        if console.no_color:
+        if is_no_color():
             rows = [[str(idx), name] for idx, name in settings.layers]
             _print_plain_table(["#", "Name"], rows, "Layers")
         else:
@@ -2486,7 +2489,7 @@ def project_tags(
             layer_table.add_column("Name", style="cyan")
             for idx, name in settings.layers:
                 layer_table.add_row(str(idx), name)
-            console.print(layer_table)
+            get_console().print(layer_table)
         print_line("")
 
         # Sorting Layers
@@ -2541,7 +2544,7 @@ def project_quality(
         title = f"Quality Levels (current: {settings.current_quality})"
         headers = ["#", "Name", "Shadow Res", "Shadow Dist", "VSync", "LOD Bias", "AA"]
 
-        if console.no_color:
+        if is_no_color():
             rows = [
                 [
                     f"{'>' if i == settings.current_quality else ' '}{i}",
@@ -2577,7 +2580,7 @@ def project_quality(
                     str(lvl.lod_bias),
                     str(lvl.anti_aliasing),
                 )
-            console.print(table)
+            get_console().print(table)
 
 
 @project_app.command("assemblies")
@@ -2624,7 +2627,7 @@ def project_assemblies(
             print_line("[dim]No Assembly Definitions found in Assets/[/dim]")
             return
 
-        if console.no_color:
+        if is_no_color():
             rows = [
                 [asm.name, str(asm.path.relative_to(path)), str(len(asm.references)), "yes" if asm.allow_unsafe else ""]
                 for asm in assemblies
@@ -2642,7 +2645,7 @@ def project_assemblies(
                 rel_path = asm.path.relative_to(path)
                 unsafe = "[yellow]✓[/yellow]" if asm.allow_unsafe else ""
                 table.add_row(asm.name, str(rel_path), str(len(asm.references)), unsafe)
-            console.print(table)
+            get_console().print(table)
 
 
 # =============================================================================
@@ -2718,7 +2721,7 @@ def editor_list(
             print_line("[dim]No Unity editors found[/dim]")
             return
 
-        if console.no_color:
+        if is_no_color():
             rows = [[editor.version, str(editor.path)] for editor in editors]
             _print_plain_table(["Version", "Path"], rows, f"Installed Editors ({len(editors)})")
         else:
@@ -2729,7 +2732,7 @@ def editor_list(
             table.add_column("Path", style="dim")
             for editor in editors:
                 table.add_row(editor.version, str(editor.path))
-            console.print(table)
+            get_console().print(table)
 
 
 @editor_app.command("install")
@@ -2950,12 +2953,12 @@ def completion(
     if shell not in _COMPLETION_SCRIPTS:
         import sys
 
-        if err_console.no_color:
+        if is_no_color():
             print(f"Unsupported shell: {shell}", file=sys.stderr)
             print(f"Supported shells: {', '.join(_COMPLETION_SCRIPTS.keys())}", file=sys.stderr)
         else:
-            err_console.print(f"[red]Unsupported shell: {shell}[/red]")
-            err_console.print(f"Supported shells: {', '.join(_COMPLETION_SCRIPTS.keys())}")
+            get_err_console().print(f"[red]Unsupported shell: {shell}[/red]")
+            get_err_console().print(f"Supported shells: {', '.join(_COMPLETION_SCRIPTS.keys())}")
         raise typer.Exit(1)
 
     # Output script to stdout (no Rich formatting)

@@ -27,6 +27,9 @@ from rich.text import Text
 console = Console()
 err_console = Console(stderr=True)
 
+# Falsy values for env var boolean checks (matches Click's BoolParamType)
+_ENV_FALSY = {"", "0", "false", "f", "no", "n", "off"}
+
 
 # =============================================================================
 # Output Mode
@@ -71,10 +74,10 @@ def resolve_output_mode(
     if pretty_flag is False:
         return OutputMode.PLAIN
 
-    # Environment variables
-    if os.environ.get("UNITY_CLI_JSON", "").strip() not in ("", "0"):
+    # Environment variables (falsy values match Click's BoolParamType)
+    if os.environ.get("UNITY_CLI_JSON", "").strip().lower() not in _ENV_FALSY:
         return OutputMode.JSON
-    if os.environ.get("UNITY_CLI_NO_PRETTY", "").strip() not in ("", "0"):
+    if os.environ.get("UNITY_CLI_NO_PRETTY", "").strip().lower() not in _ENV_FALSY:
         return OutputMode.PLAIN
     if os.environ.get("NO_COLOR") is not None:
         return OutputMode.PLAIN
@@ -85,9 +88,13 @@ def resolve_output_mode(
     return OutputMode.PLAIN
 
 
+_current_mode: OutputMode = OutputMode.PRETTY
+
+
 def configure_output(mode: OutputMode) -> None:
     """Reconfigure module-level consoles based on output mode."""
-    global console, err_console
+    global console, err_console, _current_mode
+    _current_mode = mode
 
     if mode is OutputMode.PLAIN or mode is OutputMode.JSON:
         console = Console(highlight=False, no_color=True, soft_wrap=True)
@@ -98,12 +105,23 @@ def configure_output(mode: OutputMode) -> None:
 
 
 def get_output_mode() -> OutputMode:
-    """Return the current output mode by inspecting the module console state."""
-    if not console.is_terminal and console.no_color:
-        # Heuristic: if console was configured as no_color, check JSON via flag
-        # The actual mode is tracked in CLIContext; this is a fallback.
-        return OutputMode.PLAIN
-    return OutputMode.PRETTY
+    """Return the current output mode."""
+    return _current_mode
+
+
+def is_no_color() -> bool:
+    """Return True when output should have no color/markup (PLAIN or JSON)."""
+    return console.no_color
+
+
+def get_console() -> Console:
+    """Return the current stdout console (always up-to-date after configure_output)."""
+    return console
+
+
+def get_err_console() -> Console:
+    """Return the current stderr console (always up-to-date after configure_output)."""
+    return err_console
 
 
 # =============================================================================

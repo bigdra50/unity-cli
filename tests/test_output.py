@@ -39,10 +39,20 @@ class TestResolveOutputMode:
             assert resolve_output_mode() is OutputMode.JSON
 
     def test_env_unity_cli_json_zero_ignored(self) -> None:
-        with patch.dict(os.environ, {"UNITY_CLI_JSON": "0"}, clear=False):
-            # Should fall through to TTY detection
-            mode = resolve_output_mode()
-            assert mode in (OutputMode.PRETTY, OutputMode.PLAIN)
+        env = {k: v for k, v in os.environ.items() if k not in ("UNITY_CLI_JSON", "UNITY_CLI_NO_PRETTY", "NO_COLOR")}
+        with (
+            patch.dict(os.environ, {**env, "UNITY_CLI_JSON": "0"}, clear=True),
+            patch.object(sys.stdout, "isatty", return_value=False),
+        ):
+            assert resolve_output_mode() is OutputMode.PLAIN
+
+    def test_env_unity_cli_json_false_ignored(self) -> None:
+        env = {k: v for k, v in os.environ.items() if k not in ("UNITY_CLI_JSON", "UNITY_CLI_NO_PRETTY", "NO_COLOR")}
+        with (
+            patch.dict(os.environ, {**env, "UNITY_CLI_JSON": "false"}, clear=True),
+            patch.object(sys.stdout, "isatty", return_value=False),
+        ):
+            assert resolve_output_mode() is OutputMode.PLAIN
 
     def test_env_unity_cli_no_pretty(self) -> None:
         with patch.dict(os.environ, {"UNITY_CLI_NO_PRETTY": "1"}, clear=False):
