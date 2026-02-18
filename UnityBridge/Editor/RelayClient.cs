@@ -56,13 +56,15 @@ namespace UnityBridge
     /// TCP client for connecting to the Relay Server.
     /// Handles registration, heartbeat, and command message routing.
     /// </summary>
-    public class RelayClient : IDisposable
+    public class RelayClient : IRelayClient
     {
         private TcpClient _client;
         private NetworkStream _stream;
         private CancellationTokenSource _cts;
         private Task _receiveTask;
         private Task _heartbeatTask;
+        private readonly SemaphoreSlim _sendLock = new(1, 1);
+        private bool _disposed;
 
         private readonly string _host;
         private readonly int _port;
@@ -176,7 +178,15 @@ namespace UnityBridge
                     UnityVersion,
                     Capabilities);
 
-                await Framing.WriteFrameAsync(_stream, registerMsg, cancellationToken);
+                await _sendLock.WaitAsync(cancellationToken);
+                try
+                {
+                    await Framing.WriteFrameAsync(_stream, registerMsg, cancellationToken);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
                 BridgeLog.Verbose($"Sent REGISTER: {InstanceId}");
 
                 // Wait for REGISTERED response
@@ -237,7 +247,15 @@ namespace UnityBridge
             {
                 Status = ConnectionStatus.Reloading;
                 var statusMsg = Messages.CreateStatus(InstanceId, InstanceStatus.Reloading, "Domain reload started");
-                await Framing.WriteFrameAsync(_stream, statusMsg);
+                await _sendLock.WaitAsync();
+                try
+                {
+                    await Framing.WriteFrameAsync(_stream, statusMsg);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
                 BridgeLog.Verbose("Sent STATUS: reloading");
             }
             catch (Exception ex)
@@ -257,7 +275,15 @@ namespace UnityBridge
             try
             {
                 var statusMsg = Messages.CreateStatus(InstanceId, InstanceStatus.Ready);
-                await Framing.WriteFrameAsync(_stream, statusMsg);
+                await _sendLock.WaitAsync();
+                try
+                {
+                    await Framing.WriteFrameAsync(_stream, statusMsg);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
                 BridgeLog.Verbose("Sent STATUS: ready");
             }
             catch (Exception ex)
@@ -280,7 +306,15 @@ namespace UnityBridge
             try
             {
                 var resultMsg = Messages.CreateCommandResult(id, data);
-                await Framing.WriteFrameAsync(_stream, resultMsg);
+                await _sendLock.WaitAsync();
+                try
+                {
+                    await Framing.WriteFrameAsync(_stream, resultMsg);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
                 BridgeLog.Verbose($"Sent COMMAND_RESULT: {id}");
             }
             catch (Exception ex)
@@ -303,7 +337,15 @@ namespace UnityBridge
             try
             {
                 var errorMsg = Messages.CreateCommandResultError(id, code, message);
-                await Framing.WriteFrameAsync(_stream, errorMsg);
+                await _sendLock.WaitAsync();
+                try
+                {
+                    await Framing.WriteFrameAsync(_stream, errorMsg);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
                 BridgeLog.Verbose($"Sent COMMAND_RESULT (error): {id} - {code}");
             }
             catch (Exception ex)
@@ -365,7 +407,15 @@ namespace UnityBridge
             var pingTs = Messages.ParsePing(msg);
 
             var pongMsg = Messages.CreatePong(pingTs);
-            await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken);
+            await _sendLock.WaitAsync(cancellationToken);
+            try
+            {
+                await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken);
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
         }
 
         private void HandleCommand(JObject msg)
@@ -544,10 +594,26 @@ namespace UnityBridge
             }
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+
+            await DisconnectInternalAsync();
+            _sendLock.Dispose();
+        }
+
         public void Dispose()
         {
-            // Fire and forget to avoid blocking Unity main thread
+            if (_disposed)
+                return;
+            _disposed = true;
+
+            // Synchronous fallback for contexts that cannot use DisposeAsync.
+            // Fire and forget to avoid blocking Unity main thread.
             _ = DisconnectInternalAsync();
+            _sendLock.Dispose();
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using UnityBridge.Helpers;
 using UnityEditor;
 using UnityEngine;
 
@@ -253,43 +254,10 @@ namespace UnityBridge.Tools
         }
 
         private static GameObject FindGameObject(string name, int? instanceId)
-        {
-            if (instanceId.HasValue)
-            {
-                var obj = EditorUtility.InstanceIDToObject(instanceId.Value);
-                if (obj is GameObject go)
-                    return go;
-                return null;
-            }
-
-            if (!string.IsNullOrEmpty(name))
-            {
-                return GameObject.Find(name) ?? GameObject.Find("/" + name);
-            }
-
-            return null;
-        }
+            => GameObjectFinder.Find(name, instanceId);
 
         private static Type FindType(string typeName)
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                try
-                {
-                    var type = assembly.GetType(typeName);
-                    if (type != null) return type;
-
-                    type = assembly.GetTypes().FirstOrDefault(t =>
-                        t.Name == typeName || t.FullName == typeName);
-                    if (type != null) return type;
-                }
-                catch
-                {
-                    // Skip assemblies that fail
-                }
-            }
-            return null;
-        }
+            => TypeResolver.FindType(typeName);
 
         private static void CreateFolderRecursively(string path)
         {
