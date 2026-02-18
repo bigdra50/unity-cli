@@ -1,13 +1,21 @@
-"""Rich-based output formatting utilities for Unity CLI.
+"""Output formatting utilities for Unity CLI.
 
-Provides consistent, readable output formatting using Rich library.
-Supports JSON output mode with field filtering for scripting.
+Supports three modes:
+  - PRETTY: Rich-based colored output (TTY default)
+  - PLAIN: Tab-separated, no ANSI escapes (pipe default)
+  - JSON: Machine-readable JSON
+
+Mode resolution priority:
+  per-command --json > --pretty/--no-pretty > UNITY_CLI_JSON > UNITY_CLI_NO_PRETTY/NO_COLOR > isatty()
 """
 
 from __future__ import annotations
 
+import enum
 import json
 import os
+import sys
+from dataclasses import dataclass
 from typing import Any
 
 from rich.console import Console
@@ -17,6 +25,132 @@ from rich.text import Text
 
 console = Console()
 err_console = Console(stderr=True)
+
+# Falsy values for env var boolean checks (matches Click's BoolParamType)
+_ENV_FALSY = {"", "0", "false", "f", "no", "n", "off"}
+
+
+# =============================================================================
+# Output Mode
+# =============================================================================
+
+
+class OutputMode(enum.Enum):
+    PRETTY = "pretty"
+    PLAIN = "plain"
+    JSON = "json"
+
+
+@dataclass(frozen=True)
+class OutputConfig:
+    mode: OutputMode
+
+    @property
+    def is_json(self) -> bool:
+        return self.mode is OutputMode.JSON
+
+    @property
+    def is_plain(self) -> bool:
+        return self.mode is OutputMode.PLAIN
+
+    @property
+    def is_pretty(self) -> bool:
+        return self.mode is OutputMode.PRETTY
+
+
+def resolve_output_mode(
+    pretty_flag: bool | None = None,
+) -> OutputMode:
+    """Determine output mode from flags, environment, and TTY detection.
+
+    Priority: --pretty/--no-pretty > env vars > isatty()
+
+    Note: per-command --json is handled separately in _should_json().
+    UNITY_CLI_JSON env var is checked here for global default.
+    """
+    if pretty_flag is True:
+        return OutputMode.PRETTY
+    if pretty_flag is False:
+        return OutputMode.PLAIN
+
+    # Environment variables (falsy values match Click's BoolParamType)
+    if os.environ.get("UNITY_CLI_JSON", "").strip().lower() not in _ENV_FALSY:
+        return OutputMode.JSON
+    if os.environ.get("UNITY_CLI_NO_PRETTY", "").strip().lower() not in _ENV_FALSY:
+        return OutputMode.PLAIN
+    if os.environ.get("NO_COLOR") is not None:
+        return OutputMode.PLAIN
+
+    # TTY detection
+    if sys.stdout.isatty():
+        return OutputMode.PRETTY
+    return OutputMode.PLAIN
+
+
+_current_mode: OutputMode = OutputMode.PRETTY
+
+
+def configure_output(mode: OutputMode) -> None:
+    """Reconfigure module-level consoles based on output mode."""
+    global console, err_console, _current_mode
+    _current_mode = mode
+
+    if mode is OutputMode.PLAIN or mode is OutputMode.JSON:
+        console = Console(highlight=False, no_color=True, soft_wrap=True)
+        err_console = Console(stderr=True, highlight=False, no_color=True, soft_wrap=True)
+    else:
+        console = Console()
+        err_console = Console(stderr=True)
+
+
+def get_output_mode() -> OutputMode:
+    """Return the current output mode."""
+    return _current_mode
+
+
+def is_no_color() -> bool:
+    """Return True when output should have no color/markup (PLAIN or JSON)."""
+    return console.no_color
+
+
+def get_console() -> Console:
+    """Return the current stdout console (always up-to-date after configure_output)."""
+    return console
+
+
+def get_err_console() -> Console:
+    """Return the current stderr console (always up-to-date after configure_output)."""
+    return err_console
+
+
+# =============================================================================
+# Plain-text helpers
+# =============================================================================
+
+
+def print_line(text: str) -> None:
+    """Print a line, stripping Rich markup in non-PRETTY mode.
+
+    Uses Rich's own markup parser to avoid stripping legitimate bracket
+    content like ``[ERROR]`` or ``[Physics]`` from server data.
+    """
+    if console.no_color:
+        print(Text.from_markup(text).plain)
+    else:
+        console.print(text)
+
+
+def _print_plain_table(
+    headers: list[str],
+    rows: list[list[str]],
+    title: str | None = None,
+) -> None:
+    """Print a tab-separated table for pipe-friendly output."""
+    if title:
+        print(title)
+    print("\t".join(headers))
+    for row in rows:
+        print("\t".join(row))
 
 
 def filter_fields(data: Any, fields: list[str] | None) -> Any:
@@ -58,7 +192,10 @@ def print_json(data: Any, fields: list[str] | None = None) -> None:
         fields: Fields to include (None for all)
     """
     filtered = filter_fields(data, fields)
-    console.print_json(json.dumps(filtered, ensure_ascii=False))
+    if console.no_color:
+        print(json.dumps(filtered, ensure_ascii=False, indent=2))
+    else:
+        console.print_json(json.dumps(filtered, ensure_ascii=False))
 
 
 def print_error(message: str, code: str | None = None) -> None:
@@ -68,6 +205,12 @@ def print_error(message: str, code: str | None = None) -> None:
         message: Error message (will be escaped to prevent markup injection)
         code: Optional error code
     """
+    if err_console.no_color:
+        print(f"Error: {message}", file=sys.stderr)
+        if code:
+            print(f"Code: {code}", file=sys.stderr)
+        return
+
     text = Text()
     text.append("Error: ", style="bold red")
     text.append(escape(message))  # Escape untrusted content
@@ -96,6 +239,10 @@ def print_success(message: str) -> None:
     Args:
         message: Success message
     """
+    if console.no_color:
+        print(f"[OK] {message}")
+        return
+
     text = Text()
     text.append("[OK] ", style="bold green")
     text.append(message)
@@ -108,6 +255,10 @@ def print_warning(message: str) -> None:
     Args:
         message: Warning message
     """
+    if console.no_color:
+        print(f"[WARN] {message}")
+        return
+
     text = Text()
     text.append("[WARN] ", style="bold yellow")
     text.append(message)
@@ -120,6 +271,10 @@ def print_info(message: str) -> None:
     Args:
         message: Info message
     """
+    if console.no_color:
+        print(f"[INFO] {message}")
+        return
+
     text = Text()
     text.append("[INFO] ", style="bold blue")
     text.append(message)
@@ -127,23 +282,38 @@ def print_info(message: str) -> None:
 
 
 def print_instances_table(instances: list[dict[str, Any]]) -> None:
-    """Print Unity instances as a formatted table.
-
-    Args:
-        instances: List of instance dicts with keys:
-            - instance_id: Project path
-            - project_name: Project name
-            - unity_version: Unity version
-            - status: Connection status
-            - is_default: Whether this is the default instance
-    """
+    """Print Unity instances as a formatted table."""
     if not instances:
-        console.print("No Unity instances connected", style="dim")
+        print_line("No Unity instances connected")
         return
 
     # Detect duplicate project names to decide whether to show path
     project_names = [inst.get("project_name", "") for inst in instances]
     has_duplicates = len(project_names) != len(set(project_names))
+    cwd = os.getcwd()
+
+    if console.no_color:
+        headers = ["#", "Project"]
+        if has_duplicates:
+            headers.append("Path")
+        headers.extend(["Version", "Status", "Default"])
+
+        rows: list[list[str]] = []
+        for inst in instances:
+            ref_id = str(inst.get("ref_id", ""))
+            project = inst.get("project_name", inst.get("instance_id", "Unknown"))
+            version = inst.get("unity_version", "Unknown")
+            status = inst.get("status", "unknown")
+            is_default = "*" if inst.get("is_default") else ""
+
+            row = [ref_id, project]
+            if has_duplicates:
+                row.append(os.path.relpath(inst.get("instance_id", ""), cwd))
+            row.extend([version, status, is_default])
+            rows.append(row)
+
+        _print_plain_table(headers, rows, f"Connected Instances ({len(instances)})")
+        return
 
     table = Table(title=f"Connected Instances ({len(instances)})")
     table.add_column("#", style="dim", justify="right", no_wrap=True)
@@ -154,8 +324,6 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
     table.add_column("Status", style="yellow")
     table.add_column("Default", justify="center")
 
-    cwd = os.getcwd()
-
     for inst in instances:
         ref_id = str(inst.get("ref_id", ""))
         project = escape(inst.get("project_name", inst.get("instance_id", "Unknown")))
@@ -164,7 +332,6 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
         status = inst.get("status", "unknown")
         is_default = "[green]*[/green]" if inst.get("is_default") else ""
 
-        # Status styling (status is controlled, no need to escape)
         status_style = {
             "ready": "green",
             "busy": "yellow",
@@ -172,29 +339,33 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
             "disconnected": "red",
         }.get(status.lower(), "dim")
 
-        row: list[str | Text] = [ref_id, project]
+        row_items: list[str | Text] = [ref_id, project]
         if has_duplicates:
             rel_path = os.path.relpath(instance_id, cwd)
-            row.append(escape(rel_path))
-        row.extend([version, Text(escape(status), style=status_style), is_default])
+            row_items.append(escape(rel_path))
+        row_items.extend([version, Text(escape(status), style=status_style), is_default])
 
-        table.add_row(*row)
+        table.add_row(*row_items)
 
     console.print(table)
 
 
 def print_logs_table(logs: list[dict[str, Any]]) -> None:
-    """Print console logs as a formatted table.
-
-    Args:
-        logs: List of log dicts with keys:
-            - type: Log type (error, warning, log, etc.)
-            - message: Log message
-            - stackTrace: Optional stack trace
-            - timestamp: Optional timestamp
-    """
+    """Print console logs as a formatted table."""
     if not logs:
-        console.print("No logs found", style="dim")
+        print_line("No logs found")
+        return
+
+    if console.no_color:
+        headers = ["Type", "Message"]
+        rows: list[list[str]] = []
+        for log in logs:
+            log_type = log.get("type", "log").upper()
+            message = log.get("message", "")
+            if len(message) > 200:
+                message = message[:197] + "..."
+            rows.append([log_type, message])
+        _print_plain_table(headers, rows, f"Console Logs ({len(logs)})")
         return
 
     table = Table(title=f"Console Logs ({len(logs)})")
@@ -213,33 +384,44 @@ def print_logs_table(logs: list[dict[str, Any]]) -> None:
         log_type = log.get("type", "log").lower()
         message = log.get("message", "")
 
-        # Truncate long messages
         if len(message) > 200:
             message = message[:197] + "..."
 
         style = type_styles.get(log_type, "dim")
         table.add_row(
             Text(log_type.upper(), style=style),
-            escape(message),  # Escape Unity log content
+            escape(message),
         )
 
     console.print(table)
 
 
 def print_hierarchy_table(items: list[dict[str, Any]], show_components: bool = False) -> None:
-    """Print scene hierarchy as a formatted table.
-
-    Args:
-        items: List of hierarchy item dicts with keys:
-            - name: GameObject name
-            - instanceID: Instance ID
-            - depth: Hierarchy depth
-            - childCount: Number of children
-            - components: Optional list of component names
-        show_components: Whether to show component column
-    """
+    """Print scene hierarchy as a formatted table."""
     if not items:
-        console.print("No GameObjects in hierarchy", style="dim")
+        print_line("No GameObjects in hierarchy")
+        return
+
+    if console.no_color:
+        headers = ["Name", "ID", "Children"]
+        if show_components:
+            headers.append("Components")
+
+        rows: list[list[str]] = []
+        for item in items:
+            depth = item.get("depth", 0)
+            indent = "  " * depth
+            name = f"{indent}{item.get('name', 'Unknown')}"
+            instance_id = str(item.get("instanceID", ""))
+            child_count = str(item.get("childCount", 0))
+            row = [name, instance_id, child_count]
+            if show_components:
+                components = item.get("components", [])
+                comp_str = ", ".join(components[:3])
+                row.append(comp_str + ("..." if len(components) > 3 else ""))
+            rows.append(row)
+
+        _print_plain_table(headers, rows, f"Scene Hierarchy ({len(items)} objects)")
         return
 
     table = Table(title=f"Scene Hierarchy ({len(items)} objects)")
@@ -268,16 +450,20 @@ def print_hierarchy_table(items: list[dict[str, Any]], show_components: bool = F
 
 
 def print_components_table(components: list[dict[str, Any]]) -> None:
-    """Print component list as a formatted table.
-
-    Args:
-        components: List of component dicts with keys:
-            - type: Component type name
-            - enabled: Whether component is enabled
-            - instanceID: Instance ID
-    """
+    """Print component list as a formatted table."""
     if not components:
-        console.print("No components found", style="dim")
+        print_line("No components found")
+        return
+
+    if console.no_color:
+        headers = ["Type", "Enabled", "ID"]
+        rows: list[list[str]] = []
+        for comp in components:
+            comp_type = comp.get("type", "Unknown")
+            enabled = "Yes" if comp.get("enabled", True) else "No"
+            instance_id = str(comp.get("instanceID", ""))
+            rows.append([comp_type, enabled, instance_id])
+        _print_plain_table(headers, rows, f"Components ({len(components)})")
         return
 
     table = Table(title=f"Components ({len(components)})")
@@ -298,24 +484,30 @@ def print_components_table(components: list[dict[str, Any]]) -> None:
 
 
 def print_test_results_table(results: list[dict[str, Any]]) -> None:
-    """Print test results as a formatted table.
-
-    Args:
-        results: List of test result dicts with keys:
-            - name: Test name
-            - result: Test result (Passed, Failed, Skipped, etc.)
-            - duration: Test duration in seconds
-            - message: Optional failure message
-    """
+    """Print test results as a formatted table."""
     if not results:
-        console.print("No test results", style="dim")
+        print_line("No test results")
         return
 
     passed = sum(1 for r in results if r.get("result") == "Passed")
     failed = sum(1 for r in results if r.get("result") == "Failed")
     skipped = sum(1 for r in results if r.get("result") == "Skipped")
 
-    table = Table(title=f"Test Results (Passed: {passed}, Failed: {failed}, Skipped: {skipped})")
+    title = f"Test Results (Passed: {passed}, Failed: {failed}, Skipped: {skipped})"
+
+    if console.no_color:
+        headers = ["Test", "Result", "Duration"]
+        rows: list[list[str]] = []
+        for test in results:
+            name = test.get("name", "Unknown")
+            result = test.get("result", "Unknown")
+            duration = test.get("duration", 0)
+            duration_str = f"{duration:.3f}s" if isinstance(duration, float) else str(duration)
+            rows.append([name, result, duration_str])
+        _print_plain_table(headers, rows, title)
+        return
+
+    table = Table(title=title)
     table.add_column("Test", style="cyan", overflow="fold")
     table.add_column("Result", justify="center")
     table.add_column("Duration", justify="right")
@@ -341,12 +533,14 @@ def print_test_results_table(results: list[dict[str, Any]]) -> None:
 
 
 def print_key_value(data: dict[str, Any], title: str | None = None) -> None:
-    """Print dict as key-value pairs.
+    """Print dict as key-value pairs."""
+    if console.no_color:
+        if title:
+            print(title)
+        for key, value in data.items():
+            print(f"  {key}: {value}")
+        return
 
-    Args:
-        data: Dict to display
-        title: Optional title
-    """
     if title:
         console.print(f"[bold]{escape(title)}[/bold]")
 
