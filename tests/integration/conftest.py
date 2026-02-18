@@ -7,6 +7,7 @@ Tests are skipped automatically when the environment is unavailable.
 from __future__ import annotations
 
 import pytest
+from typer.testing import CliRunner
 
 from unity_cli.api import (
     ConsoleAPI,
@@ -63,3 +64,15 @@ def console(conn: RelayConnection) -> ConsoleAPI:
 @pytest.fixture(scope="session")
 def uitree(conn: RelayConnection) -> UITreeAPI:
     return UITreeAPI(conn)
+
+
+@pytest.fixture(scope="session")
+def cli_runner(conn: RelayConnection) -> CliRunner:
+    """CliRunner that depends on conn (auto-skips if no Relay)."""
+    return CliRunner()
+
+
+@pytest.fixture(scope="session")
+def cli_args(conn: RelayConnection) -> list[str]:
+    """Base CLI args targeting TestProject."""
+    return ["--instance", INSTANCE]
