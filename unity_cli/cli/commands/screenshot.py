@@ -10,7 +10,7 @@ from rich.markup import escape
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.exit_codes import ExitCode
 from unity_cli.cli.helpers import _handle_error, _should_json
-from unity_cli.cli.output import print_error, print_json, print_line, print_success
+from unity_cli.cli.output import OutputMode, get_output_mode, print_error, print_json, print_line, print_success
 from unity_cli.exceptions import UnityCLIError
 
 
@@ -70,11 +70,16 @@ def register(app: typer.Typer) -> None:
                 camera=camera_name,
             )
 
+            captured_path = result.get("path", "")
+
             if _should_json(context, json_flag):
                 print_json(result)
                 return
 
-            captured_path = result.get("path", "")
+            if get_output_mode() is not OutputMode.PRETTY:
+                print(captured_path)
+                return
+
             print_success(f"Screenshot captured: {captured_path}")
             if result.get("note"):
                 print_line(f"[dim]{escape(str(result.get('note')))}[/dim]")
