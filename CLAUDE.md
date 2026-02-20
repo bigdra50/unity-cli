@@ -27,6 +27,7 @@ u instances                               # List connected instances
 # Editor Selection & Screenshot
 u selection                               # Get current editor selection
 u screenshot -s game -p ./out.png
+u screenshot -s game | mcat -i           # Pipe: inline display
 
 # Console commands (adb logcat style levels)
 u console get                             # All logs (plain text)
