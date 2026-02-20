@@ -252,7 +252,7 @@ def print_success(message: str) -> None:
         return
 
     if console.no_color:
-        print(f"[OK] {message}")
+        print(message)
         return
 
     text = Text()

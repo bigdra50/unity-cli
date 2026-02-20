@@ -221,6 +221,11 @@ u screenshot -s camera                 # Camera.Render
 u screenshot -p ./output.png           # Custom path
 u screenshot --super-size 2            # 2x resolution (game only)
 u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
+
+# Pipe-friendly: outputs path only when piped
+u screenshot -s game | mcat -i   # Inline display in terminal
+u screenshot -s game | pbcopy    # Copy path to clipboard
+u screenshot -s game | xargs open  # Open with default viewer
 ```
 
 ### Instance Management

@@ -221,6 +221,11 @@ u screenshot -s camera                 # Camera.Render
 u screenshot -p ./output.png           # 出力パス指定
 u screenshot --super-size 2            # 2倍解像度（game only）
 u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
+
+# パイプ時はパスのみ出力
+u screenshot -s game | mcat -i   # ターミナルにインライン表示
+u screenshot -s game | pbcopy    # パスをクリップボードにコピー
+u screenshot -s game | xargs open  # デフォルトビューアで開く
 ```
 
 ### インスタンス管理
