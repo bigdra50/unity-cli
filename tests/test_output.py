@@ -158,7 +158,7 @@ class TestPlainTextOutput:
     def test_print_success_plain(self, capsys: pytest.CaptureFixture[str]) -> None:
         print_success("done")
         out = capsys.readouterr().out
-        assert "[OK] done" in out
+        assert out.strip() == "done"
         # No ANSI escapes
         assert "\033" not in out
 
