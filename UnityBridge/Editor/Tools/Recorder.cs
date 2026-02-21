@@ -177,6 +177,11 @@ namespace UnityBridge.Tools
             // Pre-allocated readback buffers
             private NativeArray<byte>[] _readbackBuffers;
 
+            // Play Mode FPS control: saved values to restore on Stop
+            private int _savedTargetFrameRate;
+            private int _savedVSyncCount;
+            private bool _playModeOverrideActive;
+
             private int _frameCount;
             private int _droppedFrames;
             private int _pendingWrites;
@@ -221,16 +226,34 @@ namespace UnityBridge.Tools
                         bufferSize, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 }
 
+                // Play Mode: override Application.targetFrameRate and VSync for high FPS
+                if (EditorApplication.isPlaying)
+                {
+                    _savedTargetFrameRate = Application.targetFrameRate;
+                    _savedVSyncCount = QualitySettings.vSyncCount;
+                    QualitySettings.vSyncCount = 0;
+                    Application.targetFrameRate = _targetFps;
+                    _playModeOverrideActive = true;
+                }
+
                 EditorApplication.update += OnUpdate;
                 EditorApplication.QueuePlayerLoopUpdate();
 
-                BridgeLog.Info($"[Recorder] Started recording at {_targetFps} FPS ({_width}x{_height}, {_format}, ring={RingSize})");
+                BridgeLog.Info($"[Recorder] Started recording at {_targetFps} FPS ({_width}x{_height}, {_format}, ring={RingSize}, playMode={_playModeOverrideActive})");
             }
 
             public JObject Stop()
             {
                 IsRecording = false;
                 EditorApplication.update -= OnUpdate;
+
+                // Restore Play Mode FPS settings
+                if (_playModeOverrideActive)
+                {
+                    QualitySettings.vSyncCount = _savedVSyncCount;
+                    Application.targetFrameRate = _savedTargetFrameRate;
+                    _playModeOverrideActive = false;
+                }
 
                 // Wait briefly for pending writes
                 var waitStart = DateTime.UtcNow;
