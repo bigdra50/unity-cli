@@ -136,6 +136,9 @@ namespace UnityBridge.Tools
 
             void OnUpdate()
             {
+                // Force editor to keep ticking at high rate
+                EditorApplication.QueuePlayerLoopUpdate();
+
                 try
                 {
                     if ((DateTime.UtcNow - startTime).TotalSeconds > timeoutSeconds)
