@@ -18,7 +18,6 @@ from unity_cli.cli.commands import (
     completion,
     editor_control,
     open_cmd,
-    screenshot,
     selection,
 )
 from unity_cli.cli.commands.asset import asset_app
@@ -34,7 +33,9 @@ from unity_cli.cli.commands.menu import menu_app
 from unity_cli.cli.commands.package import package_app
 from unity_cli.cli.commands.profiler import profiler_app
 from unity_cli.cli.commands.project import project_app
+from unity_cli.cli.commands.recorder import recorder_app
 from unity_cli.cli.commands.scene import scene_app
+from unity_cli.cli.commands.screenshot import screenshot_app
 from unity_cli.cli.commands.tests import tests_app
 from unity_cli.cli.commands.uitree import uitree_app
 from unity_cli.cli.context import CLIContext, _on_retry_callback, _on_send_verbose
@@ -187,6 +188,8 @@ app.add_typer(uitree_app, name="uitree")
 app.add_typer(config_app, name="config")
 app.add_typer(project_app, name="project")
 app.add_typer(editor_app, name="editor")
+app.add_typer(screenshot_app, name="screenshot")
+app.add_typer(recorder_app, name="recorder")
 
 # =============================================================================
 # Register top-level commands
@@ -194,7 +197,6 @@ app.add_typer(editor_app, name="editor")
 
 editor_control.register(app)
 selection.register(app)
-screenshot.register(app)
 open_cmd.register(app)
 completion.register(app)
 

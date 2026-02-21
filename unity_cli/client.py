@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         MenuAPI,
         PackageAPI,
         ProfilerAPI,
+        RecorderAPI,
         SceneAPI,
         ScreenshotAPI,
         SelectionAPI,
@@ -611,6 +612,7 @@ class UnityClient:
             MenuAPI,
             PackageAPI,
             ProfilerAPI,
+            RecorderAPI,
             SceneAPI,
             ScreenshotAPI,
             SelectionAPI,
@@ -628,6 +630,7 @@ class UnityClient:
         self.component: ComponentAPI = ComponentAPI(self._conn)
         self.package: PackageAPI = PackageAPI(self._conn)
         self.profiler: ProfilerAPI = ProfilerAPI(self._conn)
+        self.recorder: RecorderAPI = RecorderAPI(self._conn)
         self.tests: TestAPI = TestAPI(self._conn)
         self.menu: MenuAPI = MenuAPI(self._conn)
         self.selection: SelectionAPI = SelectionAPI(self._conn)
