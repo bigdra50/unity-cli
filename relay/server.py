@@ -696,42 +696,62 @@ async def run_server(
         pass
 
 
-LOG_DIR = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")) / "unity-cli" / "logs"
-LOG_FILE = LOG_DIR / "relay.log"
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 LOG_BACKUP_COUNT = 5
 
-
-def _resolve_log_level(debug_flag: bool) -> int:
-    """Resolve log level from CLI flag or UNITY_CLI_LOG env var."""
-    env_level = os.environ.get("UNITY_CLI_LOG", "").upper()
-    if env_level:
-        return getattr(logging, env_level, logging.INFO)
-    return logging.DEBUG if debug_flag else logging.INFO
+_VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
 
-def _setup_logging(level: int) -> None:
-    """Configure stderr + rotating file logging."""
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=LOG_MAX_BYTES,
-        backupCount=LOG_BACKUP_COUNT,
-    )
-    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-
-    logging.basicConfig(
-        level=level,
-        format=LOG_FORMAT,
-        handlers=[logging.StreamHandler(), file_handler],
-    )
+def _resolve_log_dir() -> Path:
+    """Resolve log directory from XDG_STATE_HOME (evaluated at call time)."""
+    state_home = os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")
+    return Path(state_home) / "unity-cli" / "logs"
 
 
 def get_log_path() -> Path:
     """Return the relay log file path."""
-    return LOG_FILE
+    return _resolve_log_dir() / "relay.log"
+
+
+def _resolve_log_level(debug_flag: bool) -> int:
+    """Resolve log level from CLI flag or UNITY_CLI_LOG env var.
+
+    UNITY_CLI_LOG accepts: DEBUG, INFO, WARNING, ERROR, CRITICAL.
+    Invalid values fall back to INFO (or DEBUG if debug_flag is set).
+    """
+    env_level = os.environ.get("UNITY_CLI_LOG", "").upper()
+    if env_level in _VALID_LOG_LEVELS:
+        return getattr(logging, env_level)
+    return logging.DEBUG if debug_flag else logging.INFO
+
+
+def _setup_logging(level: int) -> None:
+    """Configure stderr + rotating file logging.
+
+    File handler creation is best-effort: if the log directory cannot be
+    created or the file cannot be opened, logging falls back to stderr only.
+    """
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+
+    try:
+        log_dir = _resolve_log_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            log_dir / "relay.log",
+            maxBytes=LOG_MAX_BYTES,
+            backupCount=LOG_BACKUP_COUNT,
+            delay=True,
+        )
+        file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+        handlers.append(file_handler)
+    except OSError as e:
+        # Fall back to stderr-only; warn after basicConfig sets up the handler
+        logging.basicConfig(level=level, format=LOG_FORMAT, handlers=handlers, force=True)
+        logger.warning(f"Failed to set up file logging: {e}")
+        return
+
+    logging.basicConfig(level=level, format=LOG_FORMAT, handlers=handlers, force=True)
 
 
 def main() -> None:
