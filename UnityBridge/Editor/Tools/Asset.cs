@@ -187,7 +187,7 @@ namespace UnityBridge.Tools
                     "'path' is required");
             }
 
-            if (!AssetDatabase.AssetPathExists(path))
+            if (!AssetPathExists(path))
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
@@ -219,7 +219,7 @@ namespace UnityBridge.Tools
                     "'path' is required");
             }
 
-            if (!AssetDatabase.AssetPathExists(path))
+            if (!AssetPathExists(path))
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
@@ -258,6 +258,15 @@ namespace UnityBridge.Tools
 
         private static Type FindType(string typeName)
             => TypeResolver.FindType(typeName);
+
+        private static bool AssetPathExists(string path)
+        {
+#if UNITY_6000_0_OR_NEWER
+            return AssetDatabase.AssetPathExists(path);
+#else
+            return AssetDatabase.GetMainAssetTypeAtPath(path) != null;
+#endif
+        }
 
         private static void CreateFolderRecursively(string path)
         {
