@@ -10,7 +10,10 @@ import argparse
 import asyncio
 import importlib.metadata
 import logging
+import os
 import signal
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
 
 from .instance_registry import (
@@ -693,6 +696,44 @@ async def run_server(
         pass
 
 
+LOG_DIR = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")) / "unity-cli" / "logs"
+LOG_FILE = LOG_DIR / "relay.log"
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+LOG_BACKUP_COUNT = 5
+
+
+def _resolve_log_level(debug_flag: bool) -> int:
+    """Resolve log level from CLI flag or UNITY_CLI_LOG env var."""
+    env_level = os.environ.get("UNITY_CLI_LOG", "").upper()
+    if env_level:
+        return getattr(logging, env_level, logging.INFO)
+    return logging.DEBUG if debug_flag else logging.INFO
+
+
+def _setup_logging(level: int) -> None:
+    """Configure stderr + rotating file logging."""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    file_handler = RotatingFileHandler(
+        LOG_FILE,
+        maxBytes=LOG_MAX_BYTES,
+        backupCount=LOG_BACKUP_COUNT,
+    )
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+
+    logging.basicConfig(
+        level=level,
+        format=LOG_FORMAT,
+        handlers=[logging.StreamHandler(), file_handler],
+    )
+
+
+def get_log_path() -> Path:
+    """Return the relay log file path."""
+    return LOG_FILE
+
+
 def main() -> None:
     """CLI entry point"""
     parser = argparse.ArgumentParser(description="Unity Bridge Relay Server")
@@ -723,11 +764,8 @@ def main() -> None:
     args = parser.parse_args()
 
     # Setup logging
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+    log_level = _resolve_log_level(args.debug)
+    _setup_logging(log_level)
 
     # Run server
     try:
