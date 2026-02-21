@@ -385,20 +385,19 @@ namespace UnityBridge.Tools
             var prevActive = RenderTexture.active;
             var renderTexture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
 
+            Texture2D texture = null;
             try
             {
                 camera.targetTexture = renderTexture;
                 camera.Render();
 
                 RenderTexture.active = renderTexture;
-                var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
                 texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 texture.Apply();
 
                 var bytes = EncodeTexture(texture, format, quality);
                 File.WriteAllBytes(path, bytes);
-
-                UnityEngine.Object.DestroyImmediate(texture);
 
                 return new JObject
                 {
@@ -413,6 +412,7 @@ namespace UnityBridge.Tools
             }
             finally
             {
+                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
                 camera.targetTexture = prevTarget;
                 RenderTexture.active = prevActive;
                 RenderTexture.ReleaseTemporary(renderTexture);
@@ -437,20 +437,19 @@ namespace UnityBridge.Tools
             var renderTexture = new RenderTexture(width, height, 24);
             var previousTarget = camera.targetTexture;
 
+            Texture2D texture = null;
             try
             {
                 camera.targetTexture = renderTexture;
                 camera.Render();
 
-                var texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+                texture = new Texture2D(width, height, TextureFormat.RGB24, false);
                 RenderTexture.active = renderTexture;
                 texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 texture.Apply();
 
                 var bytes = EncodeTexture(texture, format, quality);
                 File.WriteAllBytes(path, bytes);
-
-                UnityEngine.Object.DestroyImmediate(texture);
 
                 return new JObject
                 {
@@ -464,6 +463,7 @@ namespace UnityBridge.Tools
             }
             finally
             {
+                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
                 camera.targetTexture = previousTarget;
                 RenderTexture.active = null;
                 UnityEngine.Object.DestroyImmediate(renderTexture);
