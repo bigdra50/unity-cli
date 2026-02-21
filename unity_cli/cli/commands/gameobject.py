@@ -8,14 +8,14 @@ import typer
 from rich.markup import escape
 
 from unity_cli.cli.context import CLIContext
-from unity_cli.cli.helpers import _exit_usage, _handle_error, _should_json
+from unity_cli.cli.helpers import _exit_usage, _should_json, handle_cli_errors
 from unity_cli.cli.output import print_json, print_line, print_success
-from unity_cli.exceptions import UnityCLIError
 
 gameobject_app = typer.Typer(help="GameObject commands")
 
 
 @gameobject_app.command("find")
+@handle_cli_errors
 def gameobject_find(
     ctx: typer.Context,
     name: Annotated[str | None, typer.Option("--name", "-n", help="GameObject name")] = None,
@@ -31,22 +31,20 @@ def gameobject_find(
     if not name and id is None:
         _exit_usage("--name or --id required", "u gameobject find")
 
-    try:
-        result = context.client.gameobject.find(name=name, instance_id=id)
-        if _should_json(context, json_flag):
-            print_json(result)
-        else:
-            objects = result.get("objects", [])
-            print_line(f"[bold]Found {len(objects)} GameObject(s)[/bold]")
-            for obj in objects:
-                obj_name = escape(obj.get("name", "Unknown"))
-                obj_id = obj.get("instanceID", "")
-                print_line(f"  {obj_name} (ID: {obj_id})")
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.gameobject.find(name=name, instance_id=id)
+    if _should_json(context, json_flag):
+        print_json(result)
+    else:
+        objects = result.get("objects", [])
+        print_line(f"[bold]Found {len(objects)} GameObject(s)[/bold]")
+        for obj in objects:
+            obj_name = escape(obj.get("name", "Unknown"))
+            obj_id = obj.get("instanceID", "")
+            print_line(f"  {obj_name} (ID: {obj_id})")
 
 
 @gameobject_app.command("create")
+@handle_cli_errors
 def gameobject_create(
     ctx: typer.Context,
     name: Annotated[str, typer.Option("--name", "-n", help="GameObject name")],
@@ -69,20 +67,18 @@ def gameobject_create(
 ) -> None:
     """Create a new GameObject."""
     context: CLIContext = ctx.obj
-    try:
-        result = context.client.gameobject.create(
-            name=name,
-            primitive_type=primitive,
-            position=list(position) if position else None,
-            rotation=list(rotation) if rotation else None,
-            scale=list(scale) if scale else None,
-        )
-        print_success(result.get("message", f"Created: {name}"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.gameobject.create(
+        name=name,
+        primitive_type=primitive,
+        position=list(position) if position else None,
+        rotation=list(rotation) if rotation else None,
+        scale=list(scale) if scale else None,
+    )
+    print_success(result.get("message", f"Created: {name}"))
 
 
 @gameobject_app.command("modify")
+@handle_cli_errors
 def gameobject_modify(
     ctx: typer.Context,
     name: Annotated[str | None, typer.Option("--name", "-n", help="GameObject name")] = None,
@@ -106,20 +102,18 @@ def gameobject_modify(
     if not name and id is None:
         _exit_usage("--name or --id required", "u gameobject modify")
 
-    try:
-        result = context.client.gameobject.modify(
-            name=name,
-            instance_id=id,
-            position=list(position) if position else None,
-            rotation=list(rotation) if rotation else None,
-            scale=list(scale) if scale else None,
-        )
-        print_success(result.get("message", "Transform modified"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.gameobject.modify(
+        name=name,
+        instance_id=id,
+        position=list(position) if position else None,
+        rotation=list(rotation) if rotation else None,
+        scale=list(scale) if scale else None,
+    )
+    print_success(result.get("message", "Transform modified"))
 
 
 @gameobject_app.command("active")
+@handle_cli_errors
 def gameobject_active(
     ctx: typer.Context,
     name: Annotated[str | None, typer.Option("--name", "-n", help="GameObject name")] = None,
@@ -135,18 +129,16 @@ def gameobject_active(
     if not name and id is None:
         _exit_usage("--name or --id required", "u gameobject active")
 
-    try:
-        result = context.client.gameobject.set_active(
-            active=active,
-            name=name,
-            instance_id=id,
-        )
-        print_success(result.get("message", f"Active set to {active}"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.gameobject.set_active(
+        active=active,
+        name=name,
+        instance_id=id,
+    )
+    print_success(result.get("message", f"Active set to {active}"))
 
 
 @gameobject_app.command("delete")
+@handle_cli_errors
 def gameobject_delete(
     ctx: typer.Context,
     name: Annotated[str | None, typer.Option("--name", "-n", help="GameObject name")] = None,
@@ -158,8 +150,5 @@ def gameobject_delete(
     if not name and id is None:
         _exit_usage("--name or --id required", "u gameobject delete")
 
-    try:
-        result = context.client.gameobject.delete(name=name, instance_id=id)
-        print_success(result.get("message", "GameObject deleted"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.gameobject.delete(name=name, instance_id=id)
+    print_success(result.get("message", "GameObject deleted"))

@@ -7,14 +7,14 @@ from typing import Annotated
 import typer
 
 from unity_cli.cli.context import CLIContext
-from unity_cli.cli.helpers import _exit_usage, _handle_error, _parse_cli_value, _should_json
+from unity_cli.cli.helpers import _exit_usage, _parse_cli_value, _should_json, handle_cli_errors
 from unity_cli.cli.output import print_components_table, print_json, print_key_value, print_success
-from unity_cli.exceptions import UnityCLIError
 
 component_app = typer.Typer(help="Component commands")
 
 
 @component_app.command("list")
+@handle_cli_errors
 def component_list(
     ctx: typer.Context,
     target: Annotated[str | None, typer.Option("--target", "-t", help="Target GameObject name")] = None,
@@ -30,17 +30,15 @@ def component_list(
     if not target and target_id is None:
         _exit_usage("--target or --target-id required", "u component list")
 
-    try:
-        result = context.client.component.list(target=target, target_id=target_id)
-        if _should_json(context, json_flag):
-            print_json(result)
-        else:
-            print_components_table(result.get("components", []))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.component.list(target=target, target_id=target_id)
+    if _should_json(context, json_flag):
+        print_json(result)
+    else:
+        print_components_table(result.get("components", []))
 
 
 @component_app.command("inspect")
+@handle_cli_errors
 def component_inspect(
     ctx: typer.Context,
     component_type: Annotated[str, typer.Option("--type", "-T", help="Component type name")],
@@ -57,21 +55,19 @@ def component_inspect(
     if not target and target_id is None:
         _exit_usage("--target or --target-id required", "u component inspect")
 
-    try:
-        result = context.client.component.inspect(
-            target=target,
-            target_id=target_id,
-            component_type=component_type,
-        )
-        if _should_json(context, json_flag):
-            print_json(result, None)
-        else:
-            print_key_value(result, component_type)
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.component.inspect(
+        target=target,
+        target_id=target_id,
+        component_type=component_type,
+    )
+    if _should_json(context, json_flag):
+        print_json(result, None)
+    else:
+        print_key_value(result, component_type)
 
 
 @component_app.command("add")
+@handle_cli_errors
 def component_add(
     ctx: typer.Context,
     component_type: Annotated[str, typer.Option("--type", "-T", help="Component type name to add")],
@@ -84,18 +80,16 @@ def component_add(
     if not target and target_id is None:
         _exit_usage("--target or --target-id required", "u component add")
 
-    try:
-        result = context.client.component.add(
-            target=target,
-            target_id=target_id,
-            component_type=component_type,
-        )
-        print_success(result.get("message", "Component added"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.component.add(
+        target=target,
+        target_id=target_id,
+        component_type=component_type,
+    )
+    print_success(result.get("message", "Component added"))
 
 
 @component_app.command("modify")
+@handle_cli_errors
 def component_modify(
     ctx: typer.Context,
     component_type: Annotated[str, typer.Option("--type", "-T", help="Component type name")],
@@ -124,20 +118,18 @@ def component_modify(
 
     parsed_value = _parse_cli_value(value)
 
-    try:
-        result = context.client.component.modify(
-            target=target,
-            target_id=target_id,
-            component_type=component_type,
-            prop=prop,
-            value=parsed_value,
-        )
-        print_success(result.get("message", "Property modified"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.component.modify(
+        target=target,
+        target_id=target_id,
+        component_type=component_type,
+        prop=prop,
+        value=parsed_value,
+    )
+    print_success(result.get("message", "Property modified"))
 
 
 @component_app.command("remove")
+@handle_cli_errors
 def component_remove(
     ctx: typer.Context,
     component_type: Annotated[str, typer.Option("--type", "-T", help="Component type name to remove")],
@@ -150,12 +142,9 @@ def component_remove(
     if not target and target_id is None:
         _exit_usage("--target or --target-id required", "u component remove")
 
-    try:
-        result = context.client.component.remove(
-            target=target,
-            target_id=target_id,
-            component_type=component_type,
-        )
-        print_success(result.get("message", "Component removed"))
-    except UnityCLIError as e:
-        _handle_error(e)
+    result = context.client.component.remove(
+        target=target,
+        target_id=target_id,
+        component_type=component_type,
+    )
+    print_success(result.get("message", "Component removed"))
