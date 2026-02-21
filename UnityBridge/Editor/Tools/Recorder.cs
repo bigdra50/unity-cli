@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -15,9 +14,16 @@ using UnityEngine.Rendering;
 namespace UnityBridge.Tools
 {
     [BridgeTool("recorder")]
+    [InitializeOnLoad]
     public static class Recorder
     {
         private static RecordingSession _session;
+
+        static Recorder()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload += ForceStop;
+            EditorApplication.quitting += ForceStop;
+        }
 
         public static Task<JObject> HandleCommand(JObject parameters)
         {
@@ -51,34 +57,19 @@ namespace UnityBridge.Tools
             var cameraName = parameters["camera"]?.Value<string>();
             var outputDir = parameters["outputDir"]?.Value<string>();
 
-            if (format != "png" && format != "jpg")
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"Unknown format: {format}. Valid formats: png, jpg");
-            }
+            CaptureHelpers.ValidateFormat(format);
 
             fps = Mathf.Clamp(fps, 1, 120);
             quality = Mathf.Clamp(quality, 1, 100);
-            width = Mathf.Max(1, width);
-            height = Mathf.Max(1, height);
+            CaptureHelpers.ClampDimensions(ref width, ref height);
 
-            if (string.IsNullOrEmpty(outputDir))
-            {
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var projectPath = Directory.GetCurrentDirectory();
-                outputDir = Path.Combine(projectPath, $"Screenshots/recording_{timestamp}");
-            }
+            outputDir = CaptureHelpers.ResolveOutputDir(outputDir, "recording");
+            var camera = CaptureHelpers.FindCamera(cameraName);
 
-            if (!Directory.Exists(outputDir))
-            {
-                Directory.CreateDirectory(outputDir);
-            }
-
-            Camera camera = FindCamera(cameraName);
-
-            _session = new RecordingSession(camera, fps, format, quality, width, height, outputDir);
-            _session.Start();
+            // M3: Build session in local var, assign to _session only on success
+            var session = new RecordingSession(camera, fps, format, quality, width, height, outputDir);
+            session.Start();
+            _session = session;
 
             return new JObject
             {
@@ -121,28 +112,22 @@ namespace UnityBridge.Tools
             return _session.GetStatus();
         }
 
-        private static Camera FindCamera(string cameraName)
+        private static void ForceStop()
         {
-            Camera camera = null;
-            if (!string.IsNullOrEmpty(cameraName))
+            if (_session == null || !_session.IsRecording) return;
+
+            try
             {
-                var cameraGo = GameObject.Find(cameraName);
-                if (cameraGo != null)
-                {
-                    camera = cameraGo.GetComponent<Camera>();
-                }
+                _session.Stop();
             }
-
-            camera ??= Camera.main;
-
-            if (camera == null)
+            catch (Exception ex)
             {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "No camera found. Specify camera name or ensure a Main Camera exists.");
+                BridgeLog.Warn($"[Recorder] ForceStop error: {ex.Message}");
             }
-
-            return camera;
+            finally
+            {
+                _session = null;
+            }
         }
 
         // Cached reflection: InternalEditorUtility.RepaintAllViews()
@@ -185,6 +170,8 @@ namespace UnityBridge.Tools
             private int _frameCount;
             private int _droppedFrames;
             private int _pendingWrites;
+            private int _pendingReadbacks;
+            private int _failedWrites;
             private double _startTime;
             private double _lastCaptureTime;
 
@@ -199,7 +186,7 @@ namespace UnityBridge.Tools
                 _width = width;
                 _height = height;
                 _outputDir = outputDir;
-                _ext = format == "jpg" ? ".jpg" : ".png";
+                _ext = CaptureHelpers.GetExtension(format);
                 _frameInterval = 1.0 / fps;
             }
 
@@ -208,6 +195,8 @@ namespace UnityBridge.Tools
                 _frameCount = 0;
                 _droppedFrames = 0;
                 _pendingWrites = 0;
+                _pendingReadbacks = 0;
+                _failedWrites = 0;
                 _startTime = EditorApplication.timeSinceStartup;
                 _lastCaptureTime = 0;
                 IsRecording = true;
@@ -255,10 +244,12 @@ namespace UnityBridge.Tools
                     _playModeOverrideActive = false;
                 }
 
-                // Wait briefly for pending writes
+                // P1: Wait for both pending readbacks and writes to complete
                 var waitStart = DateTime.UtcNow;
-                while (Interlocked.CompareExchange(ref _pendingWrites, 0, 0) > 0
-                       && (DateTime.UtcNow - waitStart).TotalSeconds < 5)
+                var timeout = ToolConstants.RecorderStopTimeoutSeconds;
+                while ((Interlocked.CompareExchange(ref _pendingReadbacks, 0, 0) > 0
+                        || Interlocked.CompareExchange(ref _pendingWrites, 0, 0) > 0)
+                       && (DateTime.UtcNow - waitStart).TotalSeconds < timeout)
                 {
                     Thread.Sleep(10);
                 }
@@ -281,13 +272,14 @@ namespace UnityBridge.Tools
                 var elapsed = EditorApplication.timeSinceStartup - _startTime;
                 var fps = elapsed > 0 ? _frameCount / elapsed : 0;
 
-                BridgeLog.Info($"[Recorder] Stopped. {_frameCount} frames in {elapsed:F2}s ({fps:F1} FPS, dropped: {_droppedFrames})");
+                BridgeLog.Info($"[Recorder] Stopped. {_frameCount} frames in {elapsed:F2}s ({fps:F1} FPS, dropped: {_droppedFrames}, failed: {_failedWrites})");
 
                 return new JObject
                 {
                     ["message"] = $"Recording stopped: {_frameCount} frames",
                     ["frameCount"] = _frameCount,
                     ["droppedFrames"] = _droppedFrames,
+                    ["failedWrites"] = _failedWrites,
                     ["elapsed"] = Math.Round(elapsed, 3),
                     ["fps"] = Math.Round(fps, 1),
                     ["outputDir"] = _outputDir,
@@ -305,9 +297,11 @@ namespace UnityBridge.Tools
                     ["recording"] = true,
                     ["frameCount"] = _frameCount,
                     ["droppedFrames"] = _droppedFrames,
+                    ["failedWrites"] = _failedWrites,
                     ["elapsed"] = Math.Round(elapsed, 3),
                     ["fps"] = Math.Round(fps, 1),
                     ["pendingWrites"] = Interlocked.CompareExchange(ref _pendingWrites, 0, 0),
+                    ["pendingReadbacks"] = Interlocked.CompareExchange(ref _pendingReadbacks, 0, 0),
                     ["outputDir"] = _outputDir
                 };
             }
@@ -315,10 +309,6 @@ namespace UnityBridge.Tools
             private void OnUpdate()
             {
                 if (!IsRecording) return;
-
-                // Phase 1: Force editor to keep ticking at high rate
-                EditorApplication.QueuePlayerLoopUpdate();
-                RepaintAllViews?.Invoke();
 
                 try
                 {
@@ -328,6 +318,13 @@ namespace UnityBridge.Tools
                     // FPS throttle
                     if (elapsed - _lastCaptureTime < _frameInterval)
                         return;
+
+                    // P4: Only force repaint on capture tick, skip in Play Mode
+                    if (!EditorApplication.isPlaying)
+                    {
+                        EditorApplication.QueuePlayerLoopUpdate();
+                        RepaintAllViews?.Invoke();
+                    }
 
                     _lastCaptureTime = elapsed;
 
@@ -365,7 +362,9 @@ namespace UnityBridge.Tools
 
                 if (SystemInfo.supportsAsyncGPUReadback)
                 {
-                    // Phase 2: Zero-copy readback into pre-allocated NativeArray
+                    // P1: Track pending readbacks
+                    Interlocked.Increment(ref _pendingReadbacks);
+
                     var req = AsyncGPUReadback.RequestIntoNativeArray(
                         ref _readbackBuffers[slot],
                         _rtRing[slot], 0, TextureFormat.RGBA32,
@@ -374,24 +373,47 @@ namespace UnityBridge.Tools
                 }
                 else
                 {
-                    // Fallback: synchronous ReadPixels + encode on ThreadPool
-                    RenderTexture.active = _rtRing[slot];
-                    var texture = new Texture2D(_width, _height, TextureFormat.RGBA32, false);
-                    texture.ReadPixels(new Rect(0, 0, _width, _height), 0, 0);
-                    texture.Apply();
-                    RenderTexture.active = prevActive;
+                    // M1: Synchronous fallback wrapped in try/finally for _slotBusy safety
+                    try
+                    {
+                        RenderTexture.active = _rtRing[slot];
+                        var texture = new Texture2D(_width, _height, TextureFormat.RGBA32, false);
+                        try
+                        {
+                            texture.ReadPixels(new Rect(0, 0, _width, _height), 0, 0);
+                            texture.Apply();
 
-                    var bytes = _format == "jpg"
-                        ? texture.EncodeToJPG(_quality)
-                        : texture.EncodeToPNG();
-                    UnityEngine.Object.DestroyImmediate(texture);
+                            var bytes = _format == "jpg"
+                                ? texture.EncodeToJPG(_quality)
+                                : texture.EncodeToPNG();
 
-                    WriteFrameAsync(slot, frameIndex, bytes);
+                            WriteFrameAsync(slot, frameIndex, bytes);
+                            // WriteFrameAsync takes ownership of slot release
+                            return;
+                        }
+                        finally
+                        {
+                            UnityEngine.Object.DestroyImmediate(texture);
+                        }
+                    }
+                    catch
+                    {
+                        // Ensure slot is released on any failure before WriteFrameAsync
+                        Interlocked.Exchange(ref _slotBusy[slot], 0);
+                        throw;
+                    }
+                    finally
+                    {
+                        RenderTexture.active = prevActive;
+                    }
                 }
             }
 
             private void OnReadbackComplete(int slot, int frameIndex, AsyncGPUReadbackRequest request)
             {
+                // P1: Readback complete
+                Interlocked.Decrement(ref _pendingReadbacks);
+
                 if (request.hasError)
                 {
                     BridgeLog.Warn($"[Recorder] AsyncGPUReadback failed for frame {frameIndex}");
@@ -399,7 +421,6 @@ namespace UnityBridge.Tools
                     return;
                 }
 
-                // Phase 2: Encode on ThreadPool (EncodeNativeArrayToJPG is thread-safe in 2022.3)
                 Interlocked.Increment(ref _pendingWrites);
                 var framePath = Path.Combine(_outputDir, $"frame_{frameIndex:D6}{_ext}");
                 int w = _width;
@@ -437,6 +458,8 @@ namespace UnityBridge.Tools
                     }
                     catch (Exception ex)
                     {
+                        // M2: Track failed writes
+                        Interlocked.Increment(ref _failedWrites);
                         BridgeLog.Warn($"[Recorder] Encode/write failed for frame {frameIndex}: {ex.Message}");
                     }
                     finally
@@ -460,6 +483,8 @@ namespace UnityBridge.Tools
                     }
                     catch (Exception ex)
                     {
+                        // M2: Track failed writes
+                        Interlocked.Increment(ref _failedWrites);
                         BridgeLog.Warn($"[Recorder] Failed to write frame {frameIndex}: {ex.Message}");
                     }
                     finally

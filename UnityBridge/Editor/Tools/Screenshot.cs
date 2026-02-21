@@ -10,14 +10,13 @@ using UnityEngine;
 
 namespace UnityBridge.Tools
 {
-    /// <summary>
-    /// Handler for screenshot commands.
-    /// Captures screenshots from SceneView or GameView.
-    /// </summary>
     [BridgeTool("screenshot")]
     public static class Screenshot
     {
         private static readonly Type GameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+
+        // A1: Prevent concurrent burst executions
+        private static int _burstRunning;
 
         public static Task<JObject> HandleCommand(JObject parameters)
         {
@@ -40,11 +39,6 @@ namespace UnityBridge.Tools
                 : texture.EncodeToPNG();
         }
 
-        private static string GetExtension(string format)
-        {
-            return format == "jpg" ? ".jpg" : ".png";
-        }
-
         private static Task<JObject> Capture(JObject parameters)
         {
             var source = parameters["source"]?.Value<string>() ?? "game";
@@ -53,26 +47,11 @@ namespace UnityBridge.Tools
             var format = (parameters["format"]?.Value<string>() ?? "png").ToLowerInvariant();
             var quality = parameters["quality"]?.Value<int>() ?? 75;
 
-            if (format != "png" && format != "jpg")
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    $"Unknown format: {format}. Valid formats: png, jpg");
-            }
+            CaptureHelpers.ValidateFormat(format);
             quality = Mathf.Clamp(quality, 1, 100);
 
-            if (string.IsNullOrEmpty(path))
-            {
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var projectPath = Directory.GetCurrentDirectory();
-                path = Path.Combine(projectPath, $"Screenshots/screenshot_{timestamp}{GetExtension(format)}");
-            }
-
-            var directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            var ext = CaptureHelpers.GetExtension(format);
+            path = CaptureHelpers.ResolveOutputPath(path, "screenshot", ext);
 
             return source.ToLowerInvariant() switch
             {
@@ -87,182 +66,174 @@ namespace UnityBridge.Tools
 
         private static Task<JObject> Burst(JObject parameters)
         {
-            var count = parameters["count"]?.Value<int>() ?? 10;
-            var intervalMs = parameters["interval_ms"]?.Value<int>() ?? 0;
-            var format = (parameters["format"]?.Value<string>() ?? "jpg").ToLowerInvariant();
-            var quality = parameters["quality"]?.Value<int>() ?? 75;
-            var width = parameters["width"]?.Value<int>() ?? 1920;
-            var height = parameters["height"]?.Value<int>() ?? 1080;
-            var cameraName = parameters["camera"]?.Value<string>();
-            var outputDir = parameters["outputDir"]?.Value<string>();
-
-            if (format != "png" && format != "jpg")
+            // A1: Prevent concurrent burst execution
+            if (Interlocked.CompareExchange(ref _burstRunning, 1, 0) != 0)
             {
                 throw new ProtocolException(
                     ErrorCode.InvalidParams,
-                    $"Unknown format: {format}. Valid formats: png, jpg");
-            }
-            quality = Mathf.Clamp(quality, 1, 100);
-            count = Mathf.Clamp(count, 1, 1000);
-            width = Mathf.Max(1, width);
-            height = Mathf.Max(1, height);
-
-            if (string.IsNullOrEmpty(outputDir))
-            {
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var projectPath = Directory.GetCurrentDirectory();
-                outputDir = Path.Combine(projectPath, $"Screenshots/burst_{timestamp}");
+                    "Burst capture already in progress.");
             }
 
-            if (!Directory.Exists(outputDir))
+            try
             {
-                Directory.CreateDirectory(outputDir);
-            }
+                var count = parameters["count"]?.Value<int>() ?? 10;
+                var intervalMs = parameters["interval_ms"]?.Value<int>() ?? 0;
+                var format = (parameters["format"]?.Value<string>() ?? "jpg").ToLowerInvariant();
+                var quality = parameters["quality"]?.Value<int>() ?? 75;
+                var width = parameters["width"]?.Value<int>() ?? 1920;
+                var height = parameters["height"]?.Value<int>() ?? 1080;
+                var cameraName = parameters["camera"]?.Value<string>();
+                var outputDir = parameters["outputDir"]?.Value<string>();
 
-            var camera = FindCamera(cameraName);
+                CaptureHelpers.ValidateFormat(format);
+                quality = Mathf.Clamp(quality, 1, 100);
+                count = Mathf.Clamp(count, 1, 1000);
+                CaptureHelpers.ClampDimensions(ref width, ref height);
 
-            var tcs = new TaskCompletionSource<JObject>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var framesCaptured = 0;
-            var pendingWrites = 0;
-            var startTime = DateTime.UtcNow;
-            var lastCaptureTime = DateTime.UtcNow;
-            var paths = new List<string>();
-            const int timeoutSeconds = 60;
+                // S4: Guard against negative interval
+                intervalMs = Mathf.Max(0, intervalMs);
 
-            var ext = GetExtension(format);
-            var prevTarget = camera.targetTexture;
-            var prevActive = RenderTexture.active;
-            var renderTexture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+                outputDir = CaptureHelpers.ResolveOutputDir(outputDir, "burst");
+                var camera = CaptureHelpers.FindCamera(cameraName);
 
-            void OnUpdate()
-            {
-                // Force editor to keep ticking at high rate
-                EditorApplication.QueuePlayerLoopUpdate();
+                var tcs = new TaskCompletionSource<JObject>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var framesCaptured = 0;
+                var pendingWrites = 0;
+                var droppedFrames = 0;
+                var startTime = DateTime.UtcNow;
+                var lastCaptureTime = DateTime.UtcNow;
+                var paths = new List<string>();
+                const int timeoutSeconds = 60;
 
-                try
+                var ext = CaptureHelpers.GetExtension(format);
+                var prevTarget = camera.targetTexture;
+                var prevActive = RenderTexture.active;
+                var renderTexture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+
+                void OnUpdate()
                 {
-                    if ((DateTime.UtcNow - startTime).TotalSeconds > timeoutSeconds)
-                    {
-                        Cleanup();
-                        tcs.TrySetException(new ProtocolException(
-                            ErrorCode.InternalError,
-                            $"Burst capture timed out after {timeoutSeconds}s"));
-                        return;
-                    }
+                    // Force editor to keep ticking at high rate
+                    EditorApplication.QueuePlayerLoopUpdate();
 
-                    if (framesCaptured >= count)
+                    try
                     {
-                        // Wait for pending writes to finish
-                        if (Interlocked.CompareExchange(ref pendingWrites, 0, 0) == 0)
+                        if ((DateTime.UtcNow - startTime).TotalSeconds > timeoutSeconds)
                         {
                             Cleanup();
-                            var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
-                            var fps = elapsed > 0 ? framesCaptured / elapsed : 0;
-                            tcs.TrySetResult(new JObject
-                            {
-                                ["message"] = $"Burst capture complete: {framesCaptured} frames",
-                                ["frameCount"] = framesCaptured,
-                                ["outputDir"] = outputDir,
-                                ["format"] = format,
-                                ["elapsed"] = Math.Round(elapsed, 3),
-                                ["fps"] = Math.Round(fps, 1),
-                                ["paths"] = new JArray(paths)
-                            });
-                        }
-                        return;
-                    }
-
-                    // Interval control
-                    if (intervalMs > 0)
-                    {
-                        var elapsedSinceLastCapture = (DateTime.UtcNow - lastCaptureTime).TotalMilliseconds;
-                        if (elapsedSinceLastCapture < intervalMs)
+                            tcs.TrySetException(new ProtocolException(
+                                ErrorCode.InternalError,
+                                $"Burst capture timed out after {timeoutSeconds}s"));
                             return;
-                    }
+                        }
 
-                    // Capture frame
-                    camera.targetTexture = renderTexture;
-                    camera.Render();
+                        if (framesCaptured >= count)
+                        {
+                            // Wait for pending writes to finish
+                            if (Interlocked.CompareExchange(ref pendingWrites, 0, 0) == 0)
+                            {
+                                Cleanup();
+                                var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
+                                var fps = elapsed > 0 ? framesCaptured / elapsed : 0;
+                                tcs.TrySetResult(new JObject
+                                {
+                                    ["message"] = $"Burst capture complete: {framesCaptured} frames",
+                                    ["frameCount"] = framesCaptured,
+                                    ["droppedFrames"] = droppedFrames,
+                                    ["outputDir"] = outputDir,
+                                    ["format"] = format,
+                                    ["elapsed"] = Math.Round(elapsed, 3),
+                                    ["fps"] = Math.Round(fps, 1),
+                                    ["paths"] = new JArray(paths)
+                                });
+                            }
+                            return;
+                        }
 
-                    RenderTexture.active = renderTexture;
-                    var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                    texture.Apply();
+                        // Interval control
+                        if (intervalMs > 0)
+                        {
+                            var elapsedSinceLastCapture = (DateTime.UtcNow - lastCaptureTime).TotalMilliseconds;
+                            if (elapsedSinceLastCapture < intervalMs)
+                                return;
+                        }
 
-                    var bytes = EncodeTexture(texture, format, quality);
-                    UnityEngine.Object.DestroyImmediate(texture);
+                        // P2: Back-pressure - skip frame if too many writes pending
+                        if (Interlocked.CompareExchange(ref pendingWrites, 0, 0) >= ToolConstants.BurstMaxPendingWrites)
+                        {
+                            droppedFrames++;
+                            return;
+                        }
 
-                    var framePath = Path.Combine(outputDir, $"frame_{framesCaptured:D4}{ext}");
-                    paths.Add(framePath);
-                    framesCaptured++;
-                    lastCaptureTime = DateTime.UtcNow;
+                        // Capture frame
+                        camera.targetTexture = renderTexture;
+                        camera.Render();
 
-                    // Async file write
-                    Interlocked.Increment(ref pendingWrites);
-                    ThreadPool.QueueUserWorkItem(_ =>
-                    {
+                        RenderTexture.active = renderTexture;
+                        var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
                         try
                         {
-                            File.WriteAllBytes(framePath, bytes);
-                        }
-                        catch (Exception ex)
-                        {
-                            BridgeLog.Warn($"[Screenshot] Failed to write burst frame: {ex.Message}");
+                            texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                            texture.Apply();
+
+                            var bytes = EncodeTexture(texture, format, quality);
+
+                            var framePath = Path.Combine(outputDir, $"frame_{framesCaptured:D4}{ext}");
+                            paths.Add(framePath);
+                            framesCaptured++;
+                            lastCaptureTime = DateTime.UtcNow;
+
+                            // Async file write
+                            Interlocked.Increment(ref pendingWrites);
+                            ThreadPool.QueueUserWorkItem(_ =>
+                            {
+                                try
+                                {
+                                    File.WriteAllBytes(framePath, bytes);
+                                }
+                                catch (Exception ex)
+                                {
+                                    BridgeLog.Warn($"[Screenshot] Failed to write burst frame: {ex.Message}");
+                                }
+                                finally
+                                {
+                                    Interlocked.Decrement(ref pendingWrites);
+                                }
+                            });
                         }
                         finally
                         {
-                            Interlocked.Decrement(ref pendingWrites);
+                            UnityEngine.Object.DestroyImmediate(texture);
                         }
-                    });
+                    }
+                    catch (Exception ex)
+                    {
+                        Cleanup();
+                        tcs.TrySetException(ex is ProtocolException ? ex :
+                            new ProtocolException(ErrorCode.InternalError,
+                                $"Burst capture failed: {ex.Message}"));
+                    }
                 }
-                catch (Exception ex)
+
+                void Cleanup()
                 {
-                    Cleanup();
-                    tcs.TrySetException(ex is ProtocolException ? ex :
-                        new ProtocolException(ErrorCode.InternalError,
-                            $"Burst capture failed: {ex.Message}"));
+                    EditorApplication.update -= OnUpdate;
+                    camera.targetTexture = prevTarget;
+                    RenderTexture.active = prevActive;
+                    RenderTexture.ReleaseTemporary(renderTexture);
+                    Interlocked.Exchange(ref _burstRunning, 0);
                 }
-            }
 
-            void Cleanup()
+                EditorApplication.update += OnUpdate;
+                EditorApplication.QueuePlayerLoopUpdate();
+
+                return tcs.Task;
+            }
+            catch
             {
-                EditorApplication.update -= OnUpdate;
-                camera.targetTexture = prevTarget;
-                RenderTexture.active = prevActive;
-                RenderTexture.ReleaseTemporary(renderTexture);
+                // Release burst lock if setup fails
+                Interlocked.Exchange(ref _burstRunning, 0);
+                throw;
             }
-
-            EditorApplication.update += OnUpdate;
-            EditorApplication.QueuePlayerLoopUpdate();
-
-            return tcs.Task;
-        }
-
-        private static Camera FindCamera(string cameraName)
-        {
-            Camera camera = null;
-            if (!string.IsNullOrEmpty(cameraName))
-            {
-                var cameraGo = GameObject.Find(cameraName);
-                if (cameraGo != null)
-                {
-                    camera = cameraGo.GetComponent<Camera>();
-                }
-            }
-
-            if (camera == null)
-            {
-                camera = Camera.main;
-            }
-
-            if (camera == null)
-            {
-                throw new ProtocolException(
-                    ErrorCode.InvalidParams,
-                    "No camera found. Specify camera name or ensure a Main Camera exists.");
-            }
-
-            return camera;
         }
 
         private static Task<JObject> CaptureGameViewAsync(string path, int superSize)
@@ -313,14 +284,12 @@ namespace UnityBridge.Tools
                         return;
                     }
 
-                    // Wait frames for GameView to render after Focus + Repaint
                     if (framesToWait > 0)
                     {
                         framesToWait--;
                         return;
                     }
 
-                    // Trigger capture once
                     if (!captured)
                     {
                         ScreenCapture.CaptureScreenshot(path, superSize);
@@ -328,7 +297,6 @@ namespace UnityBridge.Tools
                         return;
                     }
 
-                    // Poll for file save completion
                     if (File.Exists(path) && new FileInfo(path).Length > 0)
                     {
                         EditorApplication.update -= OnUpdate;
@@ -363,41 +331,36 @@ namespace UnityBridge.Tools
             var height = parameters["height"]?.Value<int>() ?? 1080;
             var cameraName = parameters["camera"]?.Value<string>();
 
-            if (string.IsNullOrEmpty(path))
-            {
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var projectPath = Directory.GetCurrentDirectory();
-                path = Path.Combine(projectPath, $"Screenshots/camera_{timestamp}{GetExtension(format)}");
-            }
+            CaptureHelpers.ClampDimensions(ref width, ref height);
 
-            var directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            var ext = CaptureHelpers.GetExtension(format);
+            path = CaptureHelpers.ResolveOutputPath(path, "camera", ext);
 
-            var camera = FindCamera(cameraName);
-
-            width = Mathf.Max(1, width);
-            height = Mathf.Max(1, height);
+            var camera = CaptureHelpers.FindCamera(cameraName);
 
             var prevTarget = camera.targetTexture;
             var prevActive = RenderTexture.active;
             var renderTexture = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
 
-            Texture2D texture = null;
             try
             {
                 camera.targetTexture = renderTexture;
                 camera.Render();
 
                 RenderTexture.active = renderTexture;
-                texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                texture.Apply();
+                var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                try
+                {
+                    texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    texture.Apply();
 
-                var bytes = EncodeTexture(texture, format, quality);
-                File.WriteAllBytes(path, bytes);
+                    var bytes = EncodeTexture(texture, format, quality);
+                    File.WriteAllBytes(path, bytes);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
 
                 return new JObject
                 {
@@ -412,7 +375,6 @@ namespace UnityBridge.Tools
             }
             finally
             {
-                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
                 camera.targetTexture = prevTarget;
                 RenderTexture.active = prevActive;
                 RenderTexture.ReleaseTemporary(renderTexture);
@@ -436,20 +398,28 @@ namespace UnityBridge.Tools
 
             var renderTexture = new RenderTexture(width, height, 24);
             var previousTarget = camera.targetTexture;
+            // P5: Save current RenderTexture.active to restore in finally
+            var previousActive = RenderTexture.active;
 
-            Texture2D texture = null;
             try
             {
                 camera.targetTexture = renderTexture;
                 camera.Render();
 
-                texture = new Texture2D(width, height, TextureFormat.RGB24, false);
                 RenderTexture.active = renderTexture;
-                texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                texture.Apply();
+                var texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+                try
+                {
+                    texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    texture.Apply();
 
-                var bytes = EncodeTexture(texture, format, quality);
-                File.WriteAllBytes(path, bytes);
+                    var bytes = EncodeTexture(texture, format, quality);
+                    File.WriteAllBytes(path, bytes);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
 
                 return new JObject
                 {
@@ -463,9 +433,9 @@ namespace UnityBridge.Tools
             }
             finally
             {
-                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
                 camera.targetTexture = previousTarget;
-                RenderTexture.active = null;
+                // P5: Restore actual previous RenderTexture.active instead of null
+                RenderTexture.active = previousActive;
                 UnityEngine.Object.DestroyImmediate(renderTexture);
             }
         }
