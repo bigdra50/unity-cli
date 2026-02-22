@@ -480,6 +480,16 @@ A Claude Code plugin that helps integrate unity-cli into your Unity development 
 | `/unity-perf` | Profiler analysis |
 | `/unity-ui` | UI Toolkit / uGUI inspection |
 
+## Recipes
+
+See [docs/recipes.md](docs/recipes.md) for piping, scripting, and tool composition examples.
+
+```bash
+u screenshot -s game | mcat -i         # Inline display in terminal
+u console get -l E | head -10                  # Last 10 errors
+u instances --json | jq -r '.[].instance_id'   # Extract paths
+```
+
 ## Architecture
 
 ```mermaid
