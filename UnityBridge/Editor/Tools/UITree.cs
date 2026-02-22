@@ -24,6 +24,8 @@ namespace UnityBridge.Tools
 
         private static readonly Dictionary<string, WeakReference<VisualElement>> RefMap = new();
         private static readonly ConditionalWeakTable<VisualElement, string> ElementToRef = new();
+        private static readonly Dictionary<Type, PropertyInfo> ActualViewPropCache = new();
+        private static readonly Dictionary<Type, (PropertyInfo contextType, PropertyInfo visualTree, PropertyInfo ownerObject)> PanelPropCache = new();
         private static int _epoch;
         private static int _nextSeq = 1;
 
@@ -372,27 +374,19 @@ namespace UnityBridge.Tools
         private static JObject ListPanels()
         {
             var panels = new JArray();
+            var allPanels = ResolveAllPanels(countElements: true);
 
-            // Editor panels via reflection
-            foreach (var info in GetEditorPanels())
+            foreach (var info in allPanels)
             {
-                panels.Add(new JObject
+                var panelObj = new JObject
                 {
                     ["name"] = info.Name,
                     ["contextType"] = info.ContextType,
                     ["elementCount"] = info.ElementCount
-                });
-            }
-
-            // Runtime panels via UIDocument
-            foreach (var info in GetRuntimePanels())
-            {
-                panels.Add(new JObject
-                {
-                    ["name"] = info.Name,
-                    ["contextType"] = info.ContextType,
-                    ["elementCount"] = info.ElementCount
-                });
+                };
+                if (info.WindowType != null)
+                    panelObj["windowType"] = info.WindowType;
+                panels.Add(panelObj);
             }
 
             return new JObject
@@ -403,32 +397,17 @@ namespace UnityBridge.Tools
 
         private static (VisualElement root, string panelName) FindPanelRoot(string panelName)
         {
-            // Search editor panels
-            foreach (var info in GetEditorPanels())
-            {
-                if (info.Name.Equals(panelName, StringComparison.OrdinalIgnoreCase))
-                    return (info.Root, info.Name);
-            }
+            var panels = ResolveAllPanels(countElements: false);
 
-            // Search runtime panels
-            foreach (var info in GetRuntimePanels())
-            {
+            // Exact match (case-insensitive)
+            foreach (var info in panels)
                 if (info.Name.Equals(panelName, StringComparison.OrdinalIgnoreCase))
                     return (info.Root, info.Name);
-            }
 
             // Partial match fallback
-            foreach (var info in GetEditorPanels())
-            {
+            foreach (var info in panels)
                 if (info.Name.IndexOf(panelName, StringComparison.OrdinalIgnoreCase) >= 0)
                     return (info.Root, info.Name);
-            }
-
-            foreach (var info in GetRuntimePanels())
-            {
-                if (info.Name.IndexOf(panelName, StringComparison.OrdinalIgnoreCase) >= 0)
-                    return (info.Root, info.Name);
-            }
 
             return (null, null);
         }
@@ -439,9 +418,10 @@ namespace UnityBridge.Tools
             public string ContextType;
             public int ElementCount;
             public VisualElement Root;
+            public string WindowType;
         }
 
-        private static List<PanelInfo> GetEditorPanels()
+        private static List<PanelInfo> GetEditorPanels(bool countElements = true)
         {
             var results = new List<PanelInfo>();
 
@@ -492,7 +472,7 @@ namespace UnityBridge.Tools
                 {
                     while (enumerator.MoveNext())
                     {
-                        ProcessPanelEntry(enumerator.Current, results);
+                        ProcessPanelEntry(enumerator.Current, results, countElements);
                     }
                 }
                 else
@@ -502,7 +482,7 @@ namespace UnityBridge.Tools
                     while ((bool)moveNextMethod.Invoke(iterator, null))
                     {
                         var kvp = currentProp.GetValue(iterator);
-                        ProcessPanelEntry(kvp, results);
+                        ProcessPanelEntry(kvp, results, countElements);
                     }
                 }
             }
@@ -514,7 +494,7 @@ namespace UnityBridge.Tools
             return results;
         }
 
-        private static void ProcessPanelEntry(object kvp, List<PanelInfo> results)
+        private static void ProcessPanelEntry(object kvp, List<PanelInfo> results, bool countElements)
         {
             if (kvp == null) return;
 
@@ -525,40 +505,86 @@ namespace UnityBridge.Tools
             if (panel == null) return;
 
             var panelType = panel.GetType();
+            var props = GetPanelProperties(panelType);
 
-            // Get contextType
-            var contextTypeProp = panelType.GetProperty("contextType",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            var contextType = contextTypeProp?.GetValue(panel)?.ToString() ?? "Unknown";
-
-            // Get visualTree
-            var visualTreeProp = panelType.GetProperty("visualTree",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            var visualTree = visualTreeProp?.GetValue(panel) as VisualElement;
+            var contextType = props.contextType?.GetValue(panel)?.ToString() ?? "Unknown";
+            var visualTree = props.visualTree?.GetValue(panel) as VisualElement;
 
             if (visualTree == null) return;
 
-            // Derive panel name from ownerObject or type
-            var ownerObjectProp = panelType.GetProperty("ownerObject",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            var ownerObject = ownerObjectProp?.GetValue(panel) as ScriptableObject;
+            var ownerObject = props.ownerObject?.GetValue(panel) as ScriptableObject;
 
-            var panelName = ownerObject != null
-                ? ownerObject.GetType().Name
-                : $"Panel_{contextType}";
+            var (panelName, windowType) = DeriveEnrichedPanelName(ownerObject, contextType);
 
-            var elementCount = CountElements(visualTree);
+            var elementCount = countElements ? CountElements(visualTree) : 0;
 
             results.Add(new PanelInfo
             {
                 Name = panelName,
                 ContextType = contextType,
                 ElementCount = elementCount,
-                Root = visualTree
+                Root = visualTree,
+                WindowType = windowType
             });
         }
 
-        private static List<PanelInfo> GetRuntimePanels()
+        private static (PropertyInfo contextType, PropertyInfo visualTree, PropertyInfo ownerObject) GetPanelProperties(Type panelType)
+        {
+            if (PanelPropCache.TryGetValue(panelType, out var cached))
+                return cached;
+
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var entry = (
+                contextType: panelType.GetProperty("contextType", flags),
+                visualTree: panelType.GetProperty("visualTree", flags),
+                ownerObject: panelType.GetProperty("ownerObject", flags)
+            );
+            PanelPropCache[panelType] = entry;
+            return entry;
+        }
+
+        private static (string name, string windowType) DeriveEnrichedPanelName(
+            ScriptableObject ownerObject, string contextType)
+        {
+            if (ownerObject == null)
+                return ($"Panel_{contextType}", null);
+
+            var ownerTypeName = ownerObject.GetType().Name;
+            string viewTypeName = null;
+
+            try
+            {
+                var ownerType = ownerObject.GetType();
+                if (!ActualViewPropCache.TryGetValue(ownerType, out var prop))
+                {
+                    prop = ownerType.GetProperty("actualView",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    ActualViewPropCache[ownerType] = prop;
+                }
+
+                if (prop != null)
+                {
+                    var view = prop.GetValue(ownerObject);
+                    if (view != null)
+                        viewTypeName = view.GetType().Name;
+                }
+            }
+            catch (TargetInvocationException ex)
+            {
+                BridgeLog.Verbose($"actualView reflection failed for {ownerTypeName}: {ex.InnerException?.GetType().Name}");
+            }
+            catch (MemberAccessException ex)
+            {
+                BridgeLog.Verbose($"actualView access denied for {ownerTypeName}: {ex.GetType().Name}");
+            }
+
+            if (viewTypeName != null)
+                return ($"{ownerTypeName}:{viewTypeName}", viewTypeName);
+
+            return (ownerTypeName, null);
+        }
+
+        private static List<PanelInfo> GetRuntimePanels(bool countElements = true)
         {
             var results = new List<PanelInfo>();
 
@@ -573,7 +599,7 @@ namespace UnityBridge.Tools
                     ? doc.panelSettings.name
                     : "Unknown";
                 var panelName = $"UIDocument {panelSettingsName} ({doc.gameObject.name})";
-                var elementCount = CountElements(doc.rootVisualElement);
+                var elementCount = countElements ? CountElements(doc.rootVisualElement) : 0;
 
                 results.Add(new PanelInfo
                 {
@@ -585,6 +611,43 @@ namespace UnityBridge.Tools
             }
 
             return results;
+        }
+
+        private static List<PanelInfo> ResolveAllPanels(bool countElements = true)
+        {
+            var panels = GetEditorPanels(countElements);
+            panels.AddRange(GetRuntimePanels(countElements));
+            DeduplicateNames(panels);
+            return panels;
+        }
+
+        private static void DeduplicateNames(List<PanelInfo> panels)
+        {
+            var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var p in panels)
+            {
+                nameCount.TryGetValue(p.Name, out var count);
+                nameCount[p.Name] = count + 1;
+            }
+
+            var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (var i = 0; i < panels.Count; i++)
+            {
+                var name = panels[i].Name;
+                if (nameCount[name] <= 1)
+                    continue;
+
+                seen.TryGetValue(name, out var idx);
+                idx++;
+                seen[name] = idx;
+
+                if (idx >= 2)
+                {
+                    var info = panels[i];
+                    info.Name = $"{name}-{idx}";
+                    panels[i] = info;
+                }
+            }
         }
 
         #endregion

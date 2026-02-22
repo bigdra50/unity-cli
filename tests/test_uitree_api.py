@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from unity_cli.api.uitree import UITreeAPI
+from unity_cli.api.uitree import UITreeAPI, _strip_panel_count
 
 
 @pytest.fixture
@@ -427,3 +427,93 @@ class TestUITreeAPIParameterIntegrity:
         mock_conn.send_request.return_value = {}
         sut.text(ref="ref_0")
         assert mock_conn.send_request.call_args[0][1]["action"] == "text"
+
+
+class TestStripPanelCount:
+    """_strip_panel_count のテスト"""
+
+    def test_dockarea_with_count(self) -> None:
+        assert _strip_panel_count("DockArea:SceneView (12)") == "DockArea:SceneView"
+
+    def test_toolbar_with_count(self) -> None:
+        assert _strip_panel_count("Toolbar (76)") == "Toolbar"
+
+    def test_no_count_suffix(self) -> None:
+        assert _strip_panel_count("Toolbar") == "Toolbar"
+
+    def test_non_numeric_parens_preserved(self) -> None:
+        assert _strip_panel_count("MyPanel (v2)") == "MyPanel (v2)"
+
+    def test_zero_count(self) -> None:
+        assert _strip_panel_count("Panel (0)") == "Panel"
+
+    def test_empty_string(self) -> None:
+        assert _strip_panel_count("") == ""
+
+
+class TestAddPanelParam:
+    """_add_panel_param が strip 済みの panel 名を送ることの確認"""
+
+    def test_strips_count_before_sending(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.dump(panel="DockArea:SceneView (12)")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "DockArea:SceneView"
+
+    def test_panel_without_count_unchanged(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.dump(panel="Toolbar")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "Toolbar"
+
+    def test_query_strips_panel_count(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {"matches": [], "count": 0}
+
+        sut.query(panel="DockArea:InspectorWindow (896)")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "DockArea:InspectorWindow"
+
+    def test_click_strips_panel_count(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.click(panel="DockArea:SceneView (12)", name="Btn")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "DockArea:SceneView"
+
+    def test_scroll_strips_panel_count(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.scroll(panel="Toolbar (76)", name="Area")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "Toolbar"
+
+    def test_text_strips_panel_count(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.text(panel="DockArea:SceneView (12)", name="Label")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "DockArea:SceneView"
+
+    def test_inspect_strips_panel_count(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.inspect(panel="DockArea:SceneView (12)", name="Elem")
+
+        call_args = mock_conn.send_request.call_args
+        assert call_args[0][1]["panel"] == "DockArea:SceneView"
+
+    def test_none_panel_not_added(self, sut: UITreeAPI, mock_conn: MagicMock) -> None:
+        mock_conn.send_request.return_value = {}
+
+        sut.dump(panel=None)
+
+        call_args = mock_conn.send_request.call_args
+        assert "panel" not in call_args[0][1]
