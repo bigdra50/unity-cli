@@ -1,4 +1,4 @@
-"""Screenshot commands: capture and burst."""
+"""Screenshot command: capture (default) and burst mode."""
 
 from __future__ import annotations
 
@@ -13,36 +13,40 @@ from unity_cli.cli.helpers import _handle_error, _should_json
 from unity_cli.cli.output import OutputMode, get_output_mode, print_error, print_json, print_line, print_success
 from unity_cli.exceptions import UnityCLIError
 
-screenshot_app = typer.Typer(help="Screenshot capture commands")
 
-
-@screenshot_app.command("capture")
-def screenshot_capture(
+def screenshot(
     ctx: typer.Context,
+    burst: Annotated[
+        bool,
+        typer.Option("--burst", help="Burst mode: capture multiple frames in rapid succession"),
+    ] = False,
+    # --- capture options ---
     source: Annotated[
         str,
         typer.Option("--source", "-s", help="Capture source: game, scene, or camera"),
     ] = "game",
     path: Annotated[
         str | None,
-        typer.Option("--path", "-p", help="Output file path"),
+        typer.Option("--path", "-p", help="Output file path (capture only)"),
     ] = None,
     super_size: Annotated[
         int,
         typer.Option("--super-size", help="Resolution multiplier (1-4, game only)"),
     ] = 1,
-    width: Annotated[
-        int | None,
-        typer.Option("--width", "-W", help="Image width (camera only, default: 1920)"),
-    ] = None,
-    height: Annotated[
-        int | None,
-        typer.Option("--height", "-H", help="Image height (camera only, default: 1080)"),
-    ] = None,
-    camera_name: Annotated[
+    # --- burst options ---
+    count: Annotated[
+        int,
+        typer.Option("--count", "-n", help="Number of frames to capture (burst only)"),
+    ] = 10,
+    interval_ms: Annotated[
+        int,
+        typer.Option("--interval", help="Minimum interval between frames in ms (burst only, 0 = fastest)"),
+    ] = 0,
+    output_dir: Annotated[
         str | None,
-        typer.Option("--camera", "-c", help="Camera name (camera only, default: Main Camera)"),
+        typer.Option("--output", "-o", help="Output directory (burst only)"),
     ] = None,
+    # --- common options ---
     format: Annotated[
         str,
         typer.Option("--format", "-f", help="Image format: png or jpg"),
@@ -51,6 +55,18 @@ def screenshot_capture(
         int,
         typer.Option("--quality", "-q", help="JPEG quality 1-100 (jpg only)"),
     ] = 75,
+    width: Annotated[
+        int | None,
+        typer.Option("--width", "-W", help="Image width (camera/burst only)"),
+    ] = None,
+    height: Annotated[
+        int | None,
+        typer.Option("--height", "-H", help="Image height (camera/burst only)"),
+    ] = None,
+    camera_name: Annotated[
+        str | None,
+        typer.Option("--camera", "-c", help="Camera name"),
+    ] = None,
     json_flag: Annotated[
         bool,
         typer.Option("--json", "-j", help="Output as JSON"),
@@ -58,11 +74,31 @@ def screenshot_capture(
 ) -> None:
     """Capture screenshot from GameView, SceneView, or Camera.
 
-    Sources:
+    By default captures a single screenshot. Use --burst for multi-frame capture.
+
+    Sources (capture mode):
       game   - GameView (async, requires editor focus)
       scene  - SceneView
       camera - Camera.Render (sync, focus-independent)
     """
+    if burst:
+        _burst(ctx, count, interval_ms, format, quality, width, height, camera_name, output_dir, json_flag)
+    else:
+        _capture(ctx, source, path, super_size, format, quality, width, height, camera_name, json_flag)
+
+
+def _capture(
+    ctx: typer.Context,
+    source: str,
+    path: str | None,
+    super_size: int,
+    format: str,
+    quality: int,
+    width: int | None,
+    height: int | None,
+    camera_name: str | None,
+    json_flag: bool,
+) -> None:
     context: CLIContext = ctx.obj
 
     if source not in ("game", "scene", "camera"):
@@ -107,47 +143,18 @@ def screenshot_capture(
         _handle_error(e)
 
 
-@screenshot_app.command("burst")
-def screenshot_burst(
+def _burst(
     ctx: typer.Context,
-    count: Annotated[
-        int,
-        typer.Option("--count", "-n", help="Number of frames to capture"),
-    ] = 10,
-    interval_ms: Annotated[
-        int,
-        typer.Option("--interval", help="Minimum interval between frames in ms (0 = fastest)"),
-    ] = 0,
-    format: Annotated[
-        str,
-        typer.Option("--format", "-f", help="Image format: png or jpg"),
-    ] = "jpg",
-    quality: Annotated[
-        int,
-        typer.Option("--quality", "-q", help="JPEG quality 1-100 (jpg only)"),
-    ] = 75,
-    width: Annotated[
-        int | None,
-        typer.Option("--width", "-W", help="Image width (default: 1920)"),
-    ] = None,
-    height: Annotated[
-        int | None,
-        typer.Option("--height", "-H", help="Image height (default: 1080)"),
-    ] = None,
-    camera_name: Annotated[
-        str | None,
-        typer.Option("--camera", "-c", help="Camera name (default: Main Camera)"),
-    ] = None,
-    output_dir: Annotated[
-        str | None,
-        typer.Option("--output", "-o", help="Output directory"),
-    ] = None,
-    json_flag: Annotated[
-        bool,
-        typer.Option("--json", "-j", help="Output as JSON"),
-    ] = False,
+    count: int,
+    interval_ms: int,
+    format: str,
+    quality: int,
+    width: int | None,
+    height: int | None,
+    camera_name: str | None,
+    output_dir: str | None,
+    json_flag: bool,
 ) -> None:
-    """Capture multiple frames in rapid succession (burst mode)."""
     context: CLIContext = ctx.obj
 
     if format not in ("png", "jpg"):
