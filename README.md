@@ -214,13 +214,15 @@ u refresh
 # Editor selection
 u selection
 
-# Screenshot
+# Screenshot (capture is default, --burst for burst mode)
 u screenshot                           # GameView (default)
 u screenshot -s scene                  # SceneView
 u screenshot -s camera                 # Camera.Render
 u screenshot -p ./output.png           # Custom path
 u screenshot --super-size 2            # 2x resolution (game only)
 u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
+u screenshot --burst -n 10             # Burst: 10 frames
+u screenshot --burst -n 5 -f jpg -q 80 # Burst with format/quality
 
 # Pipe-friendly: outputs path only when piped
 u screenshot -s game | mcat -i   # Inline display in terminal

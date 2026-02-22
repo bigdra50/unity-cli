@@ -28,6 +28,8 @@ u instances                               # List connected instances
 u selection                               # Get current editor selection
 u screenshot -s game -p ./out.png
 u screenshot -s game | mcat -i           # Pipe: inline display
+u screenshot --burst -n 10               # Burst: 10 frames
+u screenshot --burst -n 5 -f jpg -q 80   # Burst with format/quality
 
 # Console commands (adb logcat style levels)
 u console get                             # All logs (plain text)

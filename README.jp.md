@@ -214,13 +214,15 @@ u refresh
 # エディタ選択状態
 u selection
 
-# スクリーンショット
+# スクリーンショット（デフォルトは capture、--burst で burst モード）
 u screenshot                           # GameView（デフォルト）
 u screenshot -s scene                  # SceneView
 u screenshot -s camera                 # Camera.Render
 u screenshot -p ./output.png           # 出力パス指定
 u screenshot --super-size 2            # 2倍解像度（game only）
 u screenshot -s camera -c "Main Camera" -W 1920 -H 1080
+u screenshot --burst -n 10             # Burst: 10フレーム連続撮影
+u screenshot --burst -n 5 -f jpg -q 80 # Burst + フォーマット/品質指定
 
 # パイプ時はパスのみ出力
 u screenshot -s game | mcat -i   # ターミナルにインライン表示
