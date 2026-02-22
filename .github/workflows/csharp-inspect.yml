@@ -1,11 +1,12 @@
 name: C# Inspect
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'TestProject/Assets/**/*.cs'
-      - 'UnityBridge/**/*.cs'
+  # Unity ライセンス設定後に pull_request トリガーを有効化する:
+  #   pull_request:
+  #     branches: [main]
+  #     paths:
+  #       - 'TestProject/Assets/**/*.cs'
+  #       - 'UnityBridge/**/*.cs'
   workflow_dispatch:
 
 # Unity ライセンスの設定方法:
