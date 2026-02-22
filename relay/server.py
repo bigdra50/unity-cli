@@ -10,7 +10,10 @@ import argparse
 import asyncio
 import importlib.metadata
 import logging
+import os
 import signal
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
 
 from .instance_registry import (
@@ -48,6 +51,12 @@ HEARTBEAT_MAX_RETRIES = 3  # Disconnect after 3 consecutive failures
 RELOAD_TIMEOUT_MS = 30000  # Extended timeout during RELOADING
 COMMAND_TIMEOUT_MS = 30000
 RELOAD_GRACE_PERIOD_MS = 60000  # Grace period before removing reloading instance
+
+# Logging configuration
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+LOG_BACKUP_COUNT = 5
+_VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
 
 class RelayServer:
@@ -693,6 +702,60 @@ async def run_server(
         pass
 
 
+def _resolve_log_dir() -> Path:
+    """Resolve log directory from XDG_STATE_HOME (evaluated at call time)."""
+    state_home = os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")
+    return Path(state_home) / "unity-cli" / "logs"
+
+
+def get_log_path() -> Path:
+    """Return the relay log file path."""
+    return _resolve_log_dir() / "relay.log"
+
+
+def _resolve_log_level(debug_flag: bool) -> int:
+    """Resolve log level from CLI flag or UNITY_CLI_LOG env var.
+
+    --debug flag takes highest precedence.
+    UNITY_CLI_LOG accepts: DEBUG, INFO, WARNING, ERROR, CRITICAL.
+    Invalid values fall back to INFO.
+    """
+    if debug_flag:
+        return logging.DEBUG
+    env_level = os.environ.get("UNITY_CLI_LOG", "").upper()
+    if env_level in _VALID_LOG_LEVELS:
+        return getattr(logging, env_level)
+    return logging.INFO
+
+
+def _setup_logging(level: int) -> None:
+    """Configure stderr + rotating file logging.
+
+    File handler creation is best-effort: if the log directory cannot be
+    created or the file cannot be opened, logging falls back to stderr only.
+    """
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+
+    try:
+        log_path = get_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            log_path,
+            maxBytes=LOG_MAX_BYTES,
+            backupCount=LOG_BACKUP_COUNT,
+            delay=True,
+        )
+        file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+        handlers.append(file_handler)
+    except OSError as e:
+        # Fall back to stderr-only; warn after basicConfig sets up the handler
+        logging.basicConfig(level=level, format=LOG_FORMAT, handlers=handlers, force=True)
+        logger.warning(f"Failed to set up file logging: {e}")
+        return
+
+    logging.basicConfig(level=level, format=LOG_FORMAT, handlers=handlers, force=True)
+
+
 def main() -> None:
     """CLI entry point"""
     parser = argparse.ArgumentParser(description="Unity Bridge Relay Server")
@@ -723,11 +786,8 @@ def main() -> None:
     args = parser.parse_args()
 
     # Setup logging
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+    log_level = _resolve_log_level(args.debug)
+    _setup_logging(log_level)
 
     # Run server
     try:
