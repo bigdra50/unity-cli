@@ -306,7 +306,7 @@ namespace UnityBridge
 
             try
             {
-                await _sendLock.WaitAsync();
+                await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
                 try
                 {
                     await Framing.WriteFrameAsync(_stream, message);
@@ -316,6 +316,10 @@ namespace UnityBridge
                     _sendLock.Release();
                 }
                 BridgeLog.Verbose($"Sent {logLabel}");
+            }
+            catch (OperationCanceledException)
+            {
+                BridgeLog.Verbose($"Send cancelled: {logLabel}");
             }
             catch (Exception ex)
             {
