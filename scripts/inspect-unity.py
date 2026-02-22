@@ -46,7 +46,7 @@ def ensure_tools(run_inspect: bool, run_similarity: bool) -> bool:
     if run_inspect and not check_tool("jb"):
         missing.append("jb (dotnet tool install -g JetBrains.ReSharper.GlobalTools)")
     if run_similarity and not check_tool("similarity-csharp"):
-        missing.append("similarity-csharp (dotnet tool install -g SimilarityCSharp)")
+        missing.append("similarity-csharp (dotnet tool install -g SimilarityCSharp.Cli)")
 
     if missing:
         print("Missing required tools:")
