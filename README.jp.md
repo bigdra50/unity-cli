@@ -480,6 +480,16 @@ Claude Code を使った Unity 開発に unity-cli を組み込みやすくす�
 | `/unity-perf` | プロファイラ分析 |
 | `/unity-ui` | UI Toolkit / uGUI 検査 |
 
+## Recipes
+
+パイプ、スクリプト、ツール連携の例は [docs/recipes.md](docs/recipes.md) を参照。
+
+```bash
+u screenshot -s game | mcat -i         # ターミナルにインライン表示
+u console get -l E | head -10                  # エラー直近10件
+u instances --json | jq -r '.[].instance_id'   # パス抽出
+```
+
 ## アーキテクチャ
 
 ```mermaid
