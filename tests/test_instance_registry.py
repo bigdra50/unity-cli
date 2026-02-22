@@ -725,6 +725,99 @@ class TestRefId:
         assert inst.ref_id == 1
 
 
+class TestStatusDetail:
+    """Test status_detail field on UnityInstance."""
+
+    def test_set_status_with_detail(self) -> None:
+        instance = UnityInstance(
+            instance_id="/test",
+            project_name="Test",
+            unity_version="2022.3",
+            status=InstanceStatus.READY,
+        )
+
+        instance.set_status(InstanceStatus.BUSY, detail="compiling")
+
+        assert instance.status == InstanceStatus.BUSY
+        assert instance.status_detail == "compiling"
+
+    def test_to_dict_includes_detail_when_busy(self) -> None:
+        instance = UnityInstance(
+            instance_id="/test",
+            project_name="Test",
+            unity_version="2022.3",
+            status=InstanceStatus.BUSY,
+            status_detail="running_tests",
+        )
+
+        d = instance.to_dict()
+
+        assert d["status_detail"] == "running_tests"
+
+    def test_to_dict_omits_detail_when_none(self) -> None:
+        instance = UnityInstance(
+            instance_id="/test",
+            project_name="Test",
+            unity_version="2022.3",
+            status=InstanceStatus.BUSY,
+        )
+
+        d = instance.to_dict()
+
+        assert "status_detail" not in d
+
+    def test_status_detail_cleared_on_ready(self) -> None:
+        instance = UnityInstance(
+            instance_id="/test",
+            project_name="Test",
+            unity_version="2022.3",
+            status=InstanceStatus.BUSY,
+            status_detail="compiling",
+        )
+
+        instance.set_status(InstanceStatus.READY)
+
+        assert instance.status == InstanceStatus.READY
+        assert instance.status_detail is None
+
+    def test_update_status_with_detail(self) -> None:
+        registry = InstanceRegistry()
+        instance = UnityInstance(
+            instance_id="/test",
+            project_name="Test",
+            unity_version="2022.3",
+            status=InstanceStatus.READY,
+        )
+        registry._instances["/test"] = instance
+
+        result = registry.update_status("/test", InstanceStatus.BUSY, detail="asset_import")
+
+        assert result is True
+        assert instance.status == InstanceStatus.BUSY
+        assert instance.status_detail == "asset_import"
+
+    @pytest.mark.asyncio
+    async def test_close_connection_clears_detail(self) -> None:
+        writer = MagicMock()
+        writer.is_closing.return_value = False
+        writer.close = MagicMock()
+        writer.wait_closed = AsyncMock()
+
+        instance = UnityInstance(
+            instance_id="/test",
+            project_name="Test",
+            unity_version="2022.3",
+            status=InstanceStatus.BUSY,
+            status_detail="compiling",
+            writer=writer,
+        )
+
+        await instance.close_connection()
+
+        assert instance.status == InstanceStatus.DISCONNECTED
+        assert instance.status_detail is None
+
+
 class TestInstanceResolution:
     """Test _resolve_instance() 5-stage matching logic."""
 

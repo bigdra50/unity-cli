@@ -61,6 +61,7 @@ class UnityInstance:
     ref_id: int = 0  # Stable reference ID assigned by InstanceRegistry
     capabilities: list[str] = field(default_factory=list)
     status: InstanceStatus = InstanceStatus.DISCONNECTED
+    status_detail: str | None = None
     reader: asyncio.StreamReader | None = None
     writer: asyncio.StreamWriter | None = None
     registered_at: float = field(default_factory=time.time)
@@ -91,7 +92,7 @@ class UnityInstance:
 
     def to_dict(self, is_default: bool = False) -> dict:
         """Convert to dictionary for API response"""
-        return {
+        d = {
             "ref_id": self.ref_id,
             "instance_id": self.instance_id,
             "project_name": self.project_name,
@@ -102,22 +103,28 @@ class UnityInstance:
             "capabilities": self.capabilities,
             "queue_size": self.queue_size,
         }
+        if self.status_detail is not None:
+            d["status_detail"] = self.status_detail
+        return d
 
     def update_heartbeat(self) -> None:
         """Update last heartbeat timestamp"""
         self.last_heartbeat = time.time()
 
-    def set_status(self, status: InstanceStatus) -> None:
+    def set_status(self, status: InstanceStatus, detail: str | None = None) -> None:
         """Update instance status"""
         old_status = self.status
         self.status = status
+        self.status_detail = None if status == InstanceStatus.READY else detail
 
         if status == InstanceStatus.RELOADING:
             self.reloading_since = time.time()
         elif old_status == InstanceStatus.RELOADING:
             self.reloading_since = None
 
-        logger.debug(f"Instance {self.instance_id}: {old_status.value} -> {status.value}")
+        logger.debug(
+            f"Instance {self.instance_id}: {old_status.value} -> {status.value}" + (f" ({detail})" if detail else "")
+        )
 
     def enqueue_command(self, cmd: QueuedCommand) -> bool:
         """
@@ -174,7 +181,7 @@ class UnityInstance:
                 pass
         self.writer = None
         self.reader = None
-        self.status = InstanceStatus.DISCONNECTED
+        self.set_status(InstanceStatus.DISCONNECTED)
 
 
 class InstanceRegistry:
@@ -376,12 +383,12 @@ class InstanceRegistry:
         logger.info(f"Set default instance: {instance_id}")
         return True
 
-    def update_status(self, instance_id: str, status: InstanceStatus) -> bool:
+    def update_status(self, instance_id: str, status: InstanceStatus, detail: str | None = None) -> bool:
         """Update instance status"""
         instance = self._instances.get(instance_id)
         if not instance:
             return False
-        instance.set_status(status)
+        instance.set_status(status, detail)
         return True
 
     def list_all(self) -> list[dict]:

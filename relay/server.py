@@ -42,6 +42,33 @@ from .status_file import is_any_instance_reloading
 
 logger = logging.getLogger(__name__)
 
+# Valid status detail values (allowlist)
+_VALID_DETAILS = frozenset(
+    {
+        "compiling",
+        "running_tests",
+        "asset_import",
+        "playmode_transition",
+    }
+)
+_MAX_DETAIL_LEN = 64
+
+
+def _sanitize_detail(raw: Any) -> str | None:
+    """Validate and sanitize status detail from Unity messages."""
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        return None
+    detail = raw.strip()
+    if not detail or len(detail) > _MAX_DETAIL_LEN:
+        return None
+    if detail in _VALID_DETAILS:
+        return detail
+    logger.warning("Unknown status detail: %s", detail)
+    return None
+
+
 # Default configuration
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 6500
@@ -255,11 +282,16 @@ class RelayServer:
 
         if msg_type == MessageType.STATUS.value:
             status_str = msg.get("status", "")
+            detail = _sanitize_detail(msg.get("detail"))
             try:
                 status = InstanceStatus(status_str)
-                self.registry.update_status(instance.instance_id, status)
+                old_status = instance.status
+                self.registry.update_status(instance.instance_id, status, detail)
+                # Process queued commands when Unity transitions from BUSY to READY
+                if old_status == InstanceStatus.BUSY and status == InstanceStatus.READY:
+                    await self._process_queue(instance)
             except ValueError:
-                logger.warning(f"Unknown status: {status_str}")
+                logger.warning("Unknown status: %s", status_str)
 
         elif msg_type == MessageType.COMMAND_RESULT.value:
             request_id = msg.get("id", "")
@@ -667,8 +699,9 @@ class RelayServer:
             ).to_dict()
 
         finally:
-            # Reset instance status
-            if instance.status == InstanceStatus.BUSY:
+            # Reset instance status — only reset detail-less BUSY (set by Relay for command tracking).
+            # detail-bearing BUSY (e.g. "compiling") is managed by Unity and reset via STATUS ready.
+            if instance.status == InstanceStatus.BUSY and not instance.status_detail:
                 instance.set_status(InstanceStatus.READY)
 
             # Cleanup pending command

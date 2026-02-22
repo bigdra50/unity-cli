@@ -90,6 +90,19 @@ namespace UnityBridge
     }
 
     /// <summary>
+    /// Activity phase detail values sent with STATUS busy.
+    /// Must match relay/_VALID_DETAILS allowlist.
+    /// </summary>
+    public static class ActivityPhase
+    {
+        public const string Idle = "idle";
+        public const string Compiling = "compiling";
+        public const string RunningTests = "running_tests";
+        public const string AssetImport = "asset_import";
+        public const string PlaymodeTransition = "playmode_transition";
+    }
+
+    /// <summary>
     /// Protocol framing: 4-byte big-endian length prefix + JSON payload
     /// </summary>
     public static class Framing

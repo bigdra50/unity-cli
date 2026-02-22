@@ -236,32 +236,38 @@ namespace UnityBridge
         }
 
         /// <summary>
-        /// Send a STATUS message to indicate reloading state
+        /// Send a STATUS message with optional detail.
+        /// Throws on send failure — callers are responsible for error handling.
+        /// </summary>
+        public async Task SendStatusAsync(string status, string detail = null)
+        {
+            if (_stream == null || _client is not { Connected: true })
+                return;
+
+            var statusMsg = Messages.CreateStatus(InstanceId, status, detail);
+            await _sendLock.WaitAsync();
+            try
+            {
+                await Framing.WriteFrameAsync(_stream, statusMsg);
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+            BridgeLog.Verbose($"Sent STATUS: {status}" + (detail != null ? $" ({detail})" : ""));
+        }
+
+        /// <summary>
+        /// Send a STATUS message to indicate reloading state.
+        /// Sets ConnectionStatus.Reloading regardless of send outcome.
         /// </summary>
         public async Task SendReloadingStatusAsync()
         {
             if (_stream == null || _client is not { Connected: true })
                 return;
 
-            try
-            {
-                Status = ConnectionStatus.Reloading;
-                var statusMsg = Messages.CreateStatus(InstanceId, InstanceStatus.Reloading, "Domain reload started");
-                await _sendLock.WaitAsync();
-                try
-                {
-                    await Framing.WriteFrameAsync(_stream, statusMsg);
-                }
-                finally
-                {
-                    _sendLock.Release();
-                }
-                BridgeLog.Verbose("Sent STATUS: reloading");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Warn($"Failed to send reloading status: {ex.Message}");
-            }
+            Status = ConnectionStatus.Reloading;
+            await SendStatusAsync(InstanceStatus.Reloading);
         }
 
         /// <summary>
@@ -269,27 +275,7 @@ namespace UnityBridge
         /// </summary>
         public async Task SendReadyStatusAsync()
         {
-            if (_stream == null || _client is not { Connected: true })
-                return;
-
-            try
-            {
-                var statusMsg = Messages.CreateStatus(InstanceId, InstanceStatus.Ready);
-                await _sendLock.WaitAsync();
-                try
-                {
-                    await Framing.WriteFrameAsync(_stream, statusMsg);
-                }
-                finally
-                {
-                    _sendLock.Release();
-                }
-                BridgeLog.Verbose("Sent STATUS: ready");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Warn($"Failed to send ready status: {ex.Message}");
-            }
+            await SendStatusAsync(InstanceStatus.Ready);
         }
 
         /// <summary>

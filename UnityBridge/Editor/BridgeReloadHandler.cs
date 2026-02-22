@@ -76,22 +76,9 @@ namespace UnityBridge
             LastHost = manager.Host;
             LastPort = manager.Port;
 
-            // Synchronous STATUS send with 500ms timeout
-            try
-            {
-                using var cts = new CancellationTokenSource(500);
-                var task = manager.Client.SendReloadingStatusAsync();
-                task.Wait(cts.Token);
-                BridgeLog.Verbose("STATUS reloading sent successfully");
-            }
-            catch (OperationCanceledException)
-            {
-                BridgeLog.Warn("STATUS send timed out, relying on status file");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Warn($"STATUS send failed: {ex.Message}, relying on status file");
-            }
+            // Delegate STATUS send to EditorStateCache (single publisher)
+            EditorStateCache.SetDomainReloading(true);
+            EditorStateCache.FlushStatus();
 
             // File fallback: write status file for relay server to detect
             BridgeStatusFile.WriteStatus(
@@ -146,7 +133,7 @@ namespace UnityBridge
                 BridgeLog.Verbose("Reconnected after reload");
 
                 if (manager.Client is not { IsConnected: true }) return;
-                await manager.Client.SendReadyStatusAsync();
+                EditorStateCache.SyncCurrentState();
 
                 // Update status file to ready
                 BridgeStatusFile.WriteStatus(
