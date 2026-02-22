@@ -52,6 +52,12 @@ RELOAD_TIMEOUT_MS = 30000  # Extended timeout during RELOADING
 COMMAND_TIMEOUT_MS = 30000
 RELOAD_GRACE_PERIOD_MS = 60000  # Grace period before removing reloading instance
 
+# Logging configuration
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+LOG_BACKUP_COUNT = 5
+_VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
+
 
 class RelayServer:
     """
@@ -696,13 +702,6 @@ async def run_server(
         pass
 
 
-LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
-LOG_BACKUP_COUNT = 5
-
-_VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
-
-
 def _resolve_log_dir() -> Path:
     """Resolve log directory from XDG_STATE_HOME (evaluated at call time)."""
     state_home = os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")
@@ -717,13 +716,16 @@ def get_log_path() -> Path:
 def _resolve_log_level(debug_flag: bool) -> int:
     """Resolve log level from CLI flag or UNITY_CLI_LOG env var.
 
+    --debug flag takes highest precedence.
     UNITY_CLI_LOG accepts: DEBUG, INFO, WARNING, ERROR, CRITICAL.
-    Invalid values fall back to INFO (or DEBUG if debug_flag is set).
+    Invalid values fall back to INFO.
     """
+    if debug_flag:
+        return logging.DEBUG
     env_level = os.environ.get("UNITY_CLI_LOG", "").upper()
     if env_level in _VALID_LOG_LEVELS:
         return getattr(logging, env_level)
-    return logging.DEBUG if debug_flag else logging.INFO
+    return logging.INFO
 
 
 def _setup_logging(level: int) -> None:
@@ -735,10 +737,10 @@ def _setup_logging(level: int) -> None:
     handlers: list[logging.Handler] = [logging.StreamHandler()]
 
     try:
-        log_dir = _resolve_log_dir()
-        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = get_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = RotatingFileHandler(
-            log_dir / "relay.log",
+            log_path,
             maxBytes=LOG_MAX_BYTES,
             backupCount=LOG_BACKUP_COUNT,
             delay=True,

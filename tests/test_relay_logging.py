@@ -51,6 +51,10 @@ class TestResolveLogLevel:
         # With debug flag -> DEBUG
         assert _resolve_log_level(debug_flag=True) == logging.DEBUG
 
+    def test_debug_flag_overrides_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("UNITY_CLI_LOG", "WARNING")
+        assert _resolve_log_level(debug_flag=True) == logging.DEBUG
+
 
 class TestResolveLogDir:
     def test_default_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
