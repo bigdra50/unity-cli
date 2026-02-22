@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using UnityBridge.Helpers;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -51,8 +52,7 @@ namespace UnityBridge.Tools
 
             if (id.HasValue)
             {
-                // Search by instanceID
-                var obj = FindByInstanceId(id.Value);
+                var obj = GameObjectFinder.Find(null, id);
                 if (obj != null)
                 {
                     results.Add(CreateGameObjectData(obj));
@@ -225,52 +225,7 @@ namespace UnityBridge.Tools
         {
             var id = parameters["id"]?.Value<int>();
             var name = parameters["name"]?.Value<string>();
-
-            if (id.HasValue)
-            {
-                return FindByInstanceId(id.Value);
-            }
-
-            if (!string.IsNullOrEmpty(name))
-            {
-                return FindByName(name);
-            }
-
-            return null;
-        }
-
-        private static GameObject FindByInstanceId(int instanceId)
-        {
-            // Check prefab stage first
-            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
-            if (prefabStage?.prefabContentsRoot != null)
-            {
-                foreach (var transform in prefabStage.prefabContentsRoot.GetComponentsInChildren<Transform>(true))
-                {
-                    if (transform.gameObject.GetInstanceID() == instanceId)
-                        return transform.gameObject;
-                }
-            }
-
-            var allObjects = GetAllSceneObjects(includeInactive: true);
-            return allObjects.FirstOrDefault(go => go.GetInstanceID() == instanceId);
-        }
-
-        private static GameObject FindByName(string name)
-        {
-            // Check prefab stage first
-            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
-            if (prefabStage?.prefabContentsRoot != null)
-            {
-                foreach (var transform in prefabStage.prefabContentsRoot.GetComponentsInChildren<Transform>(true))
-                {
-                    if (transform.name == name)
-                        return transform.gameObject;
-                }
-            }
-
-            var allObjects = GetAllSceneObjects(includeInactive: true);
-            return allObjects.FirstOrDefault(go => go.name == name);
+            return GameObjectFinder.Find(name, id);
         }
 
         private static IEnumerable<GameObject> GetAllSceneObjects(bool includeInactive)

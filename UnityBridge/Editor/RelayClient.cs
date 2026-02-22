@@ -283,30 +283,8 @@ namespace UnityBridge
         /// </summary>
         public async Task SendCommandResultAsync(string id, JObject data)
         {
-            if (_stream == null || _client is not { Connected: true })
-            {
-                BridgeLog.Warn("Cannot send result: not connected");
-                return;
-            }
-
-            try
-            {
-                var resultMsg = Messages.CreateCommandResult(id, data);
-                await _sendLock.WaitAsync();
-                try
-                {
-                    await Framing.WriteFrameAsync(_stream, resultMsg);
-                }
-                finally
-                {
-                    _sendLock.Release();
-                }
-                BridgeLog.Verbose($"Sent COMMAND_RESULT: {id}");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Error($"Failed to send command result: {ex.Message}");
-            }
+            var msg = Messages.CreateCommandResult(id, data);
+            await SendFrameAsync(msg, $"COMMAND_RESULT: {id}");
         }
 
         /// <summary>
@@ -314,29 +292,34 @@ namespace UnityBridge
         /// </summary>
         public async Task SendCommandErrorAsync(string id, string code, string message)
         {
+            var msg = Messages.CreateCommandResultError(id, code, message);
+            await SendFrameAsync(msg, $"COMMAND_RESULT (error): {id} - {code}");
+        }
+
+        private async Task SendFrameAsync(JObject message, string logLabel)
+        {
             if (_stream == null || _client is not { Connected: true })
             {
-                BridgeLog.Warn("Cannot send error: not connected");
+                BridgeLog.Warn($"Cannot send {logLabel}: not connected");
                 return;
             }
 
             try
             {
-                var errorMsg = Messages.CreateCommandResultError(id, code, message);
                 await _sendLock.WaitAsync();
                 try
                 {
-                    await Framing.WriteFrameAsync(_stream, errorMsg);
+                    await Framing.WriteFrameAsync(_stream, message);
                 }
                 finally
                 {
                     _sendLock.Release();
                 }
-                BridgeLog.Verbose($"Sent COMMAND_RESULT (error): {id} - {code}");
+                BridgeLog.Verbose($"Sent {logLabel}");
             }
             catch (Exception ex)
             {
-                BridgeLog.Error($"Failed to send command error: {ex.Message}");
+                BridgeLog.Error($"Failed to send {logLabel}: {ex.Message}");
             }
         }
 
