@@ -245,7 +245,7 @@ namespace UnityBridge
                 return;
 
             var statusMsg = Messages.CreateStatus(InstanceId, status, detail);
-            await _sendLock.WaitAsync();
+            await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
             try
             {
                 await Framing.WriteFrameAsync(_stream, statusMsg);
