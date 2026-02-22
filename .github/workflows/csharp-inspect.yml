@@ -1,0 +1,170 @@
+name: C# Inspect
+
+on:
+  # Unity ライセンス設定後に pull_request トリガーを有効化する:
+  #   pull_request:
+  #     branches: [main]
+  #     paths:
+  #       - 'TestProject/Assets/**/*.cs'
+  #       - 'UnityBridge/**/*.cs'
+  workflow_dispatch:
+
+# Unity ライセンスの設定方法:
+#   https://game.ci/docs/github/activation
+# vars.ENABLE_CSHARP_INSPECT を false にすると全体スキップ
+
+jobs:
+  # ── Unity バッチモードで .csproj/.sln を生成 ──────────────────────
+  generate-project-files:
+    runs-on: ubuntu-latest
+    if: >-
+      vars.ENABLE_CSHARP_INSPECT != 'false'
+      && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: TestProject/Library
+          key: unity-library-${{ hashFiles('TestProject/Packages/manifest.json') }}
+          restore-keys: unity-library-
+
+      # game-ci/unity-builder は buildMethod 指定時に
+      # ビルド出力を期待するため、ダミーの buildTarget を指定する。
+      # GenerateProjectFiles.Run は .csproj/.sln を生成して終了。
+      - name: Generate .csproj / .sln
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: TestProject
+          unityVersion: 6000.2.6f2
+          targetPlatform: StandaloneLinux64
+          buildMethod: CI.GenerateProjectFiles.Run
+          allowDirtyBuild: true
+        continue-on-error: true
+
+      - name: Verify project files generated
+        run: |
+          if ! ls TestProject/*.sln 1>/dev/null 2>&1; then
+            echo "::error::.sln was not generated"
+            exit 1
+          fi
+          echo "Generated files:"
+          ls -la TestProject/*.sln TestProject/*.csproj
+
+      - name: Upload project files
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-files
+          path: |
+            TestProject/*.sln
+            TestProject/*.csproj
+          retention-days: 1
+
+  # ── JetBrains inspectcode (ReSharper CLI) ──────────────────────────
+  inspectcode:
+    needs: generate-project-files
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write  # SARIF upload に必要
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download project files
+        uses: actions/download-artifact@v4
+        with:
+          name: project-files
+          path: TestProject
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install ReSharper CLT
+        run: dotnet tool install -g JetBrains.ReSharper.GlobalTools
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run inspectcode
+        run: python scripts/inspect-unity.py --only inspect --output-dir reports --keep-sln
+
+      - name: Upload SARIF to Code Scanning
+        if: always() && hashFiles('reports/inspectcode.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/inspectcode.sarif
+          category: resharper
+
+      - name: Post summary
+        if: always()
+        run: |
+          if [ -f reports/inspectcode.sarif ]; then
+            COUNT=$(python3 -c "
+          import json, pathlib
+          sarif = json.loads(pathlib.Path('reports/inspectcode.sarif').read_text())
+          total = sum(len(r.get('results', [])) for r in sarif.get('runs', []))
+          print(total)
+          ")
+            echo "## inspectcode" >> "$GITHUB_STEP_SUMMARY"
+            echo "Found **${COUNT}** issue(s)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inspectcode-report
+          path: reports/inspectcode.sarif
+
+  # ── similarity-csharp (重複コード検出) ────────────────────────────
+  # .csproj 不要のため Unity ジョブに依存しない
+  similarity:
+    runs-on: ubuntu-latest
+    if: >-
+      vars.ENABLE_CSHARP_INSPECT != 'false'
+      && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install similarity-csharp
+        run: dotnet tool install -g SimilarityCSharp.Cli
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run similarity check
+        run: python scripts/inspect-unity.py --only similarity --output-dir reports
+
+      - name: Post summary
+        if: always()
+        run: |
+          if [ -f reports/similarity.txt ]; then
+            echo "## similarity-csharp" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -3 reports/similarity.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: similarity-report
+          path: reports/similarity.txt
