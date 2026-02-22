@@ -389,6 +389,20 @@ u uitree inspect ref_3 --children
 u uitree inspect -p "Toolbar" -n "Play"
 ```
 
+### フレーム記録
+
+```bash
+# 記録開始（カメラベース、FPS/フォーマット/解像度を指定可能）
+u recorder start --fps 30 -f jpg -q 80
+u recorder start --fps 60 -W 1920 -H 1080 -o ./frames
+
+# 記録停止と結果取得
+u recorder stop
+
+# 記録ステータス確認
+u recorder status
+```
+
 ### 設定
 
 ```bash

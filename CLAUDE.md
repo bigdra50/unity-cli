@@ -16,169 +16,29 @@ CLI ←──TCP:6500──→ Relay Server (Python) ←──TCP:6500──→ 
 # Install globally (provides: unity-cli, u, unity commands)
 uv tool install .
 
-# Run CLI (u and unity are aliases for unity-cli)
-u state                                   # Get editor state
-u play                                    # Enter play mode
-u stop                                    # Exit play mode
-u pause                                   # Toggle pause
-u refresh                                 # Refresh AssetDatabase
-u instances                               # List connected instances
-
-# Editor Selection & Screenshot
-u selection                               # Get current editor selection
-u screenshot -s game -p ./out.png
-u screenshot -s game | mcat -i           # Pipe: inline display
-u screenshot --burst -n 10               # Burst: 10 frames
-u screenshot --burst -n 5 -f jpg -q 80   # Burst with format/quality
-
-# Console commands (adb logcat style levels)
-u console get                             # All logs (plain text)
-u console get --json                      # All logs (JSON format)
-u console get -s                          # All logs with stack traces
-u console get -l W                        # Warning and above
-u console get -l E                        # Error and above
-u console get -l +W                       # Warning only
-u console get -l +E+X                     # Error and exception only
-u console get -l E | head -10             # Last 10 error+ logs
-u console get | grep "NullRef"            # Filter by text
-u console clear                           # Clear console
-
-# Scene commands
-u scene active                            # Get active scene info
-u scene hierarchy                         # Get scene hierarchy
-u scene load --path <path>                # Load by path
-u scene load --name <name>                # Load by name
-u scene save                              # Save current scene
-
-# Test commands
-u tests run edit                          # Run EditMode tests
-u tests run play                          # Run PlayMode tests
-u tests list edit                         # List EditMode tests
-u tests status                            # Check test status
-
-# GameObject commands
-u gameobject find --name <name>           # Find by name
-u gameobject find --id <id>               # Find by instance ID
-u gameobject create --name <name>         # Create GameObject
-u gameobject modify -n <name> --position 0 1 0  # Modify transform
-u gameobject active -n <name> --active    # Activate GameObject
-u gameobject active -n <name> --no-active # Deactivate GameObject
-u gameobject delete --name <name>         # Delete GameObject
-
-# Component commands
-u component list --target <gameobject>    # List components
-u component inspect --target <gameobject> --type <type>  # Inspect properties
-u component add --target <gameobject> --type <type>      # Add component
-u component modify -t <go> -T <type> --prop <name> --value <val>  # Modify property
-u component remove --target <gameobject> --type <type>   # Remove component
-
-# Menu commands
-u menu exec "Window/General/Console"      # Execute menu item
-u menu list                               # List menu items
-u menu list -f "Window"                   # Filter menu items
-u menu context <method>                   # Execute context menu
-
-# Asset commands
-u asset prefab --source <gameobject> --path <path>        # Create prefab
-u asset scriptable-object --type <type> --path <path>     # Create ScriptableObject
-u asset info <path>                       # Get asset info
-u asset deps <path>                       # Get dependencies
-u asset deps <path> --no-recursive        # Direct dependencies only
-u asset refs <path>                       # Get referencers
-
-# Package commands (via Relay)
-u package list                            # List installed packages
-u package add <name>@<version>            # Add package
-u package remove <name>                   # Remove package
-
-# Build commands
-u build settings                          # Show build settings
-u build run                               # Build with current settings
-u build run --target Android --output ./Builds/Android
-u build scenes                            # List build scenes
-
-# Profiler commands
-u profiler status                         # Profiler state
-u profiler start                          # Start profiling
-u profiler stop                           # Stop profiling
-u profiler snapshot                       # Current frame data
-u profiler frames -c 30                   # Last 30 frames summary
-
-# UI Toolkit tree commands (Playwright MCP-like ref ID system)
-u uitree dump                            # List all panels
-u uitree dump -p "GameView"              # Dump tree as text
-u uitree dump -p "GameView" -o json      # Dump tree as JSON
-u uitree dump -p "GameView" -d 3         # Limit depth
-u uitree query -p "GameView" -t Button   # Query by type
-u uitree query -p "GameView" -n "StartBtn"  # Query by name
-u uitree query -p "GameView" -c "primary-button"  # Query by class
-u uitree inspect ref_3                   # Inspect by ref ID
-u uitree inspect ref_3 --style           # Include resolvedStyle
-u uitree inspect ref_3 --children        # Include children
-
-# UI Toolkit interaction commands
-u uitree click ref_3                     # Click element
-u uitree click ref_3 --button 1          # Right click
-u uitree click ref_3 --count 2           # Double click
-u uitree click -p "GameView" -n "StartBtn"  # Click by panel + name
-u uitree scroll ref_5 --y 0              # Scroll to top
-u uitree scroll ref_5 --y 500            # Scroll to y=500
-u uitree scroll ref_5 --to ref_12        # Scroll child into view
-u uitree text ref_7                      # Get element text
-
-# Standalone tools (no Relay required)
-u config show                             # Show configuration
-u project info                            # Project info
-u project version                         # Project Unity version
-u project packages                        # List manifest packages
-u project assemblies                      # List assembly definitions
-u project quality                         # Quality settings
-u project tags                            # Tags, layers, sorting layers
-u editor list                             # List installed editors
-u editor install <version>                # Install via Hub
-u open                                    # Open project
-
 # Run Relay Server standalone
 unity-relay --port 6500
+```
 
-# Run directly without install
-python -m unity_cli state
-python -m relay.server --port 6500
+All subcommands are self-documenting: `u --help`, `u <command> --help`.
 
-# Test with uvx (after pushing to GitHub)
-uvx --from git+https://github.com/bigdra50/unity-cli u state
+Frequently used:
+
+```bash
+u state                                   # Get editor state
+u play / u stop / u pause                 # Playmode control
+u refresh                                 # Refresh AssetDatabase
+u screenshot -s game -p ./out.png         # Capture screenshot
+u screenshot --burst -n 10                # Burst capture
+u console get -l E                        # Error logs
+u scene hierarchy                         # Scene hierarchy
+u tests run edit                          # Run EditMode tests
+u recorder start --fps 30                 # Start frame recording
+u recorder stop                           # Stop recording
+u uitree dump -p "GameView"               # UI Toolkit tree
 ```
 
 ## Architecture
-
-### Protocol (4-byte framing)
-
-```
-┌────────────────────────────────────┐
-│ 4-byte Length (big-endian, uint32) │
-├────────────────────────────────────┤
-│ JSON Payload (UTF-8)               │
-└────────────────────────────────────┘
-```
-
-Max payload: 16 MiB
-
-### Message Flow
-
-**CLI → Relay:**
-```json
-{"type": "REQUEST", "id": "cli-xxx:uuid", "command": "manage_editor", "params": {"action": "play"}}
-```
-
-**Relay → Unity:**
-```json
-{"type": "COMMAND", "id": "cli-xxx:uuid", "command": "manage_editor", "params": {"action": "play"}}
-```
-
-**Unity → Relay → CLI:**
-```json
-{"type": "RESPONSE", "id": "cli-xxx:uuid", "success": true, "data": {...}}
-```
 
 ### State Machine
 
@@ -188,55 +48,6 @@ DISCONNECTED → (REGISTER) → READY → (COMMAND) → BUSY → (COMMAND_RESULT
                         (beforeReload)                              (afterReload)
                               ↓                                              ↑
                           RELOADING ─────────────────────────────────────────┘
-```
-
-### Code Structure
-
-```
-relay/
-├── server.py           # Main Relay Server
-├── protocol.py         # Message types, framing, error codes
-├── instance_registry.py # Unity instance management, queue
-└── request_cache.py    # Idempotency cache (success only)
-
-unity_cli/
-├── __init__.py         # Package init
-├── cli/
-│   └── app.py          # CLI entry point (Typer + Rich)
-├── client.py           # Relay client with retry logic
-├── config.py           # Configuration management
-├── models.py           # Data models
-└── exceptions.py       # Custom exceptions
-
-UnityBridge/
-├── Editor/
-│   ├── RelayClient.cs        # TCP connection to Relay
-│   ├── Protocol.cs           # Framing, message serialization
-│   ├── CommandDispatcher.cs  # [BridgeTool] attribute handler
-│   ├── BridgeReloadHandler.cs # Domain reload recovery
-│   ├── BridgeManager.cs      # Singleton manager
-│   ├── BridgeEditorWindow.cs # Editor window UI
-│   ├── BridgeToolbar.cs      # Toolbar connection indicator
-│   ├── RelayServerLauncher.cs # uvx server launch
-│   ├── Helpers/
-│   │   ├── BridgeJobStateStore.cs # Job state persistence
-│   │   ├── BridgeLog.cs      # Logging utility
-│   │   ├── PortManager.cs    # Port management
-│   │   └── Response.cs       # Response builder
-│   └── Tools/                # Command handlers
-│       ├── Asset.cs          # Prefab, ScriptableObject
-│       ├── Component.cs      # Component operations
-│       ├── Console.cs        # Console log retrieval
-│       ├── EditorSelection.cs # Selection state
-│       ├── GameObject.cs     # GameObject operations
-│       ├── MenuItem.cs       # Menu item execution
-│       ├── Playmode.cs       # Play/Stop/Pause
-│       ├── Refresh.cs        # Asset database refresh
-│       ├── Scene.cs          # Scene management
-│       ├── Screenshot.cs     # Screenshot capture
-│       ├── Tests.cs          # Test runner
-│       └── UITree.cs         # UI Toolkit tree inspection
-└── package.json
 ```
 
 ## Key Implementation Details
@@ -252,7 +63,7 @@ UnityBridge/
 
 ### CLI
 
-- Exponential backoff: 500ms → 1s → 2s → 4s → 8s (max 30s total)
+- Exponential backoff: 500ms → 1s → 2s → 4s → 8s (max 45s total)
 - Retryable errors: INSTANCE_RELOADING, INSTANCE_BUSY, TIMEOUT
 - request_id format: `{client_id}:{uuid}`
 

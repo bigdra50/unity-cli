@@ -389,6 +389,20 @@ u uitree inspect ref_3 --children
 u uitree inspect -p "Toolbar" -n "Play"
 ```
 
+### Frame Recording
+
+```bash
+# Start recording (camera-based, configurable FPS/format/resolution)
+u recorder start --fps 30 -f jpg -q 80
+u recorder start --fps 60 -W 1920 -H 1080 -o ./frames
+
+# Stop recording and get results
+u recorder stop
+
+# Check recording status
+u recorder status
+```
+
 ### Configuration
 
 ```bash
