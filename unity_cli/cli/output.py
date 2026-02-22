@@ -308,6 +308,13 @@ def print_instances_table(instances: list[dict[str, Any]]) -> None:
         _print_instances_rich(instances, has_duplicates)
 
 
+def _format_status(inst: dict[str, Any]) -> str:
+    """Format status with optional detail (e.g. 'busy (compiling)')."""
+    status = inst.get("status", "unknown")
+    detail = inst.get("status_detail")
+    return f"{status} ({detail})" if detail else status
+
+
 def _print_instances_plain(instances: list[dict[str, Any]], has_duplicates: bool) -> None:
     cwd = os.getcwd()
     headers = ["#", "Project"]
@@ -326,7 +333,7 @@ def _print_instances_plain(instances: list[dict[str, Any]], has_duplicates: bool
         row.extend(
             [
                 inst.get("unity_version", "Unknown"),
-                inst.get("status", "unknown"),
+                _format_status(inst),
                 "*" if inst.get("is_default") else "",
             ]
         )
@@ -355,6 +362,7 @@ def _print_instances_rich(instances: list[dict[str, Any]], has_duplicates: bool)
 
     for inst in instances:
         status = inst.get("status", "unknown")
+        display_status = _format_status(inst)
         row_items: list[str | Text] = [
             str(inst.get("ref_id", "")),
             escape(inst.get("project_name", inst.get("instance_id", "Unknown"))),
@@ -364,7 +372,7 @@ def _print_instances_rich(instances: list[dict[str, Any]], has_duplicates: bool)
         row_items.extend(
             [
                 escape(inst.get("unity_version", "Unknown")),
-                Text(escape(status), style=_STATUS_STYLES.get(status.lower(), "dim")),
+                Text(escape(display_status), style=_STATUS_STYLES.get(status.lower(), "dim")),
                 "[green]*[/green]" if inst.get("is_default") else "",
             ]
         )

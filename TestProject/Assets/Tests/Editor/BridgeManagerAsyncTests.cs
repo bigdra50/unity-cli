@@ -154,6 +154,7 @@ namespace Game.Tests.Editor
 
             public Task ConnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
             public Task DisconnectAsync() => Task.CompletedTask;
+            public Task SendStatusAsync(string status, string detail = null) => Task.CompletedTask;
             public Task SendReloadingStatusAsync() => Task.CompletedTask;
             public Task SendReadyStatusAsync() => Task.CompletedTask;
 

@@ -236,32 +236,38 @@ namespace UnityBridge
         }
 
         /// <summary>
-        /// Send a STATUS message to indicate reloading state
+        /// Send a STATUS message with optional detail.
+        /// Throws on send failure — callers are responsible for error handling.
+        /// </summary>
+        public async Task SendStatusAsync(string status, string detail = null)
+        {
+            if (_stream == null || _client is not { Connected: true })
+                return;
+
+            var statusMsg = Messages.CreateStatus(InstanceId, status, detail);
+            await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
+            try
+            {
+                await Framing.WriteFrameAsync(_stream, statusMsg);
+            }
+            finally
+            {
+                _sendLock.Release();
+            }
+            BridgeLog.Verbose($"Sent STATUS: {status}" + (detail != null ? $" ({detail})" : ""));
+        }
+
+        /// <summary>
+        /// Send a STATUS message to indicate reloading state.
+        /// Sets ConnectionStatus.Reloading regardless of send outcome.
         /// </summary>
         public async Task SendReloadingStatusAsync()
         {
             if (_stream == null || _client is not { Connected: true })
                 return;
 
-            try
-            {
-                Status = ConnectionStatus.Reloading;
-                var statusMsg = Messages.CreateStatus(InstanceId, InstanceStatus.Reloading, "Domain reload started");
-                await _sendLock.WaitAsync();
-                try
-                {
-                    await Framing.WriteFrameAsync(_stream, statusMsg);
-                }
-                finally
-                {
-                    _sendLock.Release();
-                }
-                BridgeLog.Verbose("Sent STATUS: reloading");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Warn($"Failed to send reloading status: {ex.Message}");
-            }
+            Status = ConnectionStatus.Reloading;
+            await SendStatusAsync(InstanceStatus.Reloading);
         }
 
         /// <summary>
@@ -269,27 +275,7 @@ namespace UnityBridge
         /// </summary>
         public async Task SendReadyStatusAsync()
         {
-            if (_stream == null || _client is not { Connected: true })
-                return;
-
-            try
-            {
-                var statusMsg = Messages.CreateStatus(InstanceId, InstanceStatus.Ready);
-                await _sendLock.WaitAsync();
-                try
-                {
-                    await Framing.WriteFrameAsync(_stream, statusMsg);
-                }
-                finally
-                {
-                    _sendLock.Release();
-                }
-                BridgeLog.Verbose("Sent STATUS: ready");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Warn($"Failed to send ready status: {ex.Message}");
-            }
+            await SendStatusAsync(InstanceStatus.Ready);
         }
 
         /// <summary>
@@ -297,30 +283,8 @@ namespace UnityBridge
         /// </summary>
         public async Task SendCommandResultAsync(string id, JObject data)
         {
-            if (_stream == null || _client is not { Connected: true })
-            {
-                BridgeLog.Warn("Cannot send result: not connected");
-                return;
-            }
-
-            try
-            {
-                var resultMsg = Messages.CreateCommandResult(id, data);
-                await _sendLock.WaitAsync();
-                try
-                {
-                    await Framing.WriteFrameAsync(_stream, resultMsg);
-                }
-                finally
-                {
-                    _sendLock.Release();
-                }
-                BridgeLog.Verbose($"Sent COMMAND_RESULT: {id}");
-            }
-            catch (Exception ex)
-            {
-                BridgeLog.Error($"Failed to send command result: {ex.Message}");
-            }
+            var msg = Messages.CreateCommandResult(id, data);
+            await SendFrameAsync(msg, $"COMMAND_RESULT: {id}");
         }
 
         /// <summary>
@@ -328,29 +292,38 @@ namespace UnityBridge
         /// </summary>
         public async Task SendCommandErrorAsync(string id, string code, string message)
         {
+            var msg = Messages.CreateCommandResultError(id, code, message);
+            await SendFrameAsync(msg, $"COMMAND_RESULT (error): {id} - {code}");
+        }
+
+        private async Task SendFrameAsync(JObject message, string logLabel)
+        {
             if (_stream == null || _client is not { Connected: true })
             {
-                BridgeLog.Warn("Cannot send error: not connected");
+                BridgeLog.Warn($"Cannot send {logLabel}: not connected");
                 return;
             }
 
             try
             {
-                var errorMsg = Messages.CreateCommandResultError(id, code, message);
-                await _sendLock.WaitAsync();
+                await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
                 try
                 {
-                    await Framing.WriteFrameAsync(_stream, errorMsg);
+                    await Framing.WriteFrameAsync(_stream, message);
                 }
                 finally
                 {
                     _sendLock.Release();
                 }
-                BridgeLog.Verbose($"Sent COMMAND_RESULT (error): {id} - {code}");
+                BridgeLog.Verbose($"Sent {logLabel}");
+            }
+            catch (OperationCanceledException)
+            {
+                BridgeLog.Verbose($"Send cancelled: {logLabel}");
             }
             catch (Exception ex)
             {
-                BridgeLog.Error($"Failed to send command error: {ex.Message}");
+                BridgeLog.Error($"Failed to send {logLabel}: {ex.Message}");
             }
         }
 

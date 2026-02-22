@@ -85,6 +85,7 @@ namespace UnityBridge
                 return Task.CompletedTask;
             }
 
+            public Task SendStatusAsync(string status, string detail = null) => Task.CompletedTask;
             public Task SendReloadingStatusAsync() => Task.CompletedTask;
             public Task SendReadyStatusAsync() => Task.CompletedTask;
 

@@ -62,6 +62,11 @@ namespace UnityBridge
         Task DisconnectAsync();
 
         /// <summary>
+        /// Send a STATUS message with optional detail to the relay server
+        /// </summary>
+        Task SendStatusAsync(string status, string detail = null);
+
+        /// <summary>
         /// Send STATUS "reloading" to the relay server
         /// </summary>
         Task SendReloadingStatusAsync();

@@ -24,6 +24,19 @@ namespace UnityBridge.Tools
         private static TestResultCollector _activeCollector;
         private static JObject _lastCompletedResult;
 
+        /// <summary>
+        /// Whether tests are currently running.
+        /// Read from main thread only; no lock needed.
+        /// </summary>
+        public static bool IsRunning
+        {
+            get
+            {
+                var collector = _activeCollector;
+                return collector != null && !collector.IsComplete;
+            }
+        }
+
         // SemaphoreSlim for exclusive access (prevents concurrent test runs)
         private static readonly SemaphoreSlim OperationLock = new(1, 1);
 
