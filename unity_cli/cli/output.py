@@ -471,29 +471,24 @@ def print_components_table(components: list[dict[str, Any]]) -> None:
         return
 
     if console.no_color:
-        headers = ["Type", "Enabled", "ID"]
+        headers = ["Type", "ID"]
         rows: list[list[str]] = []
         for comp in components:
-            comp_type = comp.get("type", "Unknown")
-            enabled = "Yes" if comp.get("enabled", True) else "No"
+            comp_type = comp.get("typeName", comp.get("type", "Unknown"))
             instance_id = str(comp.get("instanceID", ""))
-            rows.append([comp_type, enabled, instance_id])
+            rows.append([comp_type, instance_id])
         _print_plain_table(headers, rows, f"Components ({len(components)})")
         return
 
     table = Table(title=f"Components ({len(components)})")
     table.add_column("Type", style="cyan")
-    table.add_column("Enabled", justify="center")
     table.add_column("ID", style="dim", justify="right")
 
     for comp in components:
-        comp_type = escape(comp.get("type", "Unknown"))
-        enabled = comp.get("enabled", True)
+        comp_type = escape(comp.get("typeName", comp.get("type", "Unknown")))
         instance_id = str(comp.get("instanceID", ""))
 
-        enabled_display = "[green]Yes[/green]" if enabled else "[red]No[/red]"
-
-        table.add_row(comp_type, enabled_display, instance_id)
+        table.add_row(comp_type, instance_id)
 
     console.print(table)
 

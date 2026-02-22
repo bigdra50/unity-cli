@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+from collections.abc import Callable
 from typing import Any
 
 import typer
@@ -26,6 +28,19 @@ def _handle_error(e: UnityCLIError) -> None:
     """Print error and raise typer.Exit with the mapped exit code."""
     print_error(e.message, e.code)
     raise typer.Exit(exit_code_for(e)) from None
+
+
+def handle_cli_errors(fn: Callable[..., None]) -> Callable[..., None]:
+    """Decorator that catches UnityCLIError and exits with the mapped code."""
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> None:
+        try:
+            fn(*args, **kwargs)
+        except UnityCLIError as e:
+            _handle_error(e)
+
+    return wrapper
 
 
 def _exit_usage(message: str, usage: str) -> None:

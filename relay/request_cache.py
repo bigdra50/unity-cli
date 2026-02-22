@@ -88,7 +88,8 @@ class RequestCache:
         2. If in-flight -> wait for result
         3. Otherwise -> execute and cache if successful
         """
-        # Check cache first
+        # Check cache / in-flight status under a single lock acquisition
+        event: asyncio.Event | None = None
         async with self._lock:
             if request_id in self._cache:
                 entry = self._cache[request_id]
@@ -97,12 +98,15 @@ class RequestCache:
                     return entry.response
 
             # Check if already in-flight
-            if request_id in self._pending:
+            event = self._pending.get(request_id)
+            if event is not None:
                 logger.debug(f"Request {request_id} is in-flight, waiting...")
-                event = self._pending[request_id]
+            else:
+                # Mark as in-flight while still holding the lock
+                self._pending[request_id] = asyncio.Event()
 
         # If in-flight, wait outside the lock
-        if request_id in self._pending:
+        if event is not None:
             await event.wait()
             async with self._lock:
                 if request_id in self._pending_results:
@@ -110,12 +114,7 @@ class RequestCache:
                 # Fallback: check cache
                 if request_id in self._cache:
                     return self._cache[request_id].response
-            # If we get here, something went wrong
             raise RuntimeError(f"Request {request_id} completed but result not found")
-
-        # Mark as in-flight
-        async with self._lock:
-            self._pending[request_id] = asyncio.Event()
 
         try:
             # Execute the request
