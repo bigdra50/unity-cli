@@ -16,7 +16,10 @@ jobs:
   # ── Unity バッチモードで .csproj/.sln を生成 ──────────────────────
   generate-project-files:
     runs-on: ubuntu-latest
-    if: ${{ vars.ENABLE_CSHARP_INSPECT != 'false' }}
+    if: >-
+      vars.ENABLE_CSHARP_INSPECT != 'false'
+      && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - uses: actions/checkout@v4
 
@@ -125,7 +128,10 @@ jobs:
   # .csproj 不要のため Unity ジョブに依存しない
   similarity:
     runs-on: ubuntu-latest
-    if: ${{ vars.ENABLE_CSHARP_INSPECT != 'false' }}
+    if: >-
+      vars.ENABLE_CSHARP_INSPECT != 'false'
+      && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - uses: actions/checkout@v4
 
