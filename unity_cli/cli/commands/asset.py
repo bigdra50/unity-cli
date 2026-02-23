@@ -8,7 +8,7 @@ import typer
 
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _exit_usage, _should_json, handle_cli_errors
-from unity_cli.cli.output import print_json, print_key_value, print_line, print_success
+from unity_cli.cli.output import is_no_color, print_json, print_key_value, print_line, print_plain_table, print_success
 
 asset_app = typer.Typer(help="Asset commands (Prefab, ScriptableObject)")
 
@@ -91,14 +91,18 @@ def asset_deps(
         print_json(result)
     else:
         deps = result.get("dependencies", [])
-        count = result.get("count", len(deps))
-        print_line(f"[bold]Dependencies for {path}[/bold] ({count})")
-        if result.get("recursive"):
-            print_line("[dim](recursive)[/dim]")
-        print_line("")
-        for dep in deps:
-            print_line(f"  {dep.get('path')}")
-            print_line(f"    [dim]type: {dep.get('type')}[/dim]")
+        if is_no_color():
+            rows = [[dep.get("path", ""), dep.get("type", "")] for dep in deps]
+            print_plain_table(["Path", "Type"], rows, header=False)
+        else:
+            count = result.get("count", len(deps))
+            print_line(f"[bold]Dependencies for {path}[/bold] ({count})")
+            if result.get("recursive"):
+                print_line("[dim](recursive)[/dim]")
+            print_line("")
+            for dep in deps:
+                print_line(f"  {dep.get('path')}")
+                print_line(f"    [dim]type: {dep.get('type')}[/dim]")
 
 
 @asset_app.command("refs")
@@ -118,12 +122,16 @@ def asset_refs(
         print_json(result)
     else:
         refs = result.get("referencers", [])
-        count = result.get("count", len(refs))
-        print_line(f"[bold]Referencers of {path}[/bold] ({count})")
-        print_line("")
-        if count == 0:
-            print_line("[dim]No references found[/dim]")
+        if is_no_color():
+            rows = [[ref.get("path", ""), ref.get("type", "")] for ref in refs]
+            print_plain_table(["Path", "Type"], rows, header=False)
         else:
-            for ref in refs:
-                print_line(f"  {ref.get('path')}")
-                print_line(f"    [dim]type: {ref.get('type')}[/dim]")
+            count = result.get("count", len(refs))
+            print_line(f"[bold]Referencers of {path}[/bold] ({count})")
+            print_line("")
+            if count == 0:
+                print_line("[dim]No references found[/dim]")
+            else:
+                for ref in refs:
+                    print_line(f"  {ref.get('path')}")
+                    print_line(f"    [dim]type: {ref.get('type')}[/dim]")

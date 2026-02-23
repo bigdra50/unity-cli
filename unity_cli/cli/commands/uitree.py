@@ -9,7 +9,7 @@ from rich.markup import escape
 
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _exit_usage, _handle_error, _should_json
-from unity_cli.cli.output import print_json, print_line
+from unity_cli.cli.output import is_no_color, print_json, print_key_value, print_line, print_plain_table, sanitize_tsv
 from unity_cli.exceptions import UnityCLIError
 
 uitree_app = typer.Typer(help="UI Toolkit tree commands")
@@ -118,6 +118,10 @@ def uitree_query(
 
         if _should_json(context, json_flag):
             print_json(result, None)
+        elif is_no_color():
+            matches = result.get("matches", [])
+            for elem in matches:
+                _print_query_match_plain(elem)
         else:
             matches = result.get("matches", [])
             count = result.get("count", len(matches))
@@ -189,6 +193,8 @@ def uitree_inspect(
 
         if _should_json(context, json_flag):
             print_json(result, None)
+        elif is_no_color():
+            _print_inspect_element_plain(result)
         else:
             for line in _format_inspect_element(result):
                 print_line(line)
@@ -304,6 +310,76 @@ def _format_inspect_element(elem: dict[str, Any]) -> list[str]:
         lines.append("")
         lines.extend(children_lines)
     return lines
+
+
+def _print_query_match_plain(elem: dict[str, Any]) -> None:
+    """Print a single query match as tab-separated line for pipe-friendly output."""
+    ref = elem.get("ref", "")
+    type_name = elem.get("type", "VisualElement")
+    elem_name = elem.get("name", "")
+    path = elem.get("path", "")
+    layout = elem.get("layout")
+    layout_str = ""
+    if isinstance(layout, dict) and layout:
+        layout_str = f"{layout.get('x', 0)},{layout.get('y', 0)},{layout.get('width', 0)}x{layout.get('height', 0)}"
+    row = [ref, type_name, elem_name, path, layout_str]
+    print_plain_table(["Ref", "Type", "Name", "Path", "Layout"], [row], header=False)
+
+
+_INSPECT_NONEMPTY_KEYS = ("ref", "type", "name", "childCount", "path")
+_INSPECT_PRESENT_KEYS = ("visible", "focusable", "enabledSelf", "enabledInHierarchy")
+_INSPECT_RECT_KEYS = ("layout", "worldBound")
+
+
+def _extract_nonempty(elem: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    """Extract non-empty values for given keys."""
+    return {k: elem[k] for k in keys if elem.get(k) is not None and elem.get(k) != ""}
+
+
+def _extract_present(elem: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    """Extract values that are present (key exists) regardless of value."""
+    return {k: elem[k] for k in keys if k in elem}
+
+
+def _extract_rects(elem: dict[str, Any], keys: tuple[str, ...]) -> dict[str, str]:
+    """Extract rect keys and format them."""
+    result: dict[str, str] = {}
+    for k in keys:
+        rect = elem.get(k)
+        if isinstance(rect, dict) and rect:
+            result[k] = _format_rect_value(rect)
+    return result
+
+
+def _build_inspect_kv(elem: dict[str, Any]) -> dict[str, Any]:
+    """Build key-value dict from inspect element for plain output."""
+    kv: dict[str, Any] = _extract_nonempty(elem, _INSPECT_NONEMPTY_KEYS)
+    classes = elem.get("classes")
+    if isinstance(classes, list) and classes:
+        kv["classes"] = " ".join(f".{c}" for c in classes)
+    kv.update(_extract_present(elem, _INSPECT_PRESENT_KEYS))
+    kv.update(_extract_rects(elem, _INSPECT_RECT_KEYS))
+    return kv
+
+
+def _print_inspect_element_plain(elem: dict[str, Any]) -> None:
+    """Print inspect element as tab-separated K-V for pipe-friendly output."""
+    print_key_value(_build_inspect_kv(elem))
+
+    # style: dot notation
+    style_data = elem.get("resolvedStyle")
+    if style_data and isinstance(style_data, dict):
+        style_rows = [[f"style.{sanitize_tsv(str(k))}", str(v)] for k, v in style_data.items()]
+        print_plain_table(["Key", "Value"], style_rows, header=False)
+
+    # children: one line per child
+    children_data = elem.get("children")
+    if children_data and isinstance(children_data, list):
+        for child in children_data:
+            if not isinstance(child, dict):
+                continue
+            child_row = ["child", child.get("ref", ""), child.get("type", "VisualElement"), child.get("name", "")]
+            print_plain_table(["Prefix", "Ref", "Type", "Name"], [child_row], header=False)
 
 
 def _format_query_match(elem: dict[str, Any]) -> list[str]:

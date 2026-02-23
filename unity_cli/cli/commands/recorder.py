@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.markup import escape
@@ -11,8 +11,10 @@ from unity_cli.cli.context import CLIContext
 from unity_cli.cli.exit_codes import ExitCode
 from unity_cli.cli.helpers import _handle_error, _should_json
 from unity_cli.cli.output import (
+    is_no_color,
     print_error,
     print_json,
+    print_key_value,
     print_line,
     print_success,
 )
@@ -136,6 +138,23 @@ def recorder_status(
             return
 
         recording = result.get("recording", False)
+
+        if is_no_color():
+            if not recording:
+                print_key_value({"recording": "false"})
+                return
+            kv: dict[str, Any] = {
+                "recording": "true",
+                "frameCount": result.get("frameCount", 0),
+                "elapsed": result.get("elapsed", 0),
+                "fps": result.get("fps", 0),
+            }
+            pending = result.get("pendingWrites", 0)
+            if pending:
+                kv["pendingWrites"] = pending
+            print_key_value(kv)
+            return
+
         if not recording:
             print_line("[dim]No recording in progress[/dim]")
             return

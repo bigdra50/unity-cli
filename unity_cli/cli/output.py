@@ -153,17 +153,40 @@ def print_line(text: str) -> None:
         console.print(text)
 
 
-def _print_plain_table(
+def print_plain_item(value: str) -> None:
+    """Print a single sanitized value per line for pipe-friendly list output."""
+    print(sanitize_tsv(str(value)))
+
+
+def sanitize_tsv(value: str) -> str:
+    """Replace control characters to prevent TSV parse breakage and terminal injection."""
+    # Replace common whitespace control chars with space, strip all other C0 controls
+    result = value.replace("\t", " ").replace("\n", " ").replace("\r", " ")
+    # Remove remaining C0 control characters (0x00-0x1F except already handled) and DEL (0x7F)
+    return result.translate(str.maketrans("", "", "".join(chr(c) for c in range(0x20) if chr(c) not in " ") + "\x7f"))
+
+
+# Keep alias for backward compatibility
+_sanitize_tsv = sanitize_tsv
+
+
+def print_plain_table(
     headers: list[str],
     rows: list[list[str]],
     title: str | None = None,
+    header: bool = True,
 ) -> None:
     """Print a tab-separated table for pipe-friendly output."""
     if title:
         print(title)
-    print("\t".join(headers))
+    if header:
+        print("\t".join(headers))
     for row in rows:
-        print("\t".join(row))
+        print("\t".join(sanitize_tsv("" if cell is None else str(cell)) for cell in row))
+
+
+# Keep alias for backward compatibility
+_print_plain_table = print_plain_table
 
 
 def filter_fields(data: Any, fields: list[str] | None) -> Any:
@@ -547,10 +570,8 @@ def print_test_results_table(results: list[dict[str, Any]]) -> None:
 def print_key_value(data: dict[str, Any], title: str | None = None) -> None:
     """Print dict as key-value pairs."""
     if console.no_color:
-        if title:
-            print(title)
         for key, value in data.items():
-            print(f"  {key}: {value}")
+            print(f"{sanitize_tsv(str(key))}\t{sanitize_tsv(str(value))}")
         return
 
     if title:

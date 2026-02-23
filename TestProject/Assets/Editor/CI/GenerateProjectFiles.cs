@@ -1,3 +1,5 @@
+using System;
+using System.Reflection;
 using UnityEditor;
 
 namespace CI
@@ -10,32 +12,42 @@ namespace CI
     {
         public static void Run()
         {
-            // Rider パッケージ (com.unity.ide.rider) の ProjectGeneration を利用
-            var generatorType = System.Type.GetType(
-                "Unity.Rider.Editor.ProjectGeneration, Unity.Rider.Editor");
-
-            if (generatorType == null)
-            {
-                // fallback: SyncVS (Visual Studio パッケージ)
-                UnityEditor.SyncVS.SyncSolution();
+            if (TrySyncViaRider())
                 return;
-            }
+
+            SyncFallback();
+        }
+
+        private static bool TrySyncViaRider()
+        {
+            var generatorType = Type.GetType(
+                "Unity.Rider.Editor.ProjectGeneration, Unity.Rider.Editor");
+            if (generatorType == null)
+                return false;
 
             var instance = generatorType
-                .GetMethod("GetInstance",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                .GetMethod("GetInstance", BindingFlags.Public | BindingFlags.Static)
                 ?.Invoke(null, null);
-
             if (instance == null)
-            {
-                UnityEditor.SyncVS.SyncSolution();
-                return;
-            }
+                return false;
 
             generatorType
-                .GetMethod("Sync",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                .GetMethod("Sync", BindingFlags.Public | BindingFlags.Instance)
                 ?.Invoke(instance, null);
+            return true;
+        }
+
+        private static void SyncFallback()
+        {
+#if UNITY_6000_0_OR_NEWER
+            // Unity 6 で SyncVS が internal になったためリフレクション経由
+            var syncVsType = typeof(Editor).Assembly.GetType("UnityEditor.SyncVS");
+            syncVsType?.GetMethod("SyncSolution",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                ?.Invoke(null, null);
+#else
+            SyncVS.SyncSolution();
+#endif
         }
     }
 }

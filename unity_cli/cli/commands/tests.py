@@ -17,6 +17,7 @@ from unity_cli.cli.output import (
     print_json,
     print_key_value,
     print_line,
+    print_plain_item,
     print_success,
     print_warning,
 )
@@ -185,9 +186,15 @@ def tests_list(
             print_json(result, None)
         else:
             tests = result.get("tests", [])
-            print_line(f"[bold]Tests ({escape(mode)}Mode): {len(tests)}[/bold]")
-            for t in tests:
-                print_line(f"  {escape(str(t))}")
+            if is_no_color():
+                for t in tests:
+                    name = t.get("fullName", str(t)) if isinstance(t, dict) else str(t)
+                    print_plain_item(name)
+            else:
+                print_line(f"[bold]Tests ({escape(mode)}Mode): {len(tests)}[/bold]")
+                for t in tests:
+                    name = t.get("fullName", str(t)) if isinstance(t, dict) else str(t)
+                    print_line(f"  {escape(name)}")
     except UnityCLIError as e:
         _handle_error(e)
 
@@ -206,6 +213,17 @@ def tests_status(
         result = context.client.tests.status()
         if _should_json(context, json_flag):
             print_json(result, None)
+        elif is_no_color():
+            running = result.get("running", False)
+            kv: dict[str, Any] = {"status": "running" if running else "idle"}
+            if running:
+                started = result.get("testsStarted", 0)
+                finished = result.get("testsFinished", 0)
+                kv["progress"] = f"{finished}/{started}"
+                kv["passed"] = result.get("passed", 0)
+                kv["failed"] = result.get("failed", 0)
+                kv["skipped"] = result.get("skipped", 0)
+            print_key_value(kv)
         else:
             running = result.get("running", False)
             status_text = "[green]running[/green]" if running else "[dim]idle[/dim]"

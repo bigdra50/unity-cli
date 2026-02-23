@@ -9,7 +9,7 @@ from rich.markup import escape
 
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _exit_usage, _should_json, handle_cli_errors
-from unity_cli.cli.output import print_json, print_line, print_success
+from unity_cli.cli.output import is_no_color, print_json, print_line, print_plain_table, print_success
 
 gameobject_app = typer.Typer(help="GameObject commands")
 
@@ -36,11 +36,15 @@ def gameobject_find(
         print_json(result)
     else:
         objects = result.get("objects", [])
-        print_line(f"[bold]Found {len(objects)} GameObject(s)[/bold]")
-        for obj in objects:
-            obj_name = escape(obj.get("name", "Unknown"))
-            obj_id = obj.get("instanceID", "")
-            print_line(f"  {obj_name} (ID: {obj_id})")
+        if is_no_color():
+            rows = [[obj.get("name", "Unknown"), str(obj.get("instanceID", ""))] for obj in objects]
+            print_plain_table(["Name", "ID"], rows, header=False)
+        else:
+            print_line(f"[bold]Found {len(objects)} GameObject(s)[/bold]")
+            for obj in objects:
+                obj_name = escape(obj.get("name", "Unknown"))
+                obj_id = obj.get("instanceID", "")
+                print_line(f"  {obj_name} (ID: {obj_id})")
 
 
 @gameobject_app.command("create")
