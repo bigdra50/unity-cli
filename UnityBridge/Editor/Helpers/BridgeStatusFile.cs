@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 
 namespace UnityBridge.Helpers
@@ -84,7 +85,7 @@ namespace UnityBridge.Helpers
                     relay_host = relayHost,
                     relay_port = relayPort,
                     timestamp = DateTime.UtcNow.ToString("O"),
-                    seq = ++_seq
+                    seq = Interlocked.Increment(ref _seq)
                 };
 
                 var json = JsonConvert.SerializeObject(payload);

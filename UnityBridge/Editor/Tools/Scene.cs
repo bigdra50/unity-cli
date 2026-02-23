@@ -208,6 +208,13 @@ namespace UnityBridge.Tools
             var path = parameters["path"]?.Value<string>();
             var scene = SceneManager.GetActiveScene();
 
+            if (string.IsNullOrEmpty(path) && string.IsNullOrEmpty(scene.path))
+            {
+                throw new ProtocolException(
+                    ErrorCode.InvalidParams,
+                    "Scene has no path. Specify '--path' to save to a new location.");
+            }
+
             var saved = !string.IsNullOrEmpty(path)
                 ? EditorSceneManager.SaveScene(scene, path)
                 : EditorSceneManager.SaveScene(scene);

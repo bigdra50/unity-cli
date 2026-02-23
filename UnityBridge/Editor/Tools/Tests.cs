@@ -511,7 +511,8 @@ namespace UnityBridge.Tools
                 if (result.HasChildren) return;
                 TestsFinished++;
 
-                switch (result.ResultState)
+                var resultStatus = result.ResultState.Split(':')[0];
+                switch (resultStatus)
                 {
                     case "Passed":
                         Passed++;

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
+using UnityBridge;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -109,6 +111,30 @@ namespace UnityBridge.Tools
 
             var items = (JArray)actual["items"];
             Assert.That(items.Count, Is.LessThanOrEqualTo(pageSize));
+        }
+
+        [Test]
+        public void HandleCommand_Save_UntitledScene_ThrowsInvalidParams()
+        {
+            // Capture current scene layout to restore after the test
+            var sceneSetup = EditorSceneManager.GetSceneManagerSetup();
+
+            // NewScene(Single) replaces all open scenes with a fresh untitled scene,
+            // avoiding the "Cannot create additively with untitled scene unsaved" Unity constraint
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            try
+            {
+                var ex = Assert.Throws<ProtocolException>(() =>
+                    Scene.HandleCommand(new JObject { ["action"] = "save" }));
+
+                Assert.That(ex.Code, Is.EqualTo(ErrorCode.InvalidParams));
+            }
+            finally
+            {
+                if (sceneSetup is { Length: > 0 })
+                    EditorSceneManager.RestoreSceneManagerSetup(sceneSetup);
+            }
         }
 
         private List<GameObject> CreateHierarchy(int rootCount, int childrenPerRoot)
