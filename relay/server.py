@@ -176,8 +176,11 @@ class RelayServer:
 
             # Close server
             if self._server:
-                self._server.close()
-                await self._server.wait_closed()
+                try:
+                    self._server.close()
+                    await self._server.wait_closed()
+                except Exception:
+                    logger.exception("Error closing server")
 
             self._stopped = True
             logger.info("Relay Server stopped")

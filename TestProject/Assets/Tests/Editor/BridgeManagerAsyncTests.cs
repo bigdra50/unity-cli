@@ -46,6 +46,7 @@ namespace Game.Tests.Editor
 
             // async Task なので await で例外ハンドリングを確認できる
             // 内部 catch で SendCommandErrorAsync が呼ばれるため、例外は伝播しない
+            BridgeLog.Enabled = true;
             LogAssert.Expect(LogType.Error, new Regex("Command execution failed: InvalidOperationException - test error"));
             await manager.ExecuteCommandOnMainThreadAsync(args);
 

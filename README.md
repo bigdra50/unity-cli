@@ -4,7 +4,7 @@
 [![Complexity](https://img.shields.io/badge/complexity-A%2FB-brightgreen)](https://github.com/bigdra50/unity-cli/actions/workflows/ci.yml)
 [![Maintainability](https://img.shields.io/badge/maintainability-A-brightgreen)](https://github.com/bigdra50/unity-cli/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)]()
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/bigdra50/unity-cli)
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com/)
 [![openupm](https://img.shields.io/npm/v/com.bigdra50.unity-bridge?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.bigdra50.unity-bridge/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
