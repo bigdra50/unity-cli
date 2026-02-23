@@ -12,6 +12,7 @@ import importlib.metadata
 import logging
 import os
 import signal
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -112,6 +113,7 @@ class RelayServer:
             self._relay_version = ""
         self._server: asyncio.Server | None = None
         self._running = False
+        self._stopped = False
         self._pending_commands: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self._heartbeat_tasks: dict[str, asyncio.Task] = {}
         # Single Outstanding PING: track pending PONG per instance
@@ -135,7 +137,10 @@ class RelayServer:
             await self._server.serve_forever()
 
     async def stop(self) -> None:
-        """Stop the relay server"""
+        """Stop the relay server (idempotent)."""
+        if self._stopped:
+            return
+        self._stopped = True
         logger.info("Stopping Relay Server...")
         self._running = False
 
@@ -723,22 +728,39 @@ async def run_server(
         reload_grace_period_ms=reload_grace_period_ms,
     )
 
-    loop = asyncio.get_event_loop()
-
-    # Setup signal handlers
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(server.stop()))
+    if sys.platform != "win32":
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, lambda: asyncio.create_task(server.stop()))
 
     try:
         await server.start()
     except asyncio.CancelledError:
         pass
+    finally:
+        await server.stop()
 
 
 def _resolve_log_dir() -> Path:
-    """Resolve log directory from XDG_STATE_HOME (evaluated at call time)."""
-    state_home = os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")
-    return Path(state_home) / "unity-cli" / "logs"
+    """Resolve log directory (evaluated at call time).
+
+    Priority:
+    1. XDG_STATE_HOME (explicit override, all platforms)
+    2. Windows: %LOCALAPPDATA%/unity-cli/logs
+    3. Unix: ~/.local/state/unity-cli/logs
+    """
+    env_override = os.environ.get("XDG_STATE_HOME")
+    if env_override:
+        return Path(env_override) / "unity-cli" / "logs"
+
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if not local_app_data:
+            local_app_data = str(Path.home() / "AppData" / "Local")
+        return Path(local_app_data) / "unity-cli" / "logs"
+
+    state_home = Path.home() / ".local" / "state"
+    return state_home / "unity-cli" / "logs"
 
 
 def get_log_path() -> Path:

@@ -35,11 +35,14 @@ def _get_platform_hub_candidates() -> list[Path]:
         ]
     elif sys.platform == "win32":
         localappdata = os.environ.get("LOCALAPPDATA", "")
+        programfiles_x86 = os.environ.get("ProgramFiles(x86)", "")  # noqa: SIM112
         candidates = [
             Path(r"C:\Program Files\Unity Hub\Unity Hub.exe"),
         ]
+        if programfiles_x86:
+            candidates.append(Path(programfiles_x86) / "Unity Hub" / "Unity Hub.exe")
         if localappdata:
-            candidates.append(Path(localappdata) / "Programs/Unity Hub/Unity Hub.exe")
+            candidates.append(Path(localappdata) / "Programs" / "Unity Hub" / "Unity Hub.exe")
         return candidates
     else:  # Linux
         return [

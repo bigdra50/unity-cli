@@ -106,27 +106,60 @@ namespace UnityBridge
         }
 
         /// <summary>
+        /// Platform-specific search paths for common binary locations.
+        /// </summary>
+        private static string[] GetPlatformSearchPaths()
+        {
+            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            if (Application.platform == RuntimePlatform.WindowsEditor)
+            {
+                var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+                var paths = new System.Collections.Generic.List<string>
+                {
+                    Path.Combine(appData, "Python", "Scripts"),
+                    Path.Combine(homeDir, ".local", "bin"),
+                    Path.Combine(homeDir, ".cargo", "bin"),
+                };
+
+                // Discover installed Python versions dynamically
+                var pythonBase = Path.Combine(localAppData, "Programs", "Python");
+                if (Directory.Exists(pythonBase))
+                {
+                    foreach (var dir in Directory.GetDirectories(pythonBase, "Python*"))
+                    {
+                        var scripts = Path.Combine(dir, "Scripts");
+                        if (Directory.Exists(scripts))
+                            paths.Insert(0, scripts);
+                    }
+                }
+
+                return paths.ToArray();
+            }
+
+            return new[]
+            {
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+                "/usr/bin",
+                "/bin",
+                Path.Combine(homeDir, ".local", "bin"),
+                Path.Combine(homeDir, ".cargo", "bin"),
+            };
+        }
+
+        /// <summary>
         /// Build augmented PATH that includes common binary locations.
         /// Unity GUI app has limited PATH, so we need to add common paths explicitly.
         /// </summary>
         private static string BuildAugmentedPath()
         {
-            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var additionalPaths = new[]
-            {
-                "/opt/homebrew/bin", // Homebrew on Apple Silicon
-                "/usr/local/bin", // Homebrew on Intel / common binaries
-                "/usr/bin",
-                "/bin",
-                Path.Combine(homeDir, ".local", "bin"), // pip --user, uv
-                Path.Combine(homeDir, ".cargo", "bin") // Rust/cargo installs
-            };
-
+            var additionalPaths = GetPlatformSearchPaths();
             var currentPath = Environment.GetEnvironmentVariable("PATH") ?? "";
-
-            return Application.platform == RuntimePlatform.WindowsEditor
-                ? string.Join(";", additionalPaths) + ";" + currentPath
-                : string.Join(":", additionalPaths) + ":" + currentPath;
+            var separator = Application.platform == RuntimePlatform.WindowsEditor ? ";" : ":";
+            return string.Join(separator, additionalPaths) + separator + currentPath;
         }
 
         /// <summary>
@@ -155,56 +188,110 @@ namespace UnityBridge
         {
             try
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "/usr/sbin/lsof",
-                    Arguments = $"-i :{port} -t",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                using var process = Process.Start(psi);
-                if (process == null) return -1;
-
-                var output = process.StandardOutput.ReadToEnd().Trim();
-                process.WaitForExit(5000);
-
-                if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
-                {
-                    // lsof -t returns PID(s), take the first one
-                    var firstLine = output.Split('\n')[0].Trim();
-                    if (int.TryParse(firstLine, out var pid))
-                    {
-                        return pid;
-                    }
-                }
+#if UNITY_EDITOR_WIN
+                return GetProcessIdForPortWindows(port);
+#else
+                return GetProcessIdForPortUnix(port);
+#endif
             }
             catch (Exception ex)
             {
                 BridgeLog.Warn($"Error checking port {port}: {ex.Message}");
+                return -1;
+            }
+        }
+
+#if UNITY_EDITOR_WIN
+        private static int GetProcessIdForPortWindows(int port)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "netstat",
+                Arguments = "-ano",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return -1;
+
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(5000);
+
+            var portSuffix = $":{port}";
+            foreach (var line in output.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (!trimmed.StartsWith("TCP", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!trimmed.Contains(portSuffix))
+                    continue;
+
+                var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                // Format: TCP  <local>  <foreign>  <state>  <PID>
+                if (parts.Length < 5)
+                    continue;
+
+                if (!parts[1].EndsWith(portSuffix, StringComparison.Ordinal))
+                    continue;
+
+                if (parts[^2].Equals("LISTENING", StringComparison.OrdinalIgnoreCase)
+                    && int.TryParse(parts[^1], out var pid))
+                {
+                    return pid;
+                }
             }
 
             return -1;
         }
+#else
+        private static int GetProcessIdForPortUnix(int port)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "/usr/sbin/lsof",
+                Arguments = $"-i :{port} -t",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return -1;
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(5000);
+
+            if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
+            {
+                var firstLine = output.Split('\n')[0].Trim();
+                if (int.TryParse(firstLine, out var pid))
+                {
+                    return pid;
+                }
+            }
+
+            return -1;
+        }
+#endif
 
         private static void KillProcess(int pid)
         {
             try
             {
-                var psi = new ProcessStartInfo
+                using var process = Process.GetProcessById(pid);
+                if (!process.HasExited)
                 {
-                    FileName = "/bin/kill",
-                    Arguments = $"-9 {pid}",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                using var process = Process.Start(psi);
-                process?.WaitForExit(3000);
+                    process.Kill();
+                    process.WaitForExit(3000);
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Process already exited
             }
             catch (Exception ex)
             {
@@ -214,17 +301,8 @@ namespace UnityBridge
 
         private static string FindExecutable(string name)
         {
-            // First check augmented paths directly
-            var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var searchPaths = new[]
-            {
-                "/opt/homebrew/bin",
-                "/usr/local/bin",
-                "/usr/bin",
-                "/bin",
-                Path.Combine(homeDir, ".local", "bin"),
-                Path.Combine(homeDir, ".cargo", "bin")
-            };
+            // First check platform-specific search paths
+            var searchPaths = GetPlatformSearchPaths();
 
             foreach (var basePath in searchPaths)
             {

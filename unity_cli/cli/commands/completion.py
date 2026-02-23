@@ -30,6 +30,20 @@ complete -o default -F _unity_cli u unity unity-cli
 complete -c unity -f -a "(env _TYPER_COMPLETE_ARGS=(commandline -cp) _U_COMPLETE=complete_fish unity)"
 complete -c unity-cli -f -a "(env _TYPER_COMPLETE_ARGS=(commandline -cp) _U_COMPLETE=complete_fish unity-cli)"
 """,
+    "powershell": """Register-ArgumentCompleter -Native -CommandName u,unity,'unity-cli' -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+    $env:_TYPER_COMPLETE_ARGS = $commandAst.ToString()
+    $env:_U_COMPLETE = "complete_powershell"
+    try {
+        u | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    } finally {
+        Remove-Item Env:_TYPER_COMPLETE_ARGS -ErrorAction SilentlyContinue
+        Remove-Item Env:_U_COMPLETE -ErrorAction SilentlyContinue
+    }
+}
+""",
 }
 
 
@@ -38,7 +52,7 @@ def register(app: typer.Typer) -> None:
     def completion(
         shell: Annotated[
             str | None,
-            typer.Option("--shell", "-s", help="Shell type: zsh, bash, fish"),
+            typer.Option("--shell", "-s", help="Shell type: zsh, bash, fish, powershell"),
         ] = None,
     ) -> None:
         """Generate shell completion script.
@@ -47,8 +61,10 @@ def register(app: typer.Typer) -> None:
             u completion -s zsh > ~/.zsh/completions/_unity-cli
             u completion -s bash >> ~/.bashrc
             u completion -s fish > ~/.config/fish/completions/unity-cli.fish
+            u completion -s powershell >> $PROFILE
         """
         import os
+        import sys
 
         # Auto-detect shell if not specified
         if shell is None:
@@ -59,8 +75,10 @@ def register(app: typer.Typer) -> None:
                 shell = "bash"
             elif "fish" in shell_env:
                 shell = "fish"
+            elif os.environ.get("PSModulePath") or sys.platform == "win32":  # noqa: SIM112
+                shell = "powershell"
             else:
-                shell = "zsh"  # Default to zsh
+                shell = "zsh"
 
         shell = shell.lower()
         if shell not in _COMPLETION_SCRIPTS:

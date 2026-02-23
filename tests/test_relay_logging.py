@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Generator
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -57,15 +58,32 @@ class TestResolveLogLevel:
 
 
 class TestResolveLogDir:
-    def test_default_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_path_unix(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("XDG_STATE_HOME", raising=False)
+        if sys.platform == "win32":
+            pytest.skip("Unix-specific test")
         log_dir = _resolve_log_dir()
         assert str(log_dir).endswith(".local/state/unity-cli/logs")
 
-    def test_xdg_state_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("XDG_STATE_HOME", "/tmp/test-xdg-state")
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific test")
+    def test_default_path_windows_with_localappdata(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        monkeypatch.delenv("XDG_STATE_HOME", raising=False)
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
         log_dir = _resolve_log_dir()
-        assert log_dir == Path("/tmp/test-xdg-state/unity-cli/logs")
+        assert log_dir == tmp_path / "unity-cli" / "logs"
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific test")
+    def test_default_path_windows_without_localappdata(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("XDG_STATE_HOME", raising=False)
+        monkeypatch.delenv("LOCALAPPDATA", raising=False)
+        log_dir = _resolve_log_dir()
+        assert str(log_dir).endswith(str(Path("AppData", "Local", "unity-cli", "logs")))
+
+    def test_xdg_state_home(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        test_state = tmp_path / "xdg-state"
+        monkeypatch.setenv("XDG_STATE_HOME", str(test_state))
+        log_dir = _resolve_log_dir()
+        assert log_dir == test_state / "unity-cli" / "logs"
 
 
 class TestGetLogPath:
@@ -74,9 +92,10 @@ class TestGetLogPath:
         assert path.name == "relay.log"
         assert "unity-cli" in str(path)
 
-    def test_respects_xdg(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("XDG_STATE_HOME", "/tmp/test-xdg")
-        assert get_log_path() == Path("/tmp/test-xdg/unity-cli/logs/relay.log")
+    def test_respects_xdg(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        test_state = tmp_path / "xdg"
+        monkeypatch.setenv("XDG_STATE_HOME", str(test_state))
+        assert get_log_path() == test_state / "unity-cli" / "logs" / "relay.log"
 
 
 class TestSetupLogging:
@@ -107,8 +126,10 @@ class TestSetupLogging:
         assert root.level == logging.DEBUG
 
     def test_falls_back_to_stderr_on_permission_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Point to a path that cannot be created
-        monkeypatch.setenv("XDG_STATE_HOME", "/proc/nonexistent")
+        # Use a file as a directory to trigger OSError (cross-platform)
+        blocker = tmp_path / "blocker"
+        blocker.write_text("block")
+        monkeypatch.setenv("XDG_STATE_HOME", str(blocker / "nested"))
         _setup_logging(logging.INFO)
 
         root = logging.getLogger()
