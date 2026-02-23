@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityBridge;
+using UnityBridge.Helpers;
 using UnityEngine;
 using UnityEngine.TestTools;
 
