@@ -66,12 +66,8 @@ def uitree_dump(
                 print_line("[dim]No panels found[/dim]")
                 return
 
-            print_line("Panels:")
             for p in panels:
-                ctx_type = p.get("contextType", "")
-                p_name = p.get("name", "")
-                p_count = p.get("elementCount", 0)
-                print_line(f"  [{ctx_type}] {p_name} ({p_count} elements)")
+                print_line(_format_panel_list_entry(p))
 
     except UnityCLIError as e:
         _handle_error(e)
@@ -204,6 +200,13 @@ def uitree_inspect(
 # ---------------------------------------------------------------------------
 # uitree format helpers (pure functions returning list[str])
 # ---------------------------------------------------------------------------
+
+
+def _format_panel_list_entry(panel: dict[str, Any]) -> str:
+    """Format a single panel entry for pipe-friendly output."""
+    name = escape(panel.get("name", ""))
+    count = panel.get("elementCount", 0)
+    return f"{name} ({count})"
 
 
 def _format_rect_value(rect: dict[str, Any]) -> str:

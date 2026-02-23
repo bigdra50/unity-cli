@@ -8,8 +8,35 @@ from unity_cli.cli.commands.uitree import (
     _format_element_header,
     _format_element_style,
     _format_inspect_element,
+    _format_panel_list_entry,
     _format_query_match,
 )
+
+
+class TestFormatPanelListEntry:
+    def test_normal_panel(self) -> None:
+        panel = {"name": "Toolbar", "elementCount": 76}
+        assert _format_panel_list_entry(panel) == "Toolbar (76)"
+
+    def test_dockarea_with_window_type(self) -> None:
+        panel = {"name": "DockArea:SceneView", "elementCount": 12}
+        assert _format_panel_list_entry(panel) == "DockArea:SceneView (12)"
+
+    def test_dockarea_with_dedup_suffix(self) -> None:
+        panel = {"name": "DockArea:InspectorWindow-2", "elementCount": 896}
+        assert _format_panel_list_entry(panel) == "DockArea:InspectorWindow-2 (896)"
+
+    def test_missing_name_defaults_empty(self) -> None:
+        panel = {"elementCount": 5}
+        assert _format_panel_list_entry(panel) == " (5)"
+
+    def test_missing_count_defaults_zero(self) -> None:
+        panel = {"name": "Toolbar"}
+        assert _format_panel_list_entry(panel) == "Toolbar (0)"
+
+    def test_zero_count(self) -> None:
+        panel = {"name": "EmptyPanel", "elementCount": 0}
+        assert _format_panel_list_entry(panel) == "EmptyPanel (0)"
 
 
 class TestFormatElementHeader:

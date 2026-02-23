@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from unity_cli.client import RelayConnection
+
+_PANEL_COUNT_RE = re.compile(r"\s+\(\d+\)$")
+
+
+def _strip_panel_count(name: str) -> str:
+    """Remove trailing `` (N)`` suffix from a panel name."""
+    return _PANEL_COUNT_RE.sub("", name)
 
 
 class UITreeAPI:
@@ -13,6 +21,10 @@ class UITreeAPI:
 
     def __init__(self, conn: RelayConnection) -> None:
         self._conn = conn
+
+    def _add_panel_param(self, params: dict[str, Any], panel: str | None) -> None:
+        if panel:
+            params["panel"] = _strip_panel_count(panel)
 
     def dump(
         self,
@@ -31,8 +43,7 @@ class UITreeAPI:
             Dictionary containing panel list or tree data.
         """
         params: dict[str, Any] = {"action": "dump", "format": format}
-        if panel:
-            params["panel"] = panel
+        self._add_panel_param(params, panel)
         if depth != -1:
             params["depth"] = depth
         return self._conn.send_request("uitree", params)
@@ -55,7 +66,8 @@ class UITreeAPI:
         Returns:
             Dictionary containing matched elements.
         """
-        params: dict[str, Any] = {"action": "query", "panel": panel}
+        params: dict[str, Any] = {"action": "query"}
+        self._add_panel_param(params, panel)
         if type:
             params["type"] = type
         if name:
@@ -91,8 +103,7 @@ class UITreeAPI:
         }
         if ref:
             params["ref"] = ref
-        if panel:
-            params["panel"] = panel
+        self._add_panel_param(params, panel)
         if name:
             params["name"] = name
         return self._conn.send_request("uitree", params)
@@ -120,8 +131,7 @@ class UITreeAPI:
         params: dict[str, Any] = {"action": "click"}
         if ref:
             params["ref"] = ref
-        if panel:
-            params["panel"] = panel
+        self._add_panel_param(params, panel)
         if name:
             params["name"] = name
         if button != 0:
@@ -155,8 +165,7 @@ class UITreeAPI:
         params: dict[str, Any] = {"action": "scroll"}
         if ref:
             params["ref"] = ref
-        if panel:
-            params["panel"] = panel
+        self._add_panel_param(params, panel)
         if name:
             params["name"] = name
         if x is not None:
@@ -186,8 +195,7 @@ class UITreeAPI:
         params: dict[str, Any] = {"action": "text"}
         if ref:
             params["ref"] = ref
-        if panel:
-            params["panel"] = panel
+        self._add_panel_param(params, panel)
         if name:
             params["name"] = name
         return self._conn.send_request("uitree", params)
