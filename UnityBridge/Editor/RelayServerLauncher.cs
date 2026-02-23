@@ -105,6 +105,21 @@ namespace UnityBridge
 #endif
         }
 
+        /// <summary>
+        /// Extract numeric version from Python directory name (e.g. "Python312" → 312).
+        /// Returns 0 for unparseable names so they sort last.
+        /// </summary>
+        private static int ExtractPythonVersion(string dirName)
+        {
+            // Strip "Python" prefix and parse remainder as integer
+            if (dirName.StartsWith("Python", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(dirName.Substring(6), out var version))
+            {
+                return version;
+            }
+            return 0;
+        }
+
         private static string[] _cachedSearchPaths;
 
         /// <summary>
@@ -132,8 +147,13 @@ namespace UnityBridge
                     if (Directory.Exists(pythonBase))
                     {
                         var dirs = Directory.GetDirectories(pythonBase, "Python*");
-                        System.Array.Sort(dirs, StringComparer.OrdinalIgnoreCase);
-                        System.Array.Reverse(dirs); // Newest version first
+                        // Sort by extracted version number (descending) to prefer newest
+                        System.Array.Sort(dirs, (a, b) =>
+                        {
+                            var verA = ExtractPythonVersion(Path.GetFileName(a));
+                            var verB = ExtractPythonVersion(Path.GetFileName(b));
+                            return verB.CompareTo(verA);
+                        });
                         foreach (var dir in dirs)
                         {
                             var scripts = Path.Combine(dir, "Scripts");
@@ -238,7 +258,10 @@ namespace UnityBridge
             if (process == null) return -1;
 
             var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(5000);
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(); } catch { /* best effort */ }
+            }
 
             var portSuffix = $":{port}";
             foreach (var line in output.Split('\n'))
@@ -283,7 +306,10 @@ namespace UnityBridge
             if (process == null) return -1;
 
             var output = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit(5000);
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(); } catch { /* best effort */ }
+            }
 
             if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
             {

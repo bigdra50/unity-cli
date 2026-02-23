@@ -113,6 +113,7 @@ class RelayServer:
             self._relay_version = ""
         self._server: asyncio.Server | None = None
         self._running = False
+        self._stop_lock = asyncio.Lock()
         self._stopped = False
         self._pending_commands: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self._heartbeat_tasks: dict[str, asyncio.Task] = {}
@@ -137,47 +138,49 @@ class RelayServer:
             await self._server.serve_forever()
 
     async def stop(self) -> None:
-        """Stop the relay server (idempotent).
+        """Stop the relay server (idempotent, concurrency-safe).
 
-        Each cleanup step is individually guarded so that a partial failure
-        does not prevent subsequent resources from being released.
-        ``_stopped`` is set only after all steps complete.
+        Uses ``_stop_lock`` to serialize concurrent calls (e.g. signal handler
+        and ``finally`` block). Each cleanup step is individually guarded so
+        that a partial failure does not prevent subsequent resources from being
+        released.
         """
-        if self._stopped:
-            return
-        logger.info("Stopping Relay Server...")
-        self._running = False
+        async with self._stop_lock:
+            if self._stopped:
+                return
+            logger.info("Stopping Relay Server...")
+            self._running = False
 
-        # Cancel all heartbeat tasks
-        for task in self._heartbeat_tasks.values():
-            task.cancel()
-        self._heartbeat_tasks.clear()
+            # Cancel all heartbeat tasks
+            for task in self._heartbeat_tasks.values():
+                task.cancel()
+            self._heartbeat_tasks.clear()
 
-        # Cancel pending commands
-        for future in self._pending_commands.values():
-            if not future.done():
-                future.cancel()
-        self._pending_commands.clear()
+            # Cancel pending commands
+            for future in self._pending_commands.values():
+                if not future.done():
+                    future.cancel()
+            self._pending_commands.clear()
 
-        # Close all instances
-        try:
-            await self.registry.close_all()
-        except Exception:
-            logger.exception("Error closing instances")
+            # Close all instances
+            try:
+                await self.registry.close_all()
+            except Exception:
+                logger.exception("Error closing instances")
 
-        # Stop cache cleanup
-        try:
-            await self.request_cache.stop()
-        except Exception:
-            logger.exception("Error stopping request cache")
+            # Stop cache cleanup
+            try:
+                await self.request_cache.stop()
+            except Exception:
+                logger.exception("Error stopping request cache")
 
-        # Close server
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
+            # Close server
+            if self._server:
+                self._server.close()
+                await self._server.wait_closed()
 
-        self._stopped = True
-        logger.info("Relay Server stopped")
+            self._stopped = True
+            logger.info("Relay Server stopped")
 
     async def _handle_connection(
         self,
