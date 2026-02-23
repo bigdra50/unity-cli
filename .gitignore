@@ -19,3 +19,4 @@ uv.lock
 # Claude Code
 .claude/*
 !.claude/plugins/
+TestProject/Screenshots/
