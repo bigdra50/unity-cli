@@ -32,11 +32,15 @@ complete -c unity-cli -f -a "(env _TYPER_COMPLETE_ARGS=(commandline -cp) _U_COMP
 """,
     "powershell": """Register-ArgumentCompleter -Native -CommandName u,unity,'unity-cli' -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
+    $cmd = $commandAst.CommandElements[0].Value
     $env:_TYPER_COMPLETE_ARGS = $commandAst.ToString()
     $env:_U_COMPLETE = "complete_powershell"
     try {
-        u | ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        & $cmd | ForEach-Object {
+            $parts = $_ -split ':::', 2
+            $text = $parts[0]
+            $desc = if ($parts.Count -ge 2) { $parts[1] } else { $text }
+            [System.Management.Automation.CompletionResult]::new($text, $text, 'ParameterValue', $desc)
         }
     } finally {
         Remove-Item Env:_TYPER_COMPLETE_ARGS -ErrorAction SilentlyContinue
@@ -82,8 +86,6 @@ def register(app: typer.Typer) -> None:
 
         shell = shell.lower()
         if shell not in _COMPLETION_SCRIPTS:
-            import sys
-
             if is_no_color():
                 print(f"Unsupported shell: {shell}", file=sys.stderr)
                 print(f"Supported shells: {', '.join(_COMPLETION_SCRIPTS.keys())}", file=sys.stderr)

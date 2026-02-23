@@ -58,10 +58,9 @@ class TestResolveLogLevel:
 
 
 class TestResolveLogDir:
+    @pytest.mark.skipif(sys.platform == "win32", reason="Unix-specific test")
     def test_default_path_unix(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("XDG_STATE_HOME", raising=False)
-        if sys.platform == "win32":
-            pytest.skip("Unix-specific test")
         log_dir = _resolve_log_dir()
         assert str(log_dir).endswith(".local/state/unity-cli/logs")
 

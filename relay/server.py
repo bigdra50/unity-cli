@@ -137,10 +137,14 @@ class RelayServer:
             await self._server.serve_forever()
 
     async def stop(self) -> None:
-        """Stop the relay server (idempotent)."""
+        """Stop the relay server (idempotent).
+
+        Each cleanup step is individually guarded so that a partial failure
+        does not prevent subsequent resources from being released.
+        ``_stopped`` is set only after all steps complete.
+        """
         if self._stopped:
             return
-        self._stopped = True
         logger.info("Stopping Relay Server...")
         self._running = False
 
@@ -156,16 +160,23 @@ class RelayServer:
         self._pending_commands.clear()
 
         # Close all instances
-        await self.registry.close_all()
+        try:
+            await self.registry.close_all()
+        except Exception:
+            logger.exception("Error closing instances")
 
         # Stop cache cleanup
-        await self.request_cache.stop()
+        try:
+            await self.request_cache.stop()
+        except Exception:
+            logger.exception("Error stopping request cache")
 
         # Close server
         if self._server:
             self._server.close()
             await self._server.wait_closed()
 
+        self._stopped = True
         logger.info("Relay Server stopped")
 
     async def _handle_connection(

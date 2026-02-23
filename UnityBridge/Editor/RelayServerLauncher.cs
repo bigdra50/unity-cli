@@ -105,11 +105,17 @@ namespace UnityBridge
 #endif
         }
 
+        private static string[] _cachedSearchPaths;
+
         /// <summary>
         /// Platform-specific search paths for common binary locations.
+        /// Results are cached after the first call.
         /// </summary>
         private static string[] GetPlatformSearchPaths()
         {
+            if (_cachedSearchPaths != null)
+                return _cachedSearchPaths;
+
             var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
             if (Application.platform == RuntimePlatform.WindowsEditor)
@@ -117,37 +123,51 @@ namespace UnityBridge
                 var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
-                var paths = new System.Collections.Generic.List<string>
+                var pythonPaths = new System.Collections.Generic.List<string>();
+
+                // Discover installed Python versions dynamically
+                try
                 {
-                    Path.Combine(appData, "Python", "Scripts"),
+                    var pythonBase = Path.Combine(localAppData, "Programs", "Python");
+                    if (Directory.Exists(pythonBase))
+                    {
+                        var dirs = Directory.GetDirectories(pythonBase, "Python*");
+                        System.Array.Sort(dirs, StringComparer.OrdinalIgnoreCase);
+                        System.Array.Reverse(dirs); // Newest version first
+                        foreach (var dir in dirs)
+                        {
+                            var scripts = Path.Combine(dir, "Scripts");
+                            if (Directory.Exists(scripts))
+                                pythonPaths.Add(scripts);
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    BridgeLog.Warn($"Error scanning Python directories: {ex.Message}");
+                }
+
+                var paths = new System.Collections.Generic.List<string>(pythonPaths);
+                paths.Add(Path.Combine(appData, "Python", "Scripts"));
+                paths.Add(Path.Combine(homeDir, ".local", "bin"));
+                paths.Add(Path.Combine(homeDir, ".cargo", "bin"));
+
+                _cachedSearchPaths = paths.ToArray();
+            }
+            else
+            {
+                _cachedSearchPaths = new[]
+                {
+                    "/opt/homebrew/bin",
+                    "/usr/local/bin",
+                    "/usr/bin",
+                    "/bin",
                     Path.Combine(homeDir, ".local", "bin"),
                     Path.Combine(homeDir, ".cargo", "bin"),
                 };
-
-                // Discover installed Python versions dynamically
-                var pythonBase = Path.Combine(localAppData, "Programs", "Python");
-                if (Directory.Exists(pythonBase))
-                {
-                    foreach (var dir in Directory.GetDirectories(pythonBase, "Python*"))
-                    {
-                        var scripts = Path.Combine(dir, "Scripts");
-                        if (Directory.Exists(scripts))
-                            paths.Insert(0, scripts);
-                    }
-                }
-
-                return paths.ToArray();
             }
 
-            return new[]
-            {
-                "/opt/homebrew/bin",
-                "/usr/local/bin",
-                "/usr/bin",
-                "/bin",
-                Path.Combine(homeDir, ".local", "bin"),
-                Path.Combine(homeDir, ".cargo", "bin"),
-            };
+            return _cachedSearchPaths;
         }
 
         /// <summary>
