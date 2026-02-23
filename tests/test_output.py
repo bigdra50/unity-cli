@@ -11,15 +11,16 @@ import pytest
 from unity_cli.cli.output import (
     OutputConfig,
     OutputMode,
-    _print_plain_table,
     configure_output,
     print_error,
     print_info,
     print_key_value,
     print_line,
+    print_plain_table,
     print_success,
     print_warning,
     resolve_output_mode,
+    sanitize_tsv,
     set_quiet,
 )
 
@@ -135,8 +136,8 @@ class TestPlainTextOutput:
         assert "[ERROR]" in out
         assert "[Physics]" in out
 
-    def test_print_plain_table(self, capsys: pytest.CaptureFixture[str]) -> None:
-        _print_plain_table(
+    def testprint_plain_table(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_plain_table(
             ["Name", "Value"],
             [["foo", "1"], ["bar", "2"]],
             "My Table",
@@ -149,7 +150,7 @@ class TestPlainTextOutput:
         assert lines[3] == "bar\t2"
 
     def test_print_plain_table_no_title(self, capsys: pytest.CaptureFixture[str]) -> None:
-        _print_plain_table(["A", "B"], [["1", "2"]])
+        print_plain_table(["A", "B"], [["1", "2"]])
         out = capsys.readouterr().out
         lines = out.strip().split("\n")
         assert lines[0] == "A\tB"
@@ -181,18 +182,116 @@ class TestPlainTextOutput:
         assert "[INFO] note" in out
         assert "\033" not in out
 
-    def test_print_key_value_plain(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_print_key_value_plain_tab_separated(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_key_value({"host": "localhost", "port": 6500}, "Config")
+        out = capsys.readouterr().out
+        lines = out.strip().split("\n")
+        assert lines[0] == "host\tlocalhost"
+        assert lines[1] == "port\t6500"
+        assert "Config" not in out
+        assert "[cyan]" not in out
+
+    def test_print_key_value_plain_no_title(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_key_value({"a": "b"})
+        out = capsys.readouterr().out
+        assert out.strip() == "a\tb"
+
+    def test_print_key_value_plain_sanitizes_tabs(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_key_value({"key": "val\twith\ttabs"})
+        out = capsys.readouterr().out
+        assert out.strip() == "key\tval with tabs"
+
+
+# =============================================================================
+# _sanitize_tsv
+# =============================================================================
+
+
+class TestSanitizeTsv:
+    def test_replaces_tab_with_space(self) -> None:
+        assert sanitize_tsv("a\tb") == "a b"
+
+    def test_replaces_newline_with_space(self) -> None:
+        assert sanitize_tsv("line1\nline2") == "line1 line2"
+
+    def test_removes_carriage_return(self) -> None:
+        assert sanitize_tsv("text\r\nmore") == "text  more"
+
+    def test_normal_string_unchanged(self) -> None:
+        assert sanitize_tsv("hello world") == "hello world"
+
+    def test_empty_string(self) -> None:
+        assert sanitize_tsv("") == ""
+
+    def test_multiple_tabs_and_newlines(self) -> None:
+        assert sanitize_tsv("a\tb\tc\nd\re") == "a b c d e"
+
+    def test_strips_esc_control_character(self) -> None:
+        assert sanitize_tsv("hello\x1b[31mred\x1b[0m") == "hello[31mred[0m"
+
+    def test_strips_null_and_del(self) -> None:
+        assert sanitize_tsv("a\x00b\x7fc") == "abc"
+
+    def test_strips_other_c0_controls(self) -> None:
+        assert sanitize_tsv("a\x01\x02\x0b\x1fb") == "ab"
+
+
+# =============================================================================
+# _print_plain_table header control
+# =============================================================================
+
+
+class TestPrintPlainTableHeader:
+    def setup_method(self) -> None:
+        configure_output(OutputMode.PLAIN)
+
+    def teardown_method(self) -> None:
+        configure_output(OutputMode.PRETTY)
+
+    def test_header_false_omits_header_row(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_plain_table(["Name", "ID"], [["Cube", "123"], ["Sphere", "456"]], header=False)
+        out = capsys.readouterr().out
+        lines = out.strip().split("\n")
+        assert len(lines) == 2
+        assert lines[0] == "Cube\t123"
+        assert lines[1] == "Sphere\t456"
+
+    def test_header_true_includes_header_row(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_plain_table(["Name", "ID"], [["Cube", "123"]], header=True)
+        out = capsys.readouterr().out
+        lines = out.strip().split("\n")
+        assert lines[0] == "Name\tID"
+        assert lines[1] == "Cube\t123"
+
+    def test_sanitize_tsv_applied_to_rows(self, capsys: pytest.CaptureFixture[str]) -> None:
+        print_plain_table(["Col"], [["data\twith\ttabs"], ["line\nbreak"]])
+        out = capsys.readouterr().out
+        lines = out.strip().split("\n")
+        assert lines[1] == "data with tabs"
+        assert lines[2] == "line break"
+
+
+# =============================================================================
+# PRETTY mode regression
+# =============================================================================
+
+
+class TestPrettyModeRegression:
+    def setup_method(self) -> None:
+        configure_output(OutputMode.PRETTY)
+
+    def test_print_key_value_pretty_with_title(self, capsys: pytest.CaptureFixture[str]) -> None:
         print_key_value({"host": "localhost", "port": 6500}, "Config")
         out = capsys.readouterr().out
         assert "Config" in out
-        assert "host: localhost" in out
-        assert "port: 6500" in out
-        assert "[cyan]" not in out
+        assert "host:" in out
+        assert "localhost" in out
 
-    def test_print_key_value_no_title(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_print_key_value_pretty_indented(self, capsys: pytest.CaptureFixture[str]) -> None:
         print_key_value({"a": "b"})
         out = capsys.readouterr().out
-        assert "a: b" in out
+        assert "a:" in out
+        assert "b" in out
 
 
 # =============================================================================
