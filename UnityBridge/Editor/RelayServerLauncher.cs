@@ -277,7 +277,8 @@ namespace UnityBridge
                 if (parts.Length < 5)
                     continue;
 
-                if (!parts[1].EndsWith(portSuffix, StringComparison.Ordinal))
+                var colonIdx = parts[1].LastIndexOf(':');
+                if (colonIdx < 0 || parts[1].Substring(colonIdx + 1) != port.ToString())
                     continue;
 
                 if (parts[^2].Equals("LISTENING", StringComparison.OrdinalIgnoreCase)
