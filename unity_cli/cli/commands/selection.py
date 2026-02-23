@@ -9,7 +9,7 @@ from rich.markup import escape
 
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _handle_error, _should_json
-from unity_cli.cli.output import print_json, print_line
+from unity_cli.cli.output import is_no_color, print_json, print_key_value, print_line, print_plain_table
 from unity_cli.exceptions import UnityCLIError
 
 
@@ -36,8 +36,44 @@ def register(app: typer.Typer) -> None:
             _handle_error(e)
 
 
+def _print_selection_plain(result: dict[str, Any]) -> None:
+    count = result.get("count", 0)
+    if count == 0:
+        return
+    game_objects = result.get("gameObjects", [])
+    if count == 1 or not game_objects:
+        active_go = result.get("activeGameObject")
+        if active_go:
+            print_key_value(
+                {
+                    "name": active_go.get("name", ""),
+                    "instanceID": active_go.get("instanceID", ""),
+                    "tag": active_go.get("tag", ""),
+                    "layer": active_go.get("layerName", ""),
+                    "path": active_go.get("scenePath", ""),
+                }
+            )
+    else:
+        rows = [
+            [
+                go.get("name", ""),
+                str(go.get("instanceID", "")),
+                go.get("tag", ""),
+                go.get("layerName", ""),
+                go.get("scenePath", ""),
+            ]
+            for go in game_objects
+        ]
+        print_plain_table(["Name", "ID", "Tag", "Layer", "Path"], rows, header=False)
+
+
 def _print_selection(result: dict[str, Any]) -> None:
     count = result.get("count", 0)
+
+    if is_no_color():
+        _print_selection_plain(result)
+        return
+
     if count == 0:
         print_line("[dim]No objects selected[/dim]")
         return

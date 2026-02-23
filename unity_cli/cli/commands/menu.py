@@ -10,7 +10,7 @@ from rich.markup import escape
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.exit_codes import ExitCode
 from unity_cli.cli.helpers import _handle_error, _should_json
-from unity_cli.cli.output import print_error, print_json, print_line, print_success
+from unity_cli.cli.output import is_no_color, print_error, print_json, print_line, print_plain_item, print_success
 from unity_cli.exceptions import UnityCLIError
 
 menu_app = typer.Typer(help="Menu item commands")
@@ -58,9 +58,15 @@ def menu_list(
             print_json(result)
         else:
             items = result.get("items", [])
-            print_line(f"[bold]Menu Items ({len(items)})[/bold]")
-            for item in items:
-                print_line(f"  {escape(str(item))}")
+            if is_no_color():
+                for item in items:
+                    path = item.get("path", str(item)) if isinstance(item, dict) else str(item)
+                    print_plain_item(path)
+            else:
+                print_line(f"[bold]Menu Items ({len(items)})[/bold]")
+                for item in items:
+                    path = item.get("path", str(item)) if isinstance(item, dict) else str(item)
+                    print_line(f"  {escape(path)}")
     except UnityCLIError as e:
         _handle_error(e)
 
