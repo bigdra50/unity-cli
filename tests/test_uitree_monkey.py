@@ -83,16 +83,18 @@ class TestErrorHandling:
             {"entries": []},
             {"entries": [{"message": "NullRef"}]},
             {"entries": []},
+            {"entries": []},  # final check
         ]
-        result = sut.run(panel="P", count=3, seed=42, interval=0)
+        result = sut.run(panel="P", count=3, seed=42, interval=0, error_check_interval=1)
         assert len(result.errors) == 1
         assert result.errors[0]["message"] == "NullRef"
 
     def test_stop_on_error(self, sut: MonkeyRunner, mock_console: MagicMock) -> None:
         mock_console.get.side_effect = [
             {"entries": [{"message": "Error!"}]},
+            {"entries": []},  # final check
         ]
-        result = sut.run(panel="P", count=10, seed=42, stop_on_error=True, interval=0)
+        result = sut.run(panel="P", count=10, seed=42, stop_on_error=True, interval=0, error_check_interval=1)
         assert result.total_actions == 1
         assert len(result.errors) == 1
 
@@ -101,8 +103,9 @@ class TestErrorHandling:
             {"entries": [{"message": "Error!"}]},
             {"entries": []},
             {"entries": []},
+            {"entries": []},  # final check
         ]
-        result = sut.run(panel="P", count=3, seed=42, interval=0)
+        result = sut.run(panel="P", count=3, seed=42, interval=0, error_check_interval=1)
         assert result.total_actions == 3
 
 

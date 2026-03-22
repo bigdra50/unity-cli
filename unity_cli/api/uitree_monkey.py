@@ -49,6 +49,7 @@ class MonkeyRunner:
         class_filter: str | None = None,
         stop_on_error: bool = False,
         interval: float = 0.2,
+        error_check_interval: int = 5,
     ) -> MonkeyResult:
         """Run monkey test.
 
@@ -61,6 +62,7 @@ class MonkeyRunner:
             class_filter: Filter elements by USS class.
             stop_on_error: Stop on first console error.
             interval: Delay between actions in seconds.
+            error_check_interval: Check console errors every N actions.
 
         Returns:
             MonkeyResult with actions performed and errors found.
@@ -84,10 +86,14 @@ class MonkeyRunner:
             action_count += 1
             self._perform_action(rng, elements, result)
 
-            if self._handle_errors(result, stop_on_error):
-                break
+            if action_count % error_check_interval == 0:
+                if self._handle_errors(result, stop_on_error):
+                    break
 
             time.sleep(interval)
+
+        # Final error check
+        self._handle_errors(result, stop_on_error=False)
 
         result.total_actions = action_count
         result.duration_ms = int((time.time() - start) * 1000)

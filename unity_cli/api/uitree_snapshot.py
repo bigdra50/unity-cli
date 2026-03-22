@@ -13,18 +13,21 @@ SNAPSHOT_DIR = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")
 _NAME_RE = re.compile(r"^[\w.\-]+$")
 
 
-def _flatten_tree(node: dict[str, Any], out: list[dict[str, Any]]) -> None:
-    """Recursively flatten a tree into a list of elements."""
-    out.append(
-        {
-            "ref": node.get("ref", ""),
-            "name": node.get("name", ""),
-            "type": node.get("type", ""),
-            "classes": sorted(node.get("classes", [])),
-        }
-    )
-    for child in node.get("children", []):
-        _flatten_tree(child, out)
+def _flatten_tree(root: dict[str, Any], out: list[dict[str, Any]]) -> None:
+    """Iteratively flatten a tree into a list of elements."""
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        out.append(
+            {
+                "ref": node.get("ref", ""),
+                "name": node.get("name", ""),
+                "type": node.get("type", ""),
+                "classes": sorted(node.get("classes", [])),
+            }
+        )
+        for child in reversed(node.get("children", [])):
+            stack.append(child)
 
 
 class SnapshotStore:
@@ -124,9 +127,11 @@ def _find_class_changes(
         b = baseline_by_ref[r]
         c = current_by_ref[r]
         if b["classes"] != c["classes"]:
-            changed.append({
-                "name": b.get("name", r),
-                "baseline_classes": b["classes"],
-                "current_classes": c["classes"],
-            })
+            changed.append(
+                {
+                    "name": b.get("name", r),
+                    "baseline_classes": b["classes"],
+                    "current_classes": c["classes"],
+                }
+            )
     return changed

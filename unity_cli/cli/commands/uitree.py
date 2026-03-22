@@ -731,11 +731,11 @@ def _print_diff_result(result: dict[str, Any]) -> None:
     """Print snapshot diff in human-readable format."""
     print_line(f"Baseline: {result['baseline_count']} elements, Current: {result['current_count']} elements")
     for e in result.get("added", []):
-        print_line(f"  + {e['name']} ({e['type']})")
+        print_line(f"  + {escape(str(e['name']))} ({escape(str(e['type']))})")
     for e in result.get("removed", []):
-        print_line(f"  - {e['name']} ({e['type']})")
+        print_line(f"  - {escape(str(e['name']))} ({escape(str(e['type']))})")
     for e in result.get("changed", []):
-        print_line(f"  ~ {e['name']}: {e['baseline_classes']} -> {e['current_classes']}")
+        print_line(f"  ~ {escape(str(e['name']))}: {e['baseline_classes']} -> {e['current_classes']}")
     if not result.get("added") and not result.get("removed") and not result.get("changed"):
         print_success("No changes detected")
 
