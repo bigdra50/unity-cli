@@ -81,6 +81,7 @@ u uitree monkey -p "PanelSettings" -c "action-btn" --stop-on-error --json
 
 query でフィルタした要素をランダムに click し、コンソールエラーを監視する。
 `-c` (USS class) か `-t` (type) のフィルタが必須（フィルタなしでは要素が見つからない）。
+事前に `u uitree query -p <panel> -c <class>` で有効な class 名を確認してから monkey に渡す。
 `--seed` で操作順を再現可能。
 
 ### スナップショット
@@ -267,6 +268,7 @@ from unity_cli.api.uitree_monkey import MonkeyRunner
 
 class TestMonkey:
     def test_random_clicks_no_errors(self, uitree: UITreeAPI, console: ConsoleAPI) -> None:
+        # MonkeyRunner.run() は MonkeyResult を返す。errors は list[dict]
         runner = MonkeyRunner(uitree, console)
         result = runner.run(panel=PANEL, class_filter="<操作対象class>", count=50, seed=42, interval=0.2)
         assert result.errors == [], f"Monkey errors: {result.errors}"
@@ -282,11 +284,14 @@ class TestSnapshot:
         data = uitree.dump(panel=PANEL, format="json")
         store.save("baseline", data)
         current = uitree.dump(panel=PANEL, format="json")
+        # diff(name, current): name は保存済みスナップショット名、current は比較対象のツリーデータ
         result = store.diff("baseline", current)
         assert result["added"] == []
         assert result["removed"] == []
         assert result["changed"] == []
 ```
+
+monkey テストの前にUIを初期状態に戻す（前のテストの副作用で Toast 等のクラスが変わることがある）。`time.sleep(2)` で Toast の hidden 復帰を待つか、テスト順序に依存しない assertion を使う。
 
 ### Phase 3: PlayMode テスト移植
 
