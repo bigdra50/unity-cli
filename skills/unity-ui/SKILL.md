@@ -1,7 +1,7 @@
 ---
 name: unity-ui
 description: |
-  UI 開発・検査・自動テストワークフロー。uitree で構造把握→CLI E2Eで動作確認→PlayModeテストに移植。
+  UI 開発・検査・自動テストワークフロー。uitree で構造把握→pytest E2E テスト生成→PlayMode テストに移植。
   Use for: "UI確認", "UI Toolkit", "uGUI", "E2Eテスト", "UI操作", "uitree", "スクリーンショット"
 user-invocable: true
 metadata:
@@ -95,23 +95,19 @@ u component inspect -t "MyButton" -T "UnityEngine.UI.Button"
 ## 開発→テストフロー
 
 ```
-Phase 1: 作成 & 確認
+Phase 1: 作成 & 手動確認
   コード変更 → /unity-verify → play → dump → 操作 → screenshot → stop
 
-Phase 2: CLI E2E テスト
-  play → dump で構造把握 → シナリオをスクリプト化 → 繰り返し実行
+Phase 2: pytest E2E テスト生成
+  dump で構造把握 → pytest テストファイルを生成 → 実行して確認
 
 Phase 3: PlayMode テスト移植
   安定したシナリオを C# に書き直す → CI で回帰テスト
 ```
 
-### Phase 1: 作成 & 確認
+### Phase 1: 作成 & 手動確認
 
 ```bash
-# 1. コード変更後に検証
-# /unity-verify Quick Verify
-
-# 2. Play Mode で UI 確認
 u play
 u uitree dump -p "PanelSettings"                 # 構造把握
 u uitree click -p "PanelSettings" -n "BtnStart"  # 操作
@@ -120,57 +116,133 @@ u screenshot                                      # 結果キャプチャ
 u stop
 ```
 
-### Phase 2: CLI E2E テスト
+### Phase 2: pytest E2E テスト生成
 
-Play Mode に入り、dump で構造を把握してから操作シナリオをスクリプト化する。
+Phase 1 で確認した操作シナリオを、pytest テストとして永続化する。
+unity-cli の Python API (`UITreeAPI`, `ConsoleAPI`, `EditorAPI`) を直接使う。
 
-Functional テスト (値検証):
-```bash
-u play
-u uitree click -p "PanelSettings" -n "BtnContinue"
-u uitree text -p "PanelSettings" -n "ToastMessage"
-# → 期待値 "Loading save data..." と比較
-u console get -l E  # 出力なし = エラーなし
-u stop
+手順:
+1. `u play` + `u uitree dump` で構造を把握する
+2. 操作可能な要素（ボタン名、ラベル名）を特定する
+3. 以下のテンプレートに従い、`tests/integration/` にテストファイルを生成する
+4. `uv run python -m pytest tests/integration/<file> -v` で実行して確認する
+
+テンプレート:
+
+```python
+"""E2E tests for <UI名> — pytest + unity-cli API."""
+import time
+import pytest
+from unity_cli.api import ConsoleAPI, EditorAPI, UITreeAPI
+from unity_cli.client import RelayConnection
+
+PANEL = "<パネル名>"  # u uitree dump で確認したパネル名
+
+
+@pytest.fixture(scope="module")
+def conn() -> RelayConnection:
+    conn = RelayConnection(instance="<プロジェクト名>", timeout=5.0)
+    try:
+        EditorAPI(conn).get_state()
+    except Exception:
+        pytest.skip("Relay not available")
+    return conn
+
+
+@pytest.fixture(scope="module")
+def uitree(conn: RelayConnection) -> UITreeAPI:
+    return UITreeAPI(conn)
+
+
+@pytest.fixture(scope="module")
+def console(conn: RelayConnection) -> ConsoleAPI:
+    return ConsoleAPI(conn)
+
+
+@pytest.fixture(scope="module")
+def editor(conn: RelayConnection) -> EditorAPI:
+    return EditorAPI(conn)
+
+
+@pytest.fixture(autouse=True)
+def _play_mode(editor: EditorAPI):
+    """Play Mode に入る。"""
+    state = editor.get_state()
+    if not state.get("isPlaying"):
+        editor.play()
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if editor.get_state().get("isPlaying"):
+                break
+            time.sleep(0.5)
+    yield
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _stop_after_all(editor: EditorAPI):
+    """全テスト後に Play Mode 終了。"""
+    yield
+    try:
+        editor.stop()
+    except Exception:
+        pass
+
+
+# --- Functional テスト ---
+
+class TestMenuButtons:
+    def test_continue_shows_toast(self, uitree: UITreeAPI) -> None:
+        uitree.click(panel=PANEL, name="<ボタン名>")
+        time.sleep(0.3)
+        result = uitree.text(panel=PANEL, name="<ラベル名>")
+        assert result["text"] == "<期待値>"
+
+
+# --- Smoke テスト ---
+
+class TestSmoke:
+    BUTTONS = ["<ボタン1>", "<ボタン2>", ...]
+
+    def test_all_clickable_without_errors(self, uitree: UITreeAPI, console: ConsoleAPI) -> None:
+        console.clear()
+        for btn in self.BUTTONS:
+            uitree.click(panel=PANEL, name=btn)
+            time.sleep(0.2)
+        errors = console.get(types=["error"])
+        assert errors.get("entries", []) == []
+
+
+# --- Structural Snapshot ---
+
+class TestStructure:
+    def test_tab_switch_changes_tree(self, uitree: UITreeAPI) -> None:
+        before = uitree.dump(panel=PANEL)
+        uitree.click(panel=PANEL, name="<タブ名>")
+        time.sleep(0.3)
+        after = uitree.dump(panel=PANEL)
+        assert before != after
 ```
 
-Structural Snapshot (ツリー構造の差分検出):
-```bash
-u play
-u uitree dump -p "PanelSettings" --json > snapshot-current.json
-# 前回の snapshot と diff して構造変化を検出
-u stop
-```
-
-Smoke + Visual:
-```bash
-u play
-u uitree click -p "PanelSettings" -n "BtnStart"
-u screenshot -p "after-start.png"
-u uitree click -p "PanelSettings" -n "BtnSettings"
-u screenshot -p "settings-open.png"
-u console get -l E  # エラーなし確認
-u stop
-```
-
-AI エージェントの自律操作:
-```
-play → dump → 構造理解 → click → text/screenshot → 結果判定 → 次の操作 → stop
-```
+テストの種別に応じてクラスを追加する:
+- `TestMenuButtons` — Functional (click → text 検証)
+- `TestSmoke` — 全ボタンクリック + エラーなし
+- `TestStructure` — ツリー構造の変化検出
+- `TestVisual` — screenshot 撮影（画像比較は手動 or 別ツール）
 
 ### Phase 3: PlayMode テスト移植
 
-CLI E2E で確認したシナリオを C# PlayMode テストに書き直す。
+Phase 2 の pytest で安定したシナリオを C# PlayMode テストに書き直す。
 
-CLI E2E のまま残す:
-- 探索的テスト (シナリオが毎回変わる)
-- AI エージェントの自律テスト
-
-PlayMode に移植する:
+PlayMode に移植する基準:
 - CI で毎回回す回帰テスト
 - フレーム精度が必要 (アニメーション完了待ち等)
 - Assert で厳密に状態検証
 - InputSystem / EventSystem 経由の操作
+
+pytest E2E のまま残す基準:
+- 探索的テスト (シナリオが毎回変わる)
+- AI エージェントの自律テスト
+- Unity 外からの結合テスト
 
 移植後は `u tests run play` で実行。
 
