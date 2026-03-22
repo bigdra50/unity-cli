@@ -8,6 +8,7 @@ from unity_cli.api.asset import AssetAPI
 from unity_cli.api.build import BuildAPI
 from unity_cli.api.component import ComponentAPI
 from unity_cli.api.console import ConsoleAPI
+from unity_cli.api.dynamic_api import DynamicAPI
 from unity_cli.api.editor import EditorAPI
 from unity_cli.api.gameobject import GameObjectAPI
 from unity_cli.api.menu import MenuAPI
@@ -25,6 +26,7 @@ __all__ = [
     "BuildAPI",
     "ComponentAPI",
     "ConsoleAPI",
+    "DynamicAPI",
     "EditorAPI",
     "GameObjectAPI",
     "MenuAPI",

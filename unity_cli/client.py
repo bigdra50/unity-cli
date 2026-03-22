@@ -40,6 +40,7 @@ if TYPE_CHECKING:
         BuildAPI,
         ComponentAPI,
         ConsoleAPI,
+        DynamicAPI,
         EditorAPI,
         GameObjectAPI,
         MenuAPI,
@@ -607,6 +608,7 @@ class UnityClient:
             BuildAPI,
             ComponentAPI,
             ConsoleAPI,
+            DynamicAPI,
             EditorAPI,
             GameObjectAPI,
             MenuAPI,
@@ -624,6 +626,7 @@ class UnityClient:
         self.asset: AssetAPI = AssetAPI(self._conn)
         self.build: BuildAPI = BuildAPI(self._conn)
         self.console: ConsoleAPI = ConsoleAPI(self._conn)
+        self.dynamic_api: DynamicAPI = DynamicAPI(self._conn)
         self.editor: EditorAPI = EditorAPI(self._conn)
         self.gameobject: GameObjectAPI = GameObjectAPI(self._conn)
         self.scene: SceneAPI = SceneAPI(self._conn)

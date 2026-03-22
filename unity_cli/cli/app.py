@@ -20,6 +20,7 @@ from unity_cli.cli.commands import (
     open_cmd,
     selection,
 )
+from unity_cli.cli.commands.api import api_app
 from unity_cli.cli.commands.asset import asset_app
 from unity_cli.cli.commands.build import build_app
 from unity_cli.cli.commands.component import component_app
@@ -174,6 +175,7 @@ def main(
 # Register sub-apps (Typer groups)
 # =============================================================================
 
+app.add_typer(api_app, name="api")
 app.add_typer(console_app, name="console")
 app.add_typer(scene_app, name="scene")
 app.add_typer(tests_app, name="tests")
