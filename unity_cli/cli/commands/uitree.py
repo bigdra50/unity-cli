@@ -754,6 +754,7 @@ def snapshot_list() -> None:
 
 
 @snapshot_app.command("delete")
+@handle_cli_errors
 def snapshot_delete(
     name: Annotated[str, typer.Option("--name", help="Snapshot name to delete")],
 ) -> None:

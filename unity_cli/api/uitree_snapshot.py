@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-SNAPSHOT_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "unity-cli" / "uitree-snapshots"
+SNAPSHOT_DIR = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "unity-cli" / "uitree-snapshots"
 
 _NAME_RE = re.compile(r"^[\w.\-]+$")
 
@@ -94,15 +94,15 @@ def _collect_elements(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _compare_elements(baseline: list[dict[str, Any]], current: list[dict[str, Any]]) -> dict[str, Any]:
     """Compare two flattened element lists by name."""
-    baseline_by_name = {e["name"]: e for e in baseline if e["name"]}
-    current_by_name = {e["name"]: e for e in current if e["name"]}
+    baseline_by_ref = {e["ref"]: e for e in baseline if e["ref"]}
+    current_by_ref = {e["ref"]: e for e in current if e["ref"]}
 
-    baseline_names = set(baseline_by_name)
-    current_names = set(current_by_name)
+    baseline_refs = set(baseline_by_ref)
+    current_refs = set(current_by_ref)
 
-    added = [current_by_name[n] for n in sorted(current_names - baseline_names)]
-    removed = [baseline_by_name[n] for n in sorted(baseline_names - current_names)]
-    changed = _find_class_changes(baseline_by_name, current_by_name, baseline_names & current_names)
+    added = [current_by_ref[r] for r in sorted(current_refs - baseline_refs)]
+    removed = [baseline_by_ref[r] for r in sorted(baseline_refs - current_refs)]
+    changed = _find_class_changes(baseline_by_ref, current_by_ref, baseline_refs & current_refs)
 
     return {
         "baseline_count": len(baseline),
@@ -114,21 +114,19 @@ def _compare_elements(baseline: list[dict[str, Any]], current: list[dict[str, An
 
 
 def _find_class_changes(
-    baseline_by_name: dict[str, dict[str, Any]],
-    current_by_name: dict[str, dict[str, Any]],
-    common_names: set[str],
+    baseline_by_ref: dict[str, dict[str, Any]],
+    current_by_ref: dict[str, dict[str, Any]],
+    common_refs: set[str],
 ) -> list[dict[str, Any]]:
     """Find elements with changed USS classes."""
     changed: list[dict[str, Any]] = []
-    for n in sorted(common_names):
-        b = baseline_by_name[n]
-        c = current_by_name[n]
+    for r in sorted(common_refs):
+        b = baseline_by_ref[r]
+        c = current_by_ref[r]
         if b["classes"] != c["classes"]:
-            changed.append(
-                {
-                    "name": n,
-                    "baseline_classes": b["classes"],
-                    "current_classes": c["classes"],
-                }
-            )
+            changed.append({
+                "name": b.get("name", r),
+                "baseline_classes": b["classes"],
+                "current_classes": c["classes"],
+            })
     return changed
