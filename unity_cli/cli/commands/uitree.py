@@ -726,7 +726,11 @@ def snapshot_diff(
 
     context: CLIContext = ctx.obj
     current = context.client.uitree.dump(panel=panel, format="json")
-    result = SnapshotStore().diff(name, current)
+    try:
+        result = SnapshotStore().diff(name, current)
+    except FileNotFoundError:
+        print_line(f"Snapshot '{name}' not found")
+        raise typer.Exit(1) from None
 
     if _should_json(context, json_flag):
         print_json(result, None)

@@ -138,7 +138,9 @@ class MonkeyRunner:
         return elements
 
     def _check_errors(self) -> list[dict[str, Any]]:
-        """Check console for new errors since last clear."""
+        """Check console for new errors since last clear, then clear to avoid duplicates."""
         resp = self._console.get(types=["error"])
         entries: list[dict[str, Any]] = resp.get("entries", [])
+        if entries:
+            self._console.clear()
         return [{"source": "console", **e} for e in entries]
