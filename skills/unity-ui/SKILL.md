@@ -1,384 +1,181 @@
 ---
 name: unity-ui
 description: |
-  UI 開発ドメインスキル。UI Toolkit と uGUI の両方に対応。ビジュアルツリー検査と開発イテレーション（作成→Play確認→修正ループ）を提供する。
-  Use for: "UI確認", "UIツリー", "UI Toolkit検査", "UI作って", "UI修正して", "UIレイアウト", "VisualElement調べて", "Canvas", "uGUI", "Image", "Text", "Button"
+  UI 開発・検査・自動テストワークフロー。uitree で構造把握→CLI E2Eで動作確認→PlayModeテストに移植。
+  Use for: "UI確認", "UI Toolkit", "uGUI", "E2Eテスト", "UI操作", "uitree", "スクリーンショット"
 user-invocable: true
+metadata:
+  openclaw:
+    category: "game-development"
+    requires:
+      bins: ["u"]
 ---
 
-# Unity UI Development
+# unity-ui
 
-UI Toolkit および uGUI によるUI開発を支援する。ツリー検査と開発イテレーションの2つのフローを提供。
+> **PREREQUISITE:** `../unity-shared/SKILL.md`
+
+> uitree コマンドは Play Mode 中のみ動作する。必ず `u play` してから実行すること。
+
+## UI テストの種別
+
+| 種別 | 検証内容 | 手法 | スクショ |
+|------|---------|------|---------|
+| Functional | 操作→状態が正しいか | click → text で値検証 | 不要 |
+| Visual Regression | 外観が変わっていないか | screenshot → 画像比較 | 必要 |
+| Structural Snapshot | ツリー構造が変わっていないか | dump --json → diff | 不要 |
+| Smoke | 最低限動くか | click → console にエラーなし | 任意 |
 
 ## UI システム判定
 
-| 特徴 | UI Toolkit | uGUI |
-|------|-----------|------|
-| ルート要素 | UIDocument | Canvas |
-| スタイル | USS | RectTransform + 各コンポーネント |
-| 要素 | VisualElement | Image, Text, Button 等 |
-| 検査コマンド | u uitree | u component inspect |
-| 推奨用途 | エディタ拡張、新規UI | 既存プロジェクト、レガシーUI |
+| 手がかり | UI Toolkit | uGUI |
+|---------|-----------|------|
+| ファイル | `.uxml`, `.uss` | `.prefab` に Canvas |
+| コンポーネント | UIDocument | Canvas, RectTransform |
 
-質問内容から UI システムを判定:
-- `VisualElement`, `UXML`, `USS`, `UIDocument` → UI Toolkit
-- `Canvas`, `Image`, `Text`, `Button`, `RectTransform` → uGUI
+## コマンドリファレンス
 
-## CLI Setup
+要素の指定方法は2通り: ref ID (`ref_3`) または `-p <panel> -n <name>`。
+
+### 構造把握
 
 ```bash
-# グローバルインストール済みの場合
-u <command>
-
-# uvx 経由（インストール不要）
-uvx --from git+https://github.com/bigdra50/unity-cli u <command>
+u uitree dump                           # 全パネル一覧
+u uitree dump -p "PanelSettings"        # パネルのツリー (各要素の ref/name/type/classes が見える)
+u uitree dump -p "PanelSettings" --json # JSON 出力 (snapshot用)
+u uitree query -p "PanelSettings" -t Button              # type で検索 (VisualElement ベースのボタンはヒットしない → -c で検索)
+u uitree query -p "PanelSettings" -n "BtnStart"          # name で検索
+u uitree query -p "PanelSettings" -c "action-btn"        # USS class で検索
+u uitree query -p "PanelSettings" -t Button -c "primary" # AND 条件
+u uitree inspect -p "PanelSettings" -n "BtnStart"        # 要素詳細
+u uitree inspect ref_5_48                                # ref ID で指定
+u uitree inspect ref_5_48 --style                        # resolvedStyle 含む
+u uitree inspect ref_5_48 --children                     # 子要素情報含む
 ```
 
-以下のワークフロー内では `u` コマンドを使用する。
-
-## Decision Criteria
-
-| 状況 | 使うフロー |
-|------|-----------|
-| UIが表示されない/崩れている | Inspection Flow |
-| 新しいUIを作りたい | Development Iteration Flow |
-| 既存UIのスタイルを調整したい | Development Iteration Flow |
-| 特定要素のプロパティを確認したい | Inspection Flow → inspect |
-
-## Inspection Flow
-
-UI構造やスタイルの問題を調査する。
-
-```
-UI Issue / Layout Question
-  │
-  ▼
-┌─────────────────────────────┐
-│ Step 1: Panel Discovery     │
-│ u uitree dump               │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 2: Tree Overview       │
-│ u uitree dump -p <panel>    │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 3: Element Query       │
-│ u uitree query -p <panel>   │
-│   -t/-n/-c (絞り込み)       │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 4: Detail Inspection   │
-│ u uitree inspect <ref_id>   │
-│   --style --children        │
-└──────────┬──────────────────┘
-           ▼
-      Analyze & Report
-```
-
-### Panel Discovery
+### テキスト取得
 
 ```bash
-u uitree dump                 # パネル一覧
+u uitree text -p "PanelSettings" -n "ToastMessage"  # name で指定
+u uitree text ref_5_12                               # ref ID で指定
 ```
 
-ランタイム UI は通常 `GameView`。エディタ拡張は `InspectorWindow` 等。
-
-### Tree Overview
+### 操作
 
 ```bash
-u uitree dump -p "GameView"            # テキスト形式
-u uitree dump -p "GameView" --json     # JSON形式
-u uitree dump -p "GameView" -d 3       # 深さ3まで
+u uitree click -p "PanelSettings" -n "BtnContinue"  # name で指定
+u uitree click ref_5_48                              # ref ID で指定
+u uitree click ref_5_48 --count 2                    # ダブルクリック
+u uitree click ref_5_48 --button 1                   # 右クリック
+u uitree scroll -p "PanelSettings" -n "ScrollArea" --delta 100
 ```
 
-各要素には `ref_N` の ID が付与される。
-
-### Element Query
-
-AND条件で組み合わせ可能:
+### スクリーンショット
 
 ```bash
-u uitree query -p "GameView" -t Button              # タイプ
-u uitree query -p "GameView" -n "StartBtn"           # 名前
-u uitree query -p "GameView" -c "primary-button"     # USSクラス
-u uitree query -p "GameView" -t Button -c "primary"  # 複合
+u screenshot                          # GameView (-s game がデフォルト)
+u screenshot -p "ui-check.png"        # 保存先指定
+u screenshot --burst -n 5             # 連続 (アニメーション確認)
 ```
 
-### Detail Inspection
+UI Toolkit / uGUI (Screen Space) は `-s game` でのみ映る。`-s camera` では映らない。
+
+GameView のキャプチャにはエディタのフォーカスが必要。タイムアウトする場合は再試行で解決することが多い。
+
+### uGUI の場合
+
+uitree は UI Toolkit 専用。uGUI は scene/component コマンドで操作する。
 
 ```bash
-u uitree inspect ref_3                     # 基本情報
-u uitree inspect ref_3 --style             # resolvedStyle 込み
-u uitree inspect ref_3 --children          # 子要素込み
-u uitree inspect ref_3 --style --children  # 両方
+u scene hierarchy --depth 3
+u component list -t "Canvas"
+u component inspect -t "MyButton" -T "UnityEngine.UI.Button"
 ```
 
-| フィールド | 内容 |
-|-----------|------|
-| type, name, classes | 要素の識別情報 |
-| visible, enabledSelf | 表示/有効状態 |
-| layout | ローカル座標 (x, y, width, height) |
-| worldBound | グローバル座標 |
-| resolvedStyle | 計算済みスタイル (--style 時) |
-| children | 子要素リスト (--children 時) |
-
-## Development Iteration Flow
-
-UI の作成→Play 確認→修正を繰り返す開発サイクル。
+## 開発→テストフロー
 
 ```
-Edit UI (UXML/USS/C#)
-  │
-  ▼
-┌─────────────────────────────┐
-│ Step 1: Compile & Play      │
-│ u refresh                   │
-│ u state (poll isCompiling)  │
-│ u console get -l E          │
-│ u play                      │
-│ u state (poll isPlaying)    │
-└──────────┬──────────────────┘
-           ▼
-      compile error? ──yes──► Fix & restart
-           │
-           no
-           ▼
-┌─────────────────────────────┐
-│ Step 2: Visual Check        │
-│ u uitree dump -p "GameView" │
-│ u uitree query / inspect    │
-│ u screenshot -s game        │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 3: User Feedback       │
-│ スクリーンショットとツリー   │
-│ 情報を提示しフィードバック待ち│
-└──────────┬──────────────────┘
-           ▼
-      OK? ──yes──► u stop → Done
-           │
-           no
-           ▼
-      u stop → Edit → Step 1
+Phase 1: 作成 & 確認
+  コード変更 → /unity-verify → play → dump → 操作 → screenshot → stop
+
+Phase 2: CLI E2E テスト
+  play → dump で構造把握 → シナリオをスクリプト化 → 繰り返し実行
+
+Phase 3: PlayMode テスト移植
+  安定したシナリオを C# に書き直す → CI で回帰テスト
 ```
 
-### Step 1: Compile & Play
+### Phase 1: 作成 & 確認
 
 ```bash
-u refresh
-u state          # isCompiling == false まで 2秒間隔ポーリング（最大30秒）
-u console get -l E
+# 1. コード変更後に検証
+# /unity-verify Quick Verify
+
+# 2. Play Mode で UI 確認
+u play
+u uitree dump -p "PanelSettings"                 # 構造把握
+u uitree click -p "PanelSettings" -n "BtnStart"  # 操作
+u uitree text -p "PanelSettings" -n "StatusLabel" # 状態確認
+u screenshot                                      # 結果キャプチャ
+u stop
 ```
 
-コンパイルエラーがなければ:
+### Phase 2: CLI E2E テスト
 
+Play Mode に入り、dump で構造を把握してから操作シナリオをスクリプト化する。
+
+Functional テスト (値検証):
 ```bash
 u play
-u state          # isPlaying == true まで（最大10秒）
+u uitree click -p "PanelSettings" -n "BtnContinue"
+u uitree text -p "PanelSettings" -n "ToastMessage"
+# → 期待値 "Loading save data..." と比較
+u console get -l E  # 出力なし = エラーなし
+u stop
 ```
 
-### Step 2: Visual Check
-
-Play Mode 中にUIの状態を確認:
-
+Structural Snapshot (ツリー構造の差分検出):
 ```bash
-u uitree dump -p "GameView" -d 3              # ツリー構造
-u uitree query -p "GameView" -t Label         # 特定要素を検索
-u uitree inspect ref_N --style                # スタイル詳細
-u screenshot -s game -p ./ui_check.png        # スクリーンショット
+u play
+u uitree dump -p "PanelSettings" --json > snapshot-current.json
+# 前回の snapshot と diff して構造変化を検出
+u stop
 ```
 
-### Step 3: User Feedback
-
-スクリーンショットとツリー情報をユーザーに提示し、修正指示を待つ。自動修正は行わない。
-
-修正が必要なら `u stop` で Play Mode を終了し、コードを修正して Step 1 に戻る。
-
-## Investigation Patterns
-
-### レイアウト問題
-
+Smoke + Visual:
 ```bash
-u uitree dump -p "GameView" -d 2
-u uitree query -p "GameView" -c "broken-layout"
-u uitree inspect ref_N --style
+u play
+u uitree click -p "PanelSettings" -n "BtnStart"
+u screenshot -p "after-start.png"
+u uitree click -p "PanelSettings" -n "BtnSettings"
+u screenshot -p "settings-open.png"
+u console get -l E  # エラーなし確認
+u stop
 ```
 
-確認ポイント: width/height が 0、display: none、visibility: hidden。
-
-### 要素が見つからない
-
-```bash
-u uitree query -p "GameView" -n "Button"     # 名前で広く
-u uitree query -p "GameView" -t Button       # タイプで
-u uitree dump -p "GameView" --json           # 全ツリー
+AI エージェントの自律操作:
+```
+play → dump → 構造理解 → click → text/screenshot → 結果判定 → 次の操作 → stop
 ```
 
-### スタイル競合
+### Phase 3: PlayMode テスト移植
 
-```bash
-u uitree inspect ref_N --style               # 対象
-u uitree inspect ref_parent --style          # 親
-u uitree inspect ref_sibling --style         # 兄弟
-```
+CLI E2E で確認したシナリオを C# PlayMode テストに書き直す。
 
-親の flex-direction, align-items, justify-content が子のレイアウトに影響していないか確認。
+CLI E2E のまま残す:
+- 探索的テスト (シナリオが毎回変わる)
+- AI エージェントの自律テスト
 
-## Anti-Patterns
+PlayMode に移植する:
+- CI で毎回回す回帰テスト
+- フレーム精度が必要 (アニメーション完了待ち等)
+- Assert で厳密に状態検証
+- InputSystem / EventSystem 経由の操作
 
-| パターン | 問題 | 対策 |
-|---------|------|------|
-| Play 中にコード修正 | 変更が反映されない | stop → 修正 → play |
-| 毎回フルツリーダンプ | トークン浪費 | `-d 2` + query で絞り込む |
-| --style を常時付与 | 出力が巨大 | 必要な時だけ |
-| ref ID の再利用 | Play 再開で ID が変わる | Play ごとに再取得 |
+移植後は `u tests run play` で実行。
 
-## Token-Saving Strategies
+## CLI 非対応操作
 
-| 状況 | 対応 |
-|------|------|
-| ツリーが巨大 | `-d 2` で浅く取得、必要部分だけ深掘り |
-| JSON出力が冗長 | テキスト形式 (デフォルト) を使う |
-| resolvedStyle が長い | 必要な時だけ `--style` を付ける |
-| query結果が多い | 複合条件 (-t + -c) で絞り込む |
-| イテレーション中 | 前回と差分がある部分だけ再検査 |
-
----
-
-# uGUI (Canvas-based UI)
-
-uGUI は Canvas をルートとするレガシーUI システム。unity-cli の component コマンドで検査・操作する。
-
-## uGUI Inspection Flow
-
-```
-UI Issue / Layout Question (uGUI)
-  │
-  ▼
-┌─────────────────────────────┐
-│ Step 1: Find Canvas         │
-│ u gameobject find           │
-│   --name "Canvas"           │
-│ u scene hierarchy -d 3      │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 2: List Components     │
-│ u component list -t <obj>   │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 3: Inspect Properties  │
-│ u component inspect -t <obj>│
-│   -T Image / Text / Button  │
-└──────────┬──────────────────┘
-           ▼
-      Analyze & Report
-```
-
-### Step 1: Canvas の発見
-
-```bash
-u gameobject find --name "Canvas"    # Canvas を検索
-u scene hierarchy -d 3               # 上位3階層で UI 構造を把握
-```
-
-### Step 2: コンポーネント一覧
-
-```bash
-u component list -t "StartButton"    # オブジェクトのコンポーネント一覧
-```
-
-典型的な uGUI コンポーネント:
-- `RectTransform`: 位置・サイズ
-- `CanvasRenderer`: 描画
-- `Image`: 画像表示
-- `Text` / `TextMeshProUGUI`: テキスト表示
-- `Button`: ボタン
-- `Toggle`, `Slider`, `Dropdown`, `InputField`: 入力系
-
-### Step 3: プロパティ検査
-
-```bash
-u component inspect -t "StartButton" -T Button
-u component inspect -t "Title" -T Text
-u component inspect -t "Background" -T Image
-```
-
-### uGUI プロパティ変更
-
-```bash
-# Image の色変更
-u component modify -t "Background" -T Image --prop m_Color --value '{"r":1,"g":0,"b":0,"a":1}'
-
-# Text の内容変更
-u component modify -t "Title" -T Text --prop m_Text --value "New Title"
-
-# RectTransform の位置変更
-u component modify -t "Panel" -T RectTransform --prop m_AnchoredPosition --value '{"x":100,"y":50}'
-```
-
-### uGUI レイアウト問題の調査
-
-```bash
-# RectTransform を確認
-u component inspect -t "Panel" -T RectTransform
-
-# 確認ポイント
-# - sizeDelta: サイズ
-# - anchoredPosition: アンカー基準の位置
-# - anchorMin / anchorMax: アンカー設定
-# - pivot: ピボット
-```
-
-## uGUI Development Iteration Flow
-
-```
-Edit UI (Script / Inspector)
-  │
-  ▼
-┌─────────────────────────────┐
-│ Step 1: Compile & Play      │
-│ u refresh                   │
-│ u play                      │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 2: Visual Check        │
-│ u scene hierarchy           │
-│ u component inspect ...     │
-│ u screenshot -s game        │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 3: User Feedback       │
-│ スクリーンショット提示       │
-└──────────┬──────────────────┘
-           ▼
-      OK? → u stop → Done
-           ↓ no
-      u stop → Edit → Step 1
-```
-
-## UI Toolkit vs uGUI 選択ガイド
-
-| 条件 | 推奨 |
-|------|------|
-| 新規プロジェクト | UI Toolkit |
-| エディタ拡張 | UI Toolkit |
-| 既存 uGUI プロジェクト | uGUI 継続 |
-| TextMeshPro 使用中 | uGUI |
-| 複雑なレイアウト | UI Toolkit (Flexbox) |
-| ランタイム性能重視 | uGUI (成熟度) |
-
-## Related Skills
-
-| スキル | 使い分け |
-|--------|---------|
-| /unity-preflight | UIコード修正後のコンパイルエラーが解決しない場合 |
-| /unity-debug | UI操作時のランタイムエラー（NullRef等）を調査する場合 |
-| /unity-scene | UI オブジェクトの配置・Transform 調整 |
+unity-shared のフォールバック順に従う:
+1. `u api schema --type <Type>` で対応メソッドを検索
+2. `u api call` で実行

@@ -1,307 +1,71 @@
 ---
 name: unity-scene
 description: |
-  Unityシーン構築・管理ワークフロー。オブジェクト配置→コンポーネント設定→Transform調整→Prefab化→シーン保存を一連で実行する。
-  Use for: "シーンに配置して", "オブジェクト作って", "Prefab化して", "コンポーネント設定して", "シーン構築"
+  シーン構築ワークフロー。オブジェクト配置、コンポーネント設定、Prefab化、シーン保存。
+  Use for: "シーン構築", "オブジェクト配置", "Prefab化", "コンポーネント設定"
 user-invocable: true
+metadata:
+  openclaw:
+    category: "game-development"
+    requires:
+      bins: ["u"]
 ---
 
-# Unity Scene Construction Workflow
+# unity-scene
 
-シーン上のオブジェクト配置・設定・Prefab化を一連で行うワークフロー。
+> **PREREQUISITE:** `../unity-shared/SKILL.md`
 
-## CLI Setup
+## ワークフロー
+
+```
+1. 現状把握     u scene active / u scene hierarchy
+2. オブジェクト  u gameobject create / find / modify / delete
+3. コンポーネント u component add / modify / inspect / list
+4. Prefab化     u asset prefab <path> --target <name>
+5. シーン保存   u scene save
+```
+
+## コマンドリファレンス
+
+### Scene
 
 ```bash
-# グローバルインストール済みの場合
-u <command>
-
-# uvx 経由（インストール不要）
-uvx --from git+https://github.com/bigdra50/unity-cli u <command>
+u scene active                    # アクティブシーン情報
+u scene hierarchy --depth 2       # 階層表示
+u scene load --path "Assets/..."  # シーン読み込み
+u scene save                      # 保存
 ```
 
-以下のワークフロー内では `u` コマンドを使用する。
-
-## Scene Construction Flow
-
-```
-Request
-  │
-  ▼
-┌──────────────────────────────┐
-│ Step 1: Survey               │
-│ u scene active               │
-│ u scene hierarchy -d 2       │
-└──────────┬───────────────────┘
-           ▼
-┌──────────────────────────────┐
-│ Step 2: Create Objects       │
-│ u gameobject create ...      │
-│ u gameobject modify ...      │
-│ u gameobject active ...      │
-└──────────┬───────────────────┘
-           ▼
-┌──────────────────────────────┐
-│ Step 3: Configure Components │
-│ u component add ...          │
-│ u component modify ...       │
-│ u component inspect ...      │
-└──────────┬───────────────────┘
-           ▼
-┌──────────────────────────────┐
-│ Step 4: Prefab (optional)    │
-│ u asset prefab ...           │
-└──────────┬───────────────────┘
-           ▼
-┌──────────────────────────────┐
-│ Step 5: Save Scene           │
-│ u scene save                 │
-└──────────┬───────────────────┘
-           ▼
-      Report
-```
-
-## Step Details
-
-### Step 1: Survey
-
-現在のシーン状態を把握する。
+### GameObject
 
 ```bash
-u scene active                    # シーン名・パス確認
-u scene hierarchy -d 2            # 上位2階層の構造確認
+u gameobject create "Player"                          # 空オブジェクト
+u gameobject create "Cube" --primitive Cube            # プリミティブ
+u gameobject find --name "Player"                      # 検索
+u gameobject modify -n "Player" --position 0,1,0       # Transform変更
+u gameobject delete -n "Player"                        # 削除
 ```
 
-階層が大きい場合はページネーションを使う:
+### Component
 
 ```bash
-u scene hierarchy -d 1 --page-size 20 --cursor 0
+u component list -t "Player"                                      # 一覧
+u component inspect -t "Player" -T Rigidbody                      # 詳細
+u component add -t "Player" -T Rigidbody                          # 追加
+u component modify -t "Player" -T Rigidbody --prop mass --value 2 # 変更
+u component remove -t "Player" -T Rigidbody                       # 削除
 ```
 
-特定オブジェクトの詳細:
+### Asset
 
 ```bash
-u gameobject find -n "Main Camera"
-u component list -t "Main Camera"
+u asset prefab "Assets/Prefabs/Player.prefab" --target "Player"  # Prefab化
+u asset info "Assets/Prefabs/Player.prefab"                       # 情報
 ```
 
-### Step 2: Create & Arrange Objects
+## CLI 非対応操作
 
-```bash
-# 空のGameObject
-u gameobject create -n "Enemy"
-
-# プリミティブ付き
-u gameobject create -n "Floor" -p Plane --position 0 0 0 --scale 10 1 10
-
-# Transform変更
-u gameobject modify -n "Enemy" --position 5 1 0 --rotation 0 45 0
-
-# Active切り替え
-u gameobject active -n "DebugUI" --no-active
-u gameobject active -n "DebugUI" --active
-```
-
-### Step 3: Configure Components
-
-```bash
-# コンポーネント追加
-u component add -t "Enemy" -T Rigidbody
-u component add -t "Enemy" -T BoxCollider
-
-# プロパティ変更
-u component modify -t "Main Camera" -T Camera --prop fieldOfView --value 90
-u component modify -t "Enemy" -T Rigidbody --prop mass --value 2.5
-u component modify -t "Light" -T Light --prop m_Color --value '{"r":1,"g":0.9,"b":0.8,"a":1}'
-
-# 変更確認
-u component inspect -t "Main Camera" -T Camera
-```
-
-対応プロパティ型: int, float, bool, string, Enum, Vector2, Vector3, Color, ObjectReference
-
-Enum は名前（文字列）またはインデックス（整数）で指定可能。
-
-### Step 4: Prefab (optional)
-
-構成済みオブジェクトをPrefab化:
-
-```bash
-u asset prefab -s "Enemy" -p "Assets/Prefabs/Enemy.prefab"
-```
-
-### Step 5: Save Scene
-
-```bash
-u scene save
-# 別名保存
-u scene save -p "Assets/Scenes/Level2.unity"
-```
-
-## Decision Criteria
-
-| 状況 | 操作 |
-|------|------|
-| 新規オブジェクト配置 | `gameobject create` → `component add` → `component modify` |
-| 既存オブジェクトの調整 | `gameobject find` → `gameobject modify` / `component modify` |
-| オブジェクトの一時無効化 | `gameobject active --no-active` |
-| 再利用したい構成 | `asset prefab` でPrefab化 |
-| プロパティ名が不明 | `component inspect` で現在値とプロパティ名を確認 |
-| SerializedProperty名が不明 | Unity Inspector のプロパティ名をそのまま使う（例: `fieldOfView`, `mass`）。内部名は `m_` プレフィックス付き（例: `m_LocalPosition`） |
-
-## Command Reference
-
-```bash
-# Scene
-u scene active                              # アクティブシーン情報
-u scene hierarchy [-d DEPTH]                # 階層表示
-u scene save [-p PATH]                      # シーン保存
-u scene load --path PATH                    # パスで読み込み
-u scene load --name NAME                    # シーン名で読み込み
-
-# GameObject
-u gameobject find -n NAME                   # 名前で検索
-u gameobject find --id ID                   # Instance ID で検索
-u gameobject create -n NAME [-p PRIMITIVE]  # 作成
-u gameobject modify -n NAME [--position X Y Z] [--rotation X Y Z] [--scale X Y Z]
-u gameobject modify --id ID [--position X Y Z] [--rotation X Y Z] [--scale X Y Z]
-u gameobject active -n NAME --active/--no-active
-u gameobject delete -n NAME                 # 名前で削除
-u gameobject delete --id ID                 # Instance ID で削除
-
-# Component
-u component list -t TARGET                  # 名前で一覧
-u component list --target-id ID             # Instance ID で一覧
-u component inspect -t TARGET -T TYPE       # 詳細
-u component add -t TARGET -T TYPE           # 追加
-u component remove -t TARGET -T TYPE        # 削除
-u component modify -t TARGET -T TYPE --prop NAME --value VALUE
-# -t の代わりに --target-id ID で Instance ID 指定も可
-
-# Asset
-u asset prefab -s SOURCE -p PATH            # Prefab作成
-u asset info PATH                           # アセット情報
-```
-
-## Anti-Patterns
-
-| NG | 理由 | 対策 |
-|----|------|------|
-| inspect せずに modify | プロパティ名の誤りに気付けない | 先に inspect で確認 |
-| 大量オブジェクトを1つずつ create | 効率が悪い、スクリプトで生成すべき | 5個以上は C# スクリプトを書く |
-| save せずに作業終了 | シーン変更が失われる | 最後に必ず `scene save` |
-| Prefab化せずに複製 | 変更の一括適用ができない | 再利用する構成は Prefab化 |
-| active で非表示にしたまま忘れる | ランタイムで見つからない | 作業後に active 状態を確認 |
-
-## Token-Saving Strategies
-
-| 状況 | 対応 |
-|------|------|
-| 階層が大きい | `-d 1` で深さ制限、`--page-size` で分割 |
-| component inspect の出力が大きい | 必要なプロパティ名だけメモして modify |
-| 同種オブジェクトを複数作成 | パターンが決まったら C# スクリプト化を提案 |
-
----
-
-## YAML Fallback
-
-unity-cli が対応していない操作は YAML 直接編集で対応する。
-
-### 対象ファイル
-
-| 拡張子 | 内容 |
-|--------|------|
-| `.unity` | シーンファイル |
-| `.prefab` | プレハブ |
-| `.asset` | ScriptableObject、設定ファイル |
-| `.meta` | アセットメタデータ |
-
-### YAML 編集の判断基準
-
-| 状況 | 対応 |
-|------|------|
-| unity-cli コマンドがある | CLI を使用（推奨） |
-| CLI 非対応だが単純な変更 | YAML 直接編集 |
-| 複雑な変更 | Unity エディタで手動操作 |
-
-### YAML 編集フロー
-
-```
-CLI 非対応操作の検出
-  │
-  ▼
-┌─────────────────────────────┐
-│ Step 1: YAML 形式確認        │
-│ unity-guide エージェントで   │
-│ ドキュメント参照             │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 2: 現在値確認           │
-│ Read ツールで対象ファイル読み │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 3: 編集                 │
-│ Edit ツールで YAML を修正    │
-└──────────┬──────────────────┘
-           ▼
-┌─────────────────────────────┐
-│ Step 4: 検証                 │
-│ u refresh で再読み込み       │
-│ u console get -l E           │
-└─────────────────────────────┘
-```
-
-### YAML 構造の参考
-
-Unity YAML は %YAML 1.1 + %TAG !u! で始まる。
-
-```yaml
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!1 &123456789
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 987654321}
-  m_Layer: 0
-  m_Name: MyObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
-```
-
-### よく編集するプロパティ
-
-| プロパティ | 説明 |
-|-----------|------|
-| `m_Name` | オブジェクト名 |
-| `m_IsActive` | アクティブ状態 (0/1) |
-| `m_Layer` | レイヤー番号 |
-| `m_TagString` | タグ文字列 |
-| `m_LocalPosition` | ローカル位置 |
-| `m_LocalRotation` | ローカル回転 (Quaternion) |
-| `m_LocalScale` | ローカルスケール |
-
-### 注意事項
-
-- fileID は Unity が生成するユニークID。手動で変更しない
-- GUID 参照は .meta ファイルで確認
-- 編集後は必ず `u refresh` で Unity に再読み込みさせる
-- 形式不明な場合は unity-guide エージェントでドキュメント参照
-
-## Related Skills
-
-| スキル | 関係 |
-|--------|------|
-| unity-preflight | シーン構築中に C# を編集した場合のビルド検証 |
-| unity-debug | シーン実行時のランタイムエラー調査 |
-| unity-ui | UI Toolkit 要素の配置・検査 |
-| unity-asset | アセット依存関係・YAML フォールバック共通 |
+unity-shared のフォールバック順に従う:
+1. `u api schema --type <Type>` で対応メソッドを検索
+2. `u api call` で実行
+3. .meta インポート設定等は YAML 直接編集
