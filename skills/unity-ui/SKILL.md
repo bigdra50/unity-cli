@@ -67,7 +67,7 @@ u uitree click -p "PanelSettings" -n "BtnContinue"  # name で指定
 u uitree click ref_5_48                              # ref ID で指定
 u uitree click ref_5_48 --count 2                    # ダブルクリック
 u uitree click ref_5_48 --button 1                   # 右クリック
-u uitree scroll -p "PanelSettings" -n "ScrollArea" --delta 100
+u uitree scroll -p "PanelSettings" -n "ScrollArea" --y 100
 ```
 
 ### スクリーンショット
