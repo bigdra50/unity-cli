@@ -15,12 +15,13 @@ namespace UnityBridge.Tools
             var nsFilter = parameters["namespace"]?.ToObject<string[]>();
             var typeFilter = parameters["type"]?.Value<string>();
             var methodFilter = parameters["method"]?.Value<string>();
+            var cacheAll = parameters["cache_all"]?.Value<bool>() ?? false;
             var limit = parameters["limit"]?.Value<int>() ?? 100;
             var offset = parameters["offset"]?.Value<int>() ?? 0;
 
             var allMethods = CollectMethods(nsFilter, typeFilter, methodFilter);
             var total = allMethods.Count;
-            var page = allMethods.Skip(offset).Take(limit).ToList();
+            var page = cacheAll ? allMethods : allMethods.Skip(offset).Take(limit).ToList();
 
             var methodsArray = new JArray();
             foreach (var mi in page)

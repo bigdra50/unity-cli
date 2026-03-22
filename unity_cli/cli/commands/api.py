@@ -81,6 +81,18 @@ def api_schema(
         int,
         typer.Option("--offset", help="Pagination offset"),
     ] = 0,
+    offline: Annotated[
+        bool,
+        typer.Option("--offline", help="Use cached schema only (no Relay)"),
+    ] = False,
+    no_cache: Annotated[
+        bool,
+        typer.Option("--no-cache", help="Skip cache, fetch from Relay"),
+    ] = False,
+    unity_version: Annotated[
+        str | None,
+        typer.Option("--version", help="Unity version (for offline cache lookup)"),
+    ] = None,
     json_flag: Annotated[
         bool,
         typer.Option("--json", help="Output as JSON"),
@@ -94,6 +106,9 @@ def api_schema(
         method_name=method_name,
         limit=limit,
         offset=offset,
+        offline=offline,
+        no_cache=no_cache,
+        version=unity_version,
     )
 
     if _should_json(context, json_flag):
