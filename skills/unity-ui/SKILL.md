@@ -334,17 +334,33 @@ namespace Game.Tests.PlayMode
 
         private static void Click(VisualElement element)
         {
-            using var evt = new NavigationSubmitEvent { target = element };
-            element.SendEvent(evt);
+            // ClickEvent を発火するにはポインタ座標が必要
+            var center = element.worldBound.center;
+            using var down = PointerDownEvent.GetPooled(
+                center, (int)center.x, (int)center.y, 0, 0, 0);
+            down.target = element;
+            element.SendEvent(down);
+
+            using var up = PointerUpEvent.GetPooled(
+                center, (int)center.x, (int)center.y, 0, 0, 0);
+            up.target = element;
+            element.SendEvent(up);
         }
     }
 }
 ```
 
 Click ヘルパーの注意:
-- `NavigationSubmitEvent` は UI Toolkit の標準イベント。`ClickEvent` はマウス座標が必要なため、テストでは `NavigationSubmitEvent` が簡潔
-- `PointerDownEvent` / `PointerUpEvent` を使う場合は座標計算が必要（worldBound から取得）
-- Phase 2 の pytest テストの各テストメソッドを1対1で C# に移植する
+- `ClickEvent` は `PointerDownEvent` + `PointerUpEvent` のペアで発火する。`NavigationSubmitEvent` では `RegisterCallback<ClickEvent>` が反応しない
+- `worldBound.center` から座標を取得して使う
+- 要素が非表示 (`display: none`) の場合は `worldBound` が無効になるため、表示状態を確認してからクリックする
+
+asmdef の注意:
+- テスト対象クラスが `Assembly-CSharp`（asmdef なし）にある場合、テスト asmdef からは直接参照できない
+- 対象クラスに専用 asmdef を作成し、テスト asmdef の `references` に追加する
+- 例: `Assets/UI/Game.UI.asmdef` を作成 → `Game.Tests.PlayMode.asmdef` の references に `"Game.UI"` を追加
+
+Phase 2 の pytest テストの各テストメソッドを1対1で C# に移植する。
 
 移植後は `u tests run play` で実行。
 
