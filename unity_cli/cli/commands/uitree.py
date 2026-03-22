@@ -1,4 +1,4 @@
-"""UI Toolkit tree commands: dump, query, inspect, click, scroll, text."""
+"""UI Toolkit tree commands: dump, query, inspect, click, scroll, text, monkey, snapshot."""
 
 from __future__ import annotations
 
@@ -8,11 +8,21 @@ import typer
 from rich.markup import escape
 
 from unity_cli.cli.context import CLIContext
-from unity_cli.cli.helpers import _exit_usage, _handle_error, _should_json
-from unity_cli.cli.output import is_no_color, print_json, print_key_value, print_line, print_plain_table, sanitize_tsv
+from unity_cli.cli.helpers import _exit_usage, _handle_error, _should_json, handle_cli_errors
+from unity_cli.cli.output import (
+    is_no_color,
+    print_json,
+    print_key_value,
+    print_line,
+    print_plain_table,
+    print_success,
+    sanitize_tsv,
+)
 from unity_cli.exceptions import UnityCLIError
 
 uitree_app = typer.Typer(help="UI Toolkit tree commands")
+snapshot_app = typer.Typer(help="UI tree snapshot commands")
+uitree_app.add_typer(snapshot_app, name="snapshot")
 
 
 @uitree_app.command("dump")
@@ -583,3 +593,174 @@ def uitree_text(
 
     except UnityCLIError as e:
         _handle_error(e)
+
+
+# =============================================================================
+# monkey
+# =============================================================================
+
+
+@uitree_app.command("monkey")
+@handle_cli_errors
+def uitree_monkey(
+    ctx: typer.Context,
+    panel: Annotated[
+        str,
+        typer.Option("--panel", "-p", help="Target panel name"),
+    ],
+    duration: Annotated[
+        float | None,
+        typer.Option("--duration", help="Max duration in seconds"),
+    ] = None,
+    count: Annotated[
+        int | None,
+        typer.Option("--count", "-n", help="Max number of actions"),
+    ] = None,
+    seed: Annotated[
+        int | None,
+        typer.Option("--seed", help="Random seed for reproducibility"),
+    ] = None,
+    type_filter: Annotated[
+        str | None,
+        typer.Option("--type", "-t", help="Filter elements by type"),
+    ] = None,
+    class_filter: Annotated[
+        str | None,
+        typer.Option("--class", "-c", help="Filter elements by USS class"),
+    ] = None,
+    stop_on_error: Annotated[
+        bool,
+        typer.Option("--stop-on-error", help="Stop on first console error"),
+    ] = False,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", help="Delay between actions in seconds"),
+    ] = 0.2,
+    json_flag: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Run monkey test — random UI interactions with error monitoring.
+
+    Examples:
+        u uitree monkey -p "PanelSettings" --count 50 --seed 42
+        u uitree monkey -p "PanelSettings" --duration 30
+        u uitree monkey -p "PanelSettings" -c "action-btn" --stop-on-error
+    """
+    from dataclasses import asdict
+
+    from unity_cli.api.uitree_monkey import MonkeyRunner
+
+    context: CLIContext = ctx.obj
+    runner = MonkeyRunner(context.client.uitree, context.client.console)
+    result = runner.run(
+        panel=panel,
+        duration=duration,
+        count=count,
+        seed=seed,
+        type_filter=type_filter,
+        class_filter=class_filter,
+        stop_on_error=stop_on_error,
+        interval=interval,
+    )
+
+    if _should_json(context, json_flag):
+        print_json(asdict(result), None)
+    else:
+        print_line(
+            f"Actions: {result.total_actions}, Errors: {len(result.errors)}, "
+            f"Seed: {result.seed}, Duration: {result.duration_ms}ms"
+        )
+        if result.errors:
+            for e in result.errors:
+                print_line(f"  Error: {e.get('message', '')}")
+
+
+# =============================================================================
+# snapshot save / diff / list / delete
+# =============================================================================
+
+
+@snapshot_app.command("save")
+@handle_cli_errors
+def snapshot_save(
+    ctx: typer.Context,
+    panel: Annotated[str, typer.Option("--panel", "-p", help="Panel name")],
+    name: Annotated[str, typer.Option("--name", help="Snapshot name")],
+) -> None:
+    """Save current UI tree as a named snapshot.
+
+    Examples:
+        u uitree snapshot save -p "PanelSettings" --name baseline
+    """
+    from unity_cli.api.uitree_snapshot import SnapshotStore
+
+    context: CLIContext = ctx.obj
+    data = context.client.uitree.dump(panel=panel, format="json")
+    path = SnapshotStore().save(name, data)
+    print_success(f"Saved snapshot '{name}' to {path}")
+
+
+@snapshot_app.command("diff")
+@handle_cli_errors
+def snapshot_diff(
+    ctx: typer.Context,
+    panel: Annotated[str, typer.Option("--panel", "-p", help="Panel name")],
+    name: Annotated[str, typer.Option("--name", help="Baseline snapshot name")],
+    json_flag: Annotated[bool, typer.Option("--json", help="Output as JSON")] = False,
+) -> None:
+    """Compare current UI tree against a saved snapshot.
+
+    Examples:
+        u uitree snapshot diff -p "PanelSettings" --name baseline
+    """
+    from unity_cli.api.uitree_snapshot import SnapshotStore
+
+    context: CLIContext = ctx.obj
+    current = context.client.uitree.dump(panel=panel, format="json")
+    result = SnapshotStore().diff(name, current)
+
+    if _should_json(context, json_flag):
+        print_json(result, None)
+    else:
+        _print_diff_result(result)
+
+
+def _print_diff_result(result: dict[str, Any]) -> None:
+    """Print snapshot diff in human-readable format."""
+    print_line(f"Baseline: {result['baseline_count']} elements, Current: {result['current_count']} elements")
+    for e in result.get("added", []):
+        print_line(f"  + {e['name']} ({e['type']})")
+    for e in result.get("removed", []):
+        print_line(f"  - {e['name']} ({e['type']})")
+    for e in result.get("changed", []):
+        print_line(f"  ~ {e['name']}: {e['baseline_classes']} -> {e['current_classes']}")
+    if not result.get("added") and not result.get("removed") and not result.get("changed"):
+        print_success("No changes detected")
+
+
+@snapshot_app.command("list")
+def snapshot_list() -> None:
+    """List saved snapshots."""
+    from unity_cli.api.uitree_snapshot import SnapshotStore
+
+    names = SnapshotStore().list_names()
+    if not names:
+        print_line("No snapshots saved")
+    else:
+        for n in names:
+            print_line(n)
+
+
+@snapshot_app.command("delete")
+def snapshot_delete(
+    name: Annotated[str, typer.Option("--name", help="Snapshot name to delete")],
+) -> None:
+    """Delete a saved snapshot."""
+    from unity_cli.api.uitree_snapshot import SnapshotStore
+
+    if SnapshotStore().delete(name):
+        print_success(f"Deleted snapshot '{name}'")
+    else:
+        print_line(f"Snapshot '{name}' not found")
