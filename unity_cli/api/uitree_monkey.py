@@ -27,9 +27,7 @@ def _should_stop(action_count: int, count: int | None, start: float, duration: f
     """Check if the monkey loop should terminate."""
     if count is not None and action_count >= count:
         return True
-    if duration is not None and (time.time() - start) >= duration:
-        return True
-    return False
+    return duration is not None and (time.time() - start) >= duration
 
 
 class MonkeyRunner:
@@ -67,6 +65,9 @@ class MonkeyRunner:
         Returns:
             MonkeyResult with actions performed and errors found.
         """
+        if error_check_interval < 1:
+            msg = "error_check_interval must be >= 1"
+            raise ValueError(msg)
         if duration is None and count is None:
             count = 100
 
@@ -86,9 +87,8 @@ class MonkeyRunner:
             action_count += 1
             self._perform_action(rng, elements, result)
 
-            if action_count % error_check_interval == 0:
-                if self._handle_errors(result, stop_on_error):
-                    break
+            if action_count % error_check_interval == 0 and self._handle_errors(result, stop_on_error):
+                break
 
             time.sleep(interval)
 

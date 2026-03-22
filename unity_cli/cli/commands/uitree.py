@@ -7,6 +7,7 @@ from typing import Annotated, Any
 import typer
 from rich.markup import escape
 
+from unity_cli.api.uitree_snapshot import SNAPSHOT_NAME_RE
 from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _exit_usage, _handle_error, _should_json, handle_cli_errors
 from unity_cli.cli.output import (
@@ -20,17 +21,13 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
-import re
-
 uitree_app = typer.Typer(help="UI Toolkit tree commands")
 snapshot_app = typer.Typer(help="UI tree snapshot commands")
 uitree_app.add_typer(snapshot_app, name="snapshot")
 
-_SNAPSHOT_NAME_RE = re.compile(r"^[\w.\-]+$")
-
 
 def _validate_snapshot_name(name: str) -> None:
-    if not _SNAPSHOT_NAME_RE.fullmatch(name):
+    if not SNAPSHOT_NAME_RE.fullmatch(name):
         raise typer.BadParameter(f"Invalid snapshot name: {name!r}. Use alphanumeric, dot, hyphen, underscore.")
 
 
@@ -751,6 +748,7 @@ def _print_diff_result(result: dict[str, Any]) -> None:
 
 
 @snapshot_app.command("list")
+@handle_cli_errors
 def snapshot_list() -> None:
     """List saved snapshots."""
     from unity_cli.api.uitree_snapshot import SnapshotStore

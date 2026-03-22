@@ -10,7 +10,7 @@ from typing import Any
 
 SNAPSHOT_DIR = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "unity-cli" / "uitree-snapshots"
 
-_NAME_RE = re.compile(r"^[\w.\-]+$")
+SNAPSHOT_NAME_RE = re.compile(r"^[\w.\-]+$")
 
 
 def _flatten_tree(root: dict[str, Any], out: list[dict[str, Any]]) -> None:
@@ -37,7 +37,7 @@ class SnapshotStore:
         self._dir = snapshot_dir
 
     def _path(self, name: str) -> Path:
-        if not _NAME_RE.fullmatch(name):
+        if not SNAPSHOT_NAME_RE.fullmatch(name):
             msg = f"Invalid snapshot name: {name!r}"
             raise ValueError(msg)
         return self._dir / f"{name}.json"
