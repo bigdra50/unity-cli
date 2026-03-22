@@ -40,7 +40,7 @@ metadata:
 ### 構造把握
 
 ```bash
-u uitree dump                           # 全パネル一覧
+u uitree dump                           # 全パネル一覧 (contextType: Player がゲーム側)
 u uitree dump -p "PanelSettings"        # パネルのツリー (各要素の ref/name/type/classes が見える)
 u uitree dump -p "PanelSettings" --json # JSON 出力 (snapshot用)
 u uitree query -p "PanelSettings" -t Button              # type で検索 (VisualElement ベースのボタンはヒットしない → -c で検索)
@@ -223,7 +223,7 @@ class TestStructure:
         assert before != after
 ```
 
-既存の `conftest.py` に `conn`, `uitree`, `editor`, `console` fixture がある場合はテンプレートの fixture 定義を省略し、conftest に委譲する。
+既存の `conftest.py` に `conn`, `uitree`, `editor`, `console` fixture がある場合はテンプレートの fixture 定義を省略し、conftest に委譲する。fixture の scope は conftest に合わせる（conftest が `session` なら `_play_mode` 等も同じ scope か互換性のある scope にする）。
 
 動的な値（タイムスタンプ、プログレス%等）を持つラベルは等値比較ではなくフォーマット検証を使う:
 ```python
