@@ -80,7 +80,11 @@ class MonkeyRunner:
 
         action_count = 0
         while not _should_stop(action_count, count, start, duration):
-            elements = self._query_elements(panel, type_filter, class_filter)
+            try:
+                elements = self._query_elements(panel, type_filter, class_filter)
+            except Exception as e:
+                result.errors.append({"source": "query", "message": str(e)})
+                break
             if not elements:
                 break
 
@@ -134,9 +138,7 @@ class MonkeyRunner:
         return elements
 
     def _check_errors(self) -> list[dict[str, Any]]:
-        """Check console for new errors."""
+        """Check console for new errors since last clear."""
         resp = self._console.get(types=["error"])
         entries: list[dict[str, Any]] = resp.get("entries", [])
-        if entries:
-            self._console.clear()
         return [{"source": "console", **e} for e in entries]

@@ -126,3 +126,14 @@ class TestEmptyElements:
         mock_uitree.query.return_value = {"matches": []}
         result = sut.run(panel="P", count=10, seed=42, interval=0)
         assert result.total_actions == 0
+
+
+class TestQueryFailure:
+    def test_records_error_and_stops_on_query_exception(
+        self, sut: MonkeyRunner, mock_uitree: MagicMock
+    ) -> None:
+        mock_uitree.query.side_effect = RuntimeError("Panel not found")
+        result = sut.run(panel="P", count=10, seed=42, interval=0)
+        assert result.total_actions == 0
+        assert len(result.errors) == 1
+        assert result.errors[0]["source"] == "query"
