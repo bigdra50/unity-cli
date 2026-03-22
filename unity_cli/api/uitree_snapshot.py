@@ -129,6 +129,7 @@ def _find_class_changes(
         if b["classes"] != c["classes"]:
             changed.append(
                 {
+                    "ref": r,
                     "name": b.get("name", r),
                     "baseline_classes": b["classes"],
                     "current_classes": c["classes"],

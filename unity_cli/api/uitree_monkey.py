@@ -105,7 +105,7 @@ class MonkeyRunner:
         try:
             self._uitree.click(ref=target["ref"])
         except Exception as e:
-            result.errors.append({"message": str(e), "ref": target["ref"]})
+            result.errors.append({"source": "click", "message": str(e), "ref": target["ref"]})
             return
         result.actions.append(
             {
@@ -139,4 +139,4 @@ class MonkeyRunner:
         entries: list[dict[str, Any]] = resp.get("entries", [])
         if entries:
             self._console.clear()
-        return entries
+        return [{"source": "console", **e} for e in entries]
