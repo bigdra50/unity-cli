@@ -251,6 +251,101 @@ pytest E2E のまま残す基準:
 - AI エージェントの自律テスト
 - Unity 外からの結合テスト
 
+手順:
+1. Phase 2 の pytest テストから安定したシナリオを選ぶ
+2. 以下のテンプレートに従い、`Assets/Tests/PlayMode/` に C# テストを生成する
+3. asmdef に UI コントローラの参照を追加する（必要に応じて）
+4. `u tests run play` で実行して確認する
+
+テンプレート:
+
+```csharp
+using System.Collections;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+using UnityEngine.UIElements;
+
+namespace Game.Tests.PlayMode
+{
+    [TestFixture]
+    public class <UI名>Tests
+    {
+        private GameObject _hudObject;
+        private UIDocument _uiDocument;
+        private VisualElement _root;
+
+        [UnitySetUp]
+        public IEnumerator SetUp()
+        {
+            // UIDocument を持つ GameObject を生成
+            // コントローラが Awake/OnEnable で初期化するのを待つ
+            _hudObject = new GameObject("TestHUD");
+            _hudObject.AddComponent<<コントローラ名>>();
+            _uiDocument = _hudObject.GetComponent<UIDocument>();
+
+            yield return null; // 1フレーム待ち (InitAfterLayout 等)
+            yield return null;
+
+            _root = _uiDocument.rootVisualElement;
+            Assert.IsNotNull(_root, "Root visual element should be initialized");
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            Object.Destroy(_hudObject);
+        }
+
+        // --- Functional テスト ---
+
+        [UnityTest]
+        public IEnumerator <ボタン名>_Shows<期待される動作>()
+        {
+            var btn = _root.Q("<ボタン名>");
+            Assert.IsNotNull(btn);
+
+            Click(btn);
+            yield return null;
+
+            var label = _root.Q<Label>("<ラベル名>");
+            Assert.AreEqual("<期待値>", label.text);
+        }
+
+        // --- Smoke テスト ---
+
+        [UnityTest]
+        public IEnumerator AllButtons_ClickableWithoutErrors()
+        {
+            var buttons = new[] { "<ボタン1>", "<ボタン2>", ... };
+
+            foreach (var name in buttons)
+            {
+                var element = _root.Q(name);
+                Assert.IsNotNull(element, $"{name} should exist");
+                Click(element);
+                yield return null;
+            }
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // --- ヘルパー ---
+
+        private static void Click(VisualElement element)
+        {
+            using var evt = new NavigationSubmitEvent { target = element };
+            element.SendEvent(evt);
+        }
+    }
+}
+```
+
+Click ヘルパーの注意:
+- `NavigationSubmitEvent` は UI Toolkit の標準イベント。`ClickEvent` はマウス座標が必要なため、テストでは `NavigationSubmitEvent` が簡潔
+- `PointerDownEvent` / `PointerUpEvent` を使う場合は座標計算が必要（worldBound から取得）
+- Phase 2 の pytest テストの各テストメソッドを1対1で C# に移植する
+
 移植後は `u tests run play` で実行。
 
 ## CLI 非対応操作
