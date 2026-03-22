@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 using UnityBridge.Helpers;
+using UnityEditor;
 
 namespace UnityBridge.Tools
 {
@@ -11,6 +12,12 @@ namespace UnityBridge.Tools
     public static class ApiSchema
     {
         private static List<MethodInfo> _allMethodsCache;
+
+        [InitializeOnLoadMethod]
+        private static void RegisterReloadCallback()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload += () => _allMethodsCache = null;
+        }
 
         public static JObject HandleCommand(JObject parameters)
         {

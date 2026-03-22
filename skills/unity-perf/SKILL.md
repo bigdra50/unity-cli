@@ -17,7 +17,7 @@ metadata:
 
 ## プロファイリングフロー
 
-```
+```text
 1. /unity-verify Quick Verify      コンパイルエラーがないことを確認
 2. u play                          Play Mode 開始
 3. u profiler start                プロファイリング開始

@@ -51,6 +51,7 @@ namespace UnityBridge.Helpers
             if (targetType == typeof(float)) return token.Value<float>();
             if (targetType == typeof(double)) return token.Value<double>();
             if (targetType == typeof(bool)) return token.Value<bool>();
+            if (targetType == typeof(decimal)) return token.Value<decimal>();
             if (targetType == typeof(string)) return token.Value<string>();
 
             // Enum: accept name (string) or integer value
@@ -195,13 +196,14 @@ namespace UnityBridge.Helpers
         {
             if (type.IsPrimitive) return true;
             if (type == typeof(string)) return true;
+            if (type == typeof(decimal)) return true;
             if (type.IsEnum) return true;
 
-            // Primitive/string arrays
+            // Primitive/string/decimal arrays
             if (type.IsArray)
             {
                 var elem = type.GetElementType();
-                return elem != null && (elem.IsPrimitive || elem == typeof(string));
+                return elem != null && (elem.IsPrimitive || elem == typeof(string) || elem == typeof(decimal));
             }
 
             return false;

@@ -17,7 +17,7 @@ metadata:
 
 ## 調査フロー
 
-```
+```text
 1. エラー取得      u console get -l E,X --count 20
 2. エラー分類      → コンパイルエラー / ランタイムエラー / Missing 系
 3. コンテキスト収集  u scene hierarchy / u component inspect / u screenshot

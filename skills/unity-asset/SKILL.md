@@ -17,7 +17,7 @@ metadata:
 
 ## 調査フロー
 
-```
+```text
 1. アセット情報   u asset info <path>
 2. 依存関係      u asset deps <path>
 3. 参照元        u asset refs <path>

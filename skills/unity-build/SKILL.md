@@ -17,7 +17,7 @@ metadata:
 
 ## ワークフロー
 
-```
+```text
 1. /unity-verify Quick Verify   コンパイルエラーがないことを確認
 2. ビルド設定確認              u build settings --json
 3. ビルドシーン確認            u build scenes --json

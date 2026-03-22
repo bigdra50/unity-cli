@@ -17,7 +17,7 @@ metadata:
 
 ## ワークフロー
 
-```
+```text
 1. 現状把握     u scene active / u scene hierarchy
 2. オブジェクト  u gameobject create / find / modify / delete
 3. コンポーネント u component add / modify / inspect / list

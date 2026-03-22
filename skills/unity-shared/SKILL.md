@@ -41,7 +41,7 @@ u console get -l E,W --count 50    # Error/Warning 取得
 
 CLI 非対応の操作を行う場合:
 
-```
+```text
 1. u <既存コマンド>           最優先
 2. u api call Type Method    5,243 メソッド対応
 3. YAML 直接編集              最終手段 (.meta インポート設定等)

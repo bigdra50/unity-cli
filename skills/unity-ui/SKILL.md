@@ -94,7 +94,7 @@ u component inspect -t "MyButton" -T "UnityEngine.UI.Button"
 
 ## 開発→テストフロー
 
-```
+```text
 Phase 1: 作成 & 手動確認
   コード変更 → /unity-verify → play → dump → 操作 → screenshot → stop
 

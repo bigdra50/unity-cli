@@ -19,7 +19,7 @@ metadata:
 
 コード変更するたびに実行。unity-shared の Quick Verify そのもの。
 
-```
+```text
 u refresh → isCompiling ポーリング → u console clear → u console get -l E,W
 → Error あり: 修正して再実行 (最大3回)
 → クリーン: 完了
@@ -29,7 +29,7 @@ u refresh → isCompiling ポーリング → u console clear → u console get 
 
 ユーザーが要求した場合のみ。Quick Verify + EditMode テスト。
 
-```
+```text
 Quick Verify 実行
 → クリーンなら u tests run edit → 結果確認
 → Fail あり: 報告、修正して Quick Verify から再実行
@@ -39,7 +39,7 @@ Quick Verify 実行
 
 要求された場合のみ。Play Mode でランタイムエラーを検出。
 
-```
+```text
 u console clear → u play → isPlaying ポーリング → 3秒待機 → u console get -l +E+X → u stop
 ```
 

@@ -61,7 +61,9 @@ class TestPut:
         sut.put("6000.2.6f2", sample_schema)
         updated = {**sample_schema, "total": 999}
         sut.put("6000.2.6f2", updated)
-        assert sut.get("6000.2.6f2")["total"] == 999
+        result = sut.get("6000.2.6f2")
+        assert result is not None
+        assert result["total"] == 999
 
 
 class TestHas:
