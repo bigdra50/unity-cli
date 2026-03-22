@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
+from collections.abc import Iterator
 
 import pytest
 
@@ -16,7 +18,7 @@ PANEL = "UIDocument SamplePanelSettings (SampleHUD)"
 
 
 @pytest.fixture(autouse=True)
-def _play_mode(editor: EditorAPI) -> None:
+def _play_mode(editor: EditorAPI) -> Iterator[None]:
     """Ensure Play Mode is active before each test."""
     state = editor.get_state()
     if not state.get("isPlaying"):
@@ -30,7 +32,7 @@ def _play_mode(editor: EditorAPI) -> None:
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _stop_after_all(editor: EditorAPI):
+def _stop_after_all(editor: EditorAPI) -> Iterator[None]:
     """Stop Play Mode after all tests in this module."""
     yield
     try:
@@ -135,6 +137,6 @@ class TestStructure:
 
     def test_tree_contains_required_sections(self, uitree: UITreeAPI) -> None:
         result = uitree.dump(panel=PANEL)
-        tree_str = str(result)
+        tree_json = json.dumps(result)
         for section in ("StatusBar", "TitleCard", "Chapters", "Menu", "TabBar"):
-            assert section in tree_str, f"Expected section '{section}' not found in tree"
+            assert section in tree_json, f"Expected section '{section}' not found in tree"
