@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json as json_mod
+import json
 from typing import Annotated
 
 import typer
@@ -43,7 +43,14 @@ def api_call(
         u api call UnityEditor.AssetDatabase ImportAsset --params '["Assets/Prefabs/Player.prefab", 0]'
     """
     context: CLIContext = ctx.obj
-    parsed_params = json_mod.loads(params) if params else []
+    parsed_params: list[object] = []
+    if params:
+        try:
+            parsed_params = json.loads(params)
+        except json.JSONDecodeError as e:
+            raise typer.BadParameter(f"Invalid JSON for --params: {e}") from e
+        if not isinstance(parsed_params, list):
+            raise typer.BadParameter("--params must be a JSON array, e.g. '[1, \"hello\"]'")
     result = context.client.dynamic_api.invoke(type_name, method, parsed_params)
 
     if _should_json(context, json_flag):

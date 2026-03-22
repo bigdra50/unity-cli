@@ -65,13 +65,13 @@ class DynamicAPI:
         Returns:
             Dictionary with methods, total, and hasMore.
         """
+        resolved_version = version or self._get_unity_version_safe()
+
         # Try cache first (unless no_cache)
-        if not no_cache:
-            cache_version = version or self._get_unity_version_safe()
-            if cache_version:
-                cached = self._cache.get(cache_version)
-                if cached:
-                    return self._filter_schema(cached, namespace, type_name, method_name, limit, offset)
+        if not no_cache and resolved_version:
+            cached = self._cache.get(resolved_version)
+            if cached:
+                return self._filter_schema(cached, namespace, type_name, method_name, limit, offset)
 
         if offline:
             raise UnityCLIError(
@@ -81,10 +81,9 @@ class DynamicAPI:
 
         # Fetch full schema from Relay and cache it
         full = self._conn.send_request("api-schema", {"cache_all": True})
-        relay_version = version or self._get_unity_version_safe()
-        if relay_version:
-            full["version"] = relay_version
-            self._cache.put(relay_version, full)
+        if resolved_version:
+            full["version"] = resolved_version
+            self._cache.put(resolved_version, full)
 
         return self._filter_schema(full, namespace, type_name, method_name, limit, offset)
 
@@ -130,7 +129,8 @@ class DynamicAPI:
 
 
 def _filter_by_namespace(methods: list[dict[str, Any]], namespaces: list[str]) -> list[dict[str, Any]]:
-    return [m for m in methods if any(m.get("type", "").startswith(ns) for ns in namespaces)]
+    ns_lower = [ns.lower() for ns in namespaces]
+    return [m for m in methods if any(m.get("type", "").lower().startswith(ns) for ns in ns_lower)]
 
 
 def _filter_by_type(methods: list[dict[str, Any]], type_name: str) -> list[dict[str, Any]]:

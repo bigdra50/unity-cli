@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "unity-cli" / "api-schema"
+
+_VERSION_RE = re.compile(r"^[\w.\-]+$")
 
 
 class SchemaCache:
@@ -17,6 +20,9 @@ class SchemaCache:
         self._dir = cache_dir
 
     def _path(self, version: str) -> Path:
+        if not _VERSION_RE.fullmatch(version):
+            msg = f"Invalid version string: {version!r}"
+            raise ValueError(msg)
         return self._dir / f"{version}.json"
 
     def get(self, version: str) -> dict[str, Any] | None:

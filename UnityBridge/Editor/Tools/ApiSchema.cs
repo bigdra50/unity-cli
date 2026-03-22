@@ -10,6 +10,8 @@ namespace UnityBridge.Tools
     [BridgeTool("api-schema")]
     public static class ApiSchema
     {
+        private static List<MethodInfo> _allMethodsCache;
+
         public static JObject HandleCommand(JObject parameters)
         {
             var nsFilter = parameters["namespace"]?.ToObject<string[]>();
@@ -19,7 +21,7 @@ namespace UnityBridge.Tools
             var limit = parameters["limit"]?.Value<int>() ?? 100;
             var offset = parameters["offset"]?.Value<int>() ?? 0;
 
-            var allMethods = CollectMethods(nsFilter, typeFilter, methodFilter);
+            var allMethods = FilterMethods(GetOrBuildCache(), nsFilter, typeFilter, methodFilter);
             var total = allMethods.Count;
             var page = cacheAll ? allMethods : allMethods.Skip(offset).Take(limit).ToList();
 
@@ -54,8 +56,44 @@ namespace UnityBridge.Tools
             };
         }
 
-        private static List<MethodInfo> CollectMethods(
-            string[] nsFilter, string typeFilter, string methodFilter)
+        private static List<MethodInfo> GetOrBuildCache()
+        {
+            if (_allMethodsCache != null) return _allMethodsCache;
+            _allMethodsCache = ScanAllMethods();
+            return _allMethodsCache;
+        }
+
+        private static List<MethodInfo> FilterMethods(
+            List<MethodInfo> source, string[] nsFilter, string typeFilter, string methodFilter)
+        {
+            IEnumerable<MethodInfo> results = source;
+
+            if (nsFilter != null && nsFilter.Length > 0)
+            {
+                results = results.Where(m =>
+                {
+                    var ns = m.DeclaringType?.Namespace ?? "";
+                    return nsFilter.Any(f => ns.StartsWith(f, StringComparison.OrdinalIgnoreCase));
+                });
+            }
+
+            if (!string.IsNullOrEmpty(typeFilter))
+            {
+                results = results.Where(m =>
+                    m.DeclaringType != null &&
+                    (m.DeclaringType.Name.Equals(typeFilter, StringComparison.OrdinalIgnoreCase)
+                     || (m.DeclaringType.FullName?.Equals(typeFilter, StringComparison.OrdinalIgnoreCase) ?? false)));
+            }
+
+            if (!string.IsNullOrEmpty(methodFilter))
+            {
+                results = results.Where(m => m.Name.Equals(methodFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return results.ToList();
+        }
+
+        private static List<MethodInfo> ScanAllMethods()
         {
             var results = new List<MethodInfo>();
 
@@ -77,33 +115,12 @@ namespace UnityBridge.Tools
                     if (!ApiSafetyGuard.IsNamespaceAllowed(type)) continue;
                     if (ApiSafetyGuard.IsObsolete(type)) continue;
 
-                    if (nsFilter != null && nsFilter.Length > 0)
-                    {
-                        var ns = type.Namespace ?? "";
-                        if (!nsFilter.Any(f => ns.StartsWith(f, StringComparison.OrdinalIgnoreCase)))
-                            continue;
-                    }
-
-                    if (!string.IsNullOrEmpty(typeFilter))
-                    {
-                        if (!type.Name.Equals(typeFilter, StringComparison.OrdinalIgnoreCase)
-                            && !(type.FullName?.Equals(typeFilter, StringComparison.OrdinalIgnoreCase) ?? false))
-                            continue;
-                    }
-
                     var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
                     foreach (var mi in methods)
                     {
                         if (ApiSafetyGuard.IsObsolete(mi)) continue;
                         if (!ApiSafetyGuard.HasAllSupportedParams(mi)) continue;
                         if (mi.IsGenericMethod) continue;
-
-                        if (!string.IsNullOrEmpty(methodFilter))
-                        {
-                            if (!mi.Name.Equals(methodFilter, StringComparison.OrdinalIgnoreCase))
-                                continue;
-                        }
-
                         results.Add(mi);
                     }
                 }
