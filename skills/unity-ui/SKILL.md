@@ -284,7 +284,9 @@ namespace Game.Tests.PlayMode
             _hudObject.AddComponent<<コントローラ名>>();
             _uiDocument = _hudObject.GetComponent<UIDocument>();
 
-            yield return null; // 1フレーム待ち (InitAfterLayout 等)
+            // コルーチン初期化 (StartCoroutine in OnEnable 等) は1フレームでは完了しない
+            // 2フレーム以上待つ
+            yield return null;
             yield return null;
 
             _root = _uiDocument.rootVisualElement;
