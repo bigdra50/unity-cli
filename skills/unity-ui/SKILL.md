@@ -223,6 +223,13 @@ class TestStructure:
         assert before != after
 ```
 
+既存の `conftest.py` に `conn`, `uitree`, `editor`, `console` fixture がある場合はテンプレートの fixture 定義を省略し、conftest に委譲する。
+
+動的な値（タイムスタンプ、プログレス%等）を持つラベルは等値比較ではなくフォーマット検証を使う:
+```python
+assert result["text"].endswith("%")  # "65%" 等
+```
+
 テストの種別に応じてクラスを追加する:
 - `TestMenuButtons` — Functional (click → text 検証)
 - `TestSmoke` — 全ボタンクリック + エラーなし
