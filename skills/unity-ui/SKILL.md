@@ -25,6 +25,7 @@ metadata:
 | Visual Regression | 外観が変わっていないか | screenshot → 画像比較 | 必要 |
 | Structural Snapshot | ツリー構造が変わっていないか | dump --json → diff | 不要 |
 | Smoke | 最低限動くか | click → console にエラーなし | 任意 |
+| Monkey | ランダム操作でクラッシュしないか | monkey → errors 確認 | 不要 |
 
 ## UI システム判定
 
@@ -69,6 +70,29 @@ u uitree click ref_5_48 --count 2                    # ダブルクリック
 u uitree click ref_5_48 --button 1                   # 右クリック
 u uitree scroll -p "PanelSettings" -n "ScrollArea" --y 100
 ```
+
+### モンキーテスト
+
+```bash
+u uitree monkey -p "PanelSettings" -c "action-btn" --count 50 --seed 42
+u uitree monkey -p "PanelSettings" --duration 30 --seed 42
+u uitree monkey -p "PanelSettings" -c "action-btn" --stop-on-error --json
+```
+
+query でフィルタした要素をランダムに click し、コンソールエラーを監視する。
+`-c` (USS class) か `-t` (type) のフィルタが必須（フィルタなしでは要素が見つからない）。
+`--seed` で操作順を再現可能。
+
+### スナップショット
+
+```bash
+u uitree snapshot save -p "PanelSettings" --name baseline    # 現在のツリーを保存
+u uitree snapshot diff -p "PanelSettings" --name baseline    # baseline との差分
+u uitree snapshot list                                        # 保存済み一覧
+u uitree snapshot delete --name baseline                      # 削除
+```
+
+diff 出力: 要素の追加(`+`)/削除(`-`)/classes 変化(`~`) を検出。
 
 ### スクリーンショット
 
@@ -234,7 +258,35 @@ assert result["text"].endswith("%")  # "65%" 等
 - `TestMenuButtons` — Functional (click → text 検証)
 - `TestSmoke` — 全ボタンクリック + エラーなし
 - `TestStructure` — ツリー構造の変化検出
+- `TestMonkey` — ランダム操作でエラーなし
 - `TestVisual` — screenshot 撮影（画像比較は手動 or 別ツール）
+
+Monkey テスト例:
+```python
+from unity_cli.api.uitree_monkey import MonkeyRunner
+
+class TestMonkey:
+    def test_random_clicks_no_errors(self, uitree: UITreeAPI, console: ConsoleAPI) -> None:
+        runner = MonkeyRunner(uitree, console)
+        result = runner.run(panel=PANEL, class_filter="<操作対象class>", count=50, seed=42, interval=0.2)
+        assert result.errors == [], f"Monkey errors: {result.errors}"
+```
+
+Snapshot テスト例:
+```python
+from unity_cli.api.uitree_snapshot import SnapshotStore
+
+class TestSnapshot:
+    def test_save_and_diff_no_changes(self, uitree: UITreeAPI, tmp_path) -> None:
+        store = SnapshotStore(snapshot_dir=tmp_path / "snapshots")
+        data = uitree.dump(panel=PANEL, format="json")
+        store.save("baseline", data)
+        current = uitree.dump(panel=PANEL, format="json")
+        result = store.diff("baseline", current)
+        assert result["added"] == []
+        assert result["removed"] == []
+        assert result["changed"] == []
+```
 
 ### Phase 3: PlayMode テスト移植
 
