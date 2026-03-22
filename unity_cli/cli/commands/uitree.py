@@ -20,9 +20,18 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
+import re
+
 uitree_app = typer.Typer(help="UI Toolkit tree commands")
 snapshot_app = typer.Typer(help="UI tree snapshot commands")
 uitree_app.add_typer(snapshot_app, name="snapshot")
+
+_SNAPSHOT_NAME_RE = re.compile(r"^[\w.\-]+$")
+
+
+def _validate_snapshot_name(name: str) -> None:
+    if not _SNAPSHOT_NAME_RE.fullmatch(name):
+        raise typer.BadParameter(f"Invalid snapshot name: {name!r}. Use alphanumeric, dot, hyphen, underscore.")
 
 
 @uitree_app.command("dump")
@@ -696,6 +705,7 @@ def snapshot_save(
     """
     from unity_cli.api.uitree_snapshot import SnapshotStore
 
+    _validate_snapshot_name(name)
     context: CLIContext = ctx.obj
     data = context.client.uitree.dump(panel=panel, format="json")
     path = SnapshotStore().save(name, data)
@@ -761,6 +771,7 @@ def snapshot_delete(
     """Delete a saved snapshot."""
     from unity_cli.api.uitree_snapshot import SnapshotStore
 
+    _validate_snapshot_name(name)
     if SnapshotStore().delete(name):
         print_success(f"Deleted snapshot '{name}'")
     else:

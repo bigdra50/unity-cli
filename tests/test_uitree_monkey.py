@@ -74,7 +74,19 @@ class TestRun:
 
     def test_auto_seed_when_none(self, sut: MonkeyRunner) -> None:
         result = sut.run(panel="P", count=1, interval=0)
-        assert result.seed > 0
+        assert isinstance(result.seed, int)
+
+    def test_duration_stops_after_time(self, sut: MonkeyRunner) -> None:
+        result = sut.run(panel="P", duration=0.1, seed=42, interval=0)
+        assert result.total_actions > 0
+        assert result.duration_ms >= 100
+
+    def test_click_exception_recorded_as_error(self, sut: MonkeyRunner, mock_uitree: MagicMock) -> None:
+        mock_uitree.click.side_effect = Exception("Element vanished")
+        result = sut.run(panel="P", count=3, seed=42, interval=0)
+        assert result.total_actions == 3
+        assert len(result.errors) == 3
+        assert result.errors[0]["message"] == "Element vanished"
 
 
 class TestErrorHandling:

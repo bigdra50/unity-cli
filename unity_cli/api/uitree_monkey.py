@@ -102,7 +102,11 @@ class MonkeyRunner:
     def _perform_action(self, rng: random.Random, elements: list[dict[str, Any]], result: MonkeyResult) -> None:
         """Pick a random element and click it."""
         target = rng.choice(elements)
-        self._uitree.click(ref=target["ref"])
+        try:
+            self._uitree.click(ref=target["ref"])
+        except Exception as e:
+            result.errors.append({"message": str(e), "ref": target["ref"]})
+            return
         result.actions.append(
             {
                 "ref": target["ref"],
