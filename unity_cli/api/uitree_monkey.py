@@ -120,7 +120,7 @@ class MonkeyRunner:
             type=type_filter,
             class_name=class_filter,
         )
-        elements: list[dict[str, Any]] = resp.get("elements", [])
+        elements: list[dict[str, Any]] = resp.get("matches", [])
         return elements
 
     def _check_errors(self) -> list[dict[str, Any]]:

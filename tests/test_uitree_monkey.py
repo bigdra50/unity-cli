@@ -13,7 +13,7 @@ from unity_cli.api.uitree_monkey import MonkeyRunner
 def mock_uitree() -> MagicMock:
     uitree = MagicMock()
     uitree.query.return_value = {
-        "elements": [
+        "matches": [
             {"ref": "ref_1", "name": "Btn1", "type": "VisualElement"},
             {"ref": "ref_2", "name": "Btn2", "type": "VisualElement"},
             {"ref": "ref_3", "name": "Btn3", "type": "VisualElement"},
@@ -108,6 +108,6 @@ class TestErrorHandling:
 
 class TestEmptyElements:
     def test_stops_when_no_elements(self, sut: MonkeyRunner, mock_uitree: MagicMock) -> None:
-        mock_uitree.query.return_value = {"elements": []}
+        mock_uitree.query.return_value = {"matches": []}
         result = sut.run(panel="P", count=10, seed=42, interval=0)
         assert result.total_actions == 0
