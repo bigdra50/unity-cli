@@ -145,6 +145,9 @@ def main(
         config.relay_port = relay_port
     if timeout is not None:
         config.timeout = timeout
+        timeout_ms = int(timeout * 1000)
+        config.timeout_ms = timeout_ms
+        config.retry_max_time_ms = max(config.retry_max_time_ms, timeout_ms + 15000)
     if instance is not None:
         resolved = Path(instance).resolve()
         config.instance = str(resolved) if resolved.is_dir() else instance
