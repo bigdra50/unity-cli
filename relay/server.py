@@ -282,9 +282,10 @@ class RelayServer:
                     )
                     await self._handle_unity_message(instance, msg)
                 except TimeoutError:
-                    # Check heartbeat timeout
-                    if await self.registry.handle_heartbeat_timeout(instance_id, HEARTBEAT_TIMEOUT_MS):
-                        break
+                    # Don't disconnect here — let _heartbeat_loop handle retries via PING/PONG.
+                    # The read timeout just means no messages arrived; the heartbeat loop
+                    # independently tracks liveness with 3-retry logic.
+                    continue
         finally:
             # Cleanup
             if instance_id in self._heartbeat_tasks:
@@ -616,10 +617,11 @@ class RelayServer:
     ) -> dict[str, Any]:
         """Handle BUSY instance by enqueuing or returning error."""
         if not instance.queue_enabled:
+            detail_suffix = f" ({instance.status_detail})" if instance.status_detail else ""
             return ErrorMessage.from_code(
                 request_id,
                 ErrorCode.INSTANCE_BUSY,
-                f"Instance is busy: {instance.instance_id}. The instance is processing another command. Retry the command after a few seconds.",
+                f"Instance is busy{detail_suffix}: {instance.instance_id}. Retry the command after a few seconds.",
             ).to_dict()
 
         future: asyncio.Future[dict[str, Any]] = asyncio.Future()
