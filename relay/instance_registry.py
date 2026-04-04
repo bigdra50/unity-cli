@@ -493,6 +493,9 @@ class InstanceRegistry:
         """
         Check if an instance has timed out on heartbeat.
         Returns True if the instance was disconnected due to timeout.
+
+        Note: Not called from production code — liveness is managed by
+        RelayServer._heartbeat_loop (PING/PONG + 3-retry). Retained for tests.
         """
         instance = self._instances.get(instance_id)
         if not instance:
