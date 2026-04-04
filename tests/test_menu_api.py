@@ -10,12 +10,6 @@ from unity_cli.api.menu import MenuAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    """Create a mock relay connection."""
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> MenuAPI:
     """Create a MenuAPI instance with mock connection."""
     return MenuAPI(mock_conn)

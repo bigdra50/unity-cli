@@ -10,12 +10,6 @@ from unity_cli.api.editor import EditorAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    """Create a mock relay connection."""
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> EditorAPI:
     """Create an EditorAPI instance with mock connection."""
     return EditorAPI(mock_conn)

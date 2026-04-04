@@ -10,11 +10,6 @@ from unity_cli.api.uitree import UITreeAPI, _strip_panel_count
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> UITreeAPI:
     return UITreeAPI(mock_conn)
 

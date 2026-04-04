@@ -10,11 +10,6 @@ from unity_cli.api.profiler import ProfilerAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> ProfilerAPI:
     return ProfilerAPI(mock_conn)
 

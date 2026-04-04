@@ -134,8 +134,20 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run tests
-        run: uv run pytest tests/ -v
+      - name: Run tests with coverage
+        run: >
+          uv run python -m pytest tests/ -v
+          --cov=relay --cov=unity_cli
+          --cov-report=term-missing
+          --cov-report=html:htmlcov
+          --cov-fail-under=60
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
 
   build:
     runs-on: ubuntu-latest

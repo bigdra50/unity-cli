@@ -10,11 +10,6 @@ from unity_cli.api.build import BuildAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> BuildAPI:
     return BuildAPI(mock_conn)
 
