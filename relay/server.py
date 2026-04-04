@@ -50,6 +50,7 @@ _VALID_DETAILS = frozenset(
         "running_tests",
         "asset_import",
         "playmode_transition",
+        "editor_blocked",
     }
 )
 _MAX_DETAIL_LEN = 64

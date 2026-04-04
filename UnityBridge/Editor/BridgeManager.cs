@@ -151,6 +151,10 @@ namespace UnityBridge
 
             // Ensure update handler is registered
             EnsureUpdateRegistered();
+
+            // Force editor to tick even when unfocused, so the command is processed immediately.
+            // Without this, EditorApplication.update stops firing when Unity loses focus.
+            EditorApplication.QueuePlayerLoopUpdate();
         }
 
         private void EnsureUpdateRegistered()

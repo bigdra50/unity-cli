@@ -12,7 +12,7 @@ class TestSanitizeDetail:
 
     @pytest.mark.parametrize(
         "value",
-        ["compiling", "running_tests", "asset_import", "playmode_transition"],
+        ["compiling", "running_tests", "asset_import", "playmode_transition", "editor_blocked"],
     )
     def test_valid_detail_passes(self, value: str) -> None:
         assert _sanitize_detail(value) == value

@@ -100,6 +100,7 @@ namespace UnityBridge
         public const string RunningTests = "running_tests";
         public const string AssetImport = "asset_import";
         public const string PlaymodeTransition = "playmode_transition";
+        public const string EditorBlocked = "editor_blocked";
     }
 
     /// <summary>
