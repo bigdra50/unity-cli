@@ -115,9 +115,9 @@ namespace UnityBridge
             Volatile.Write(ref _lastUpdateTick, Stopwatch.GetTimestamp());
 
             // If watchdog sent editor_blocked, force re-evaluation on recovery
-            if (_blockedSent)
+            if (Volatile.Read(ref _blockedSent))
             {
-                _blockedSent = false;
+                Volatile.Write(ref _blockedSent, false);
                 _lastSentPhase = null;
                 BridgeLog.Verbose("[EditorStateCache] Main thread resumed, clearing editor_blocked");
             }
@@ -183,7 +183,7 @@ namespace UnityBridge
         /// </summary>
         private static async void OnWatchdogTick(object state)
         {
-            if (_domainReloadPending || _blockedSent) return;
+            if (_domainReloadPending || Volatile.Read(ref _blockedSent)) return;
 
             long elapsed = Stopwatch.GetTimestamp() - Volatile.Read(ref _lastUpdateTick);
             if (elapsed < BlockedThresholdTicks) return;
@@ -194,7 +194,7 @@ namespace UnityBridge
             try
             {
                 await manager.Client.SendStatusAsync(InstanceStatus.Busy, ActivityPhase.EditorBlocked);
-                _blockedSent = true;
+                Volatile.Write(ref _blockedSent, true);
                 _lastSentPhase = ActivityPhase.EditorBlocked;
                 BridgeLog.Verbose("[EditorStateCache] Main thread stall detected, sent editor_blocked");
             }
