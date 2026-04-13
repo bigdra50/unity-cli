@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading;
 using UnityEditor;
 using Debug = UnityEngine.Debug;
 
@@ -27,13 +28,38 @@ namespace UnityBridge.Helpers
 
         private const string EnabledKey = "UnityBridge.LogEnabled";
 
+        // EditorPrefs is main-thread only. The send path in RelayClient runs
+        // continuations on the thread pool (ConfigureAwait(false)) so PONG cannot be
+        // starved by a stalled main thread, which means BridgeLog must be safe to call
+        // from any thread. Cache the toggle here and refresh it on the main thread via
+        // [InitializeOnLoadMethod] and the setter.
+        private static int _enabledCache = 1;
+
+        [InitializeOnLoadMethod]
+        private static void RefreshEnabledCache()
+        {
+            try
+            {
+                Volatile.Write(ref _enabledCache, EditorPrefs.GetBool(EnabledKey, true) ? 1 : 0);
+            }
+            catch
+            {
+                // Fall back to enabled if EditorPrefs is unavailable (e.g. batch mode init order)
+                Volatile.Write(ref _enabledCache, 1);
+            }
+        }
+
         /// <summary>
         /// Enable or disable all console logging.
         /// </summary>
         public static bool Enabled
         {
-            get => EditorPrefs.GetBool(EnabledKey, true);
-            set => EditorPrefs.SetBool(EnabledKey, value);
+            get => Volatile.Read(ref _enabledCache) != 0;
+            set
+            {
+                EditorPrefs.SetBool(EnabledKey, value);
+                Volatile.Write(ref _enabledCache, value ? 1 : 0);
+            }
         }
 
         /// <summary>
