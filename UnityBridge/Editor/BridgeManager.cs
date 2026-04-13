@@ -21,6 +21,12 @@ namespace UnityBridge
         private bool _isProcessing;
 
         /// <summary>
+        /// Whether the EditorApplication.update handler that drains the command queue
+        /// is currently registered. Exposed for tests so they do not need reflection.
+        /// </summary>
+        internal bool IsUpdateRegistered => _updateRegistered;
+
+        /// <summary>
         /// Singleton instance
         /// </summary>
         public static BridgeManager Instance
