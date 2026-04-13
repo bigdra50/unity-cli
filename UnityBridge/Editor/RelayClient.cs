@@ -66,6 +66,12 @@ namespace UnityBridge
         private readonly SemaphoreSlim _sendLock = new(1, 1);
         private bool _disposed;
 
+        // Upper bound on _sendLock waits for latency-sensitive sends. PONG must
+        // respond before the relay heartbeat window expires; STATUS is informational
+        // and can be dropped on timeout.
+        private const int PongLockTimeoutMs = 3000;
+        private const int StatusLockTimeoutMs = 5000;
+
         private readonly string _host;
         private readonly int _port;
         private int _heartbeatIntervalMs = ProtocolConstants.HeartbeatIntervalMs;
@@ -245,7 +251,18 @@ namespace UnityBridge
                 return;
 
             var statusMsg = Messages.CreateStatus(InstanceId, status, detail);
-            await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
+            var token = _cts?.Token ?? CancellationToken.None;
+
+            // Bound the wait so a stuck send cannot block STATUS forever. On timeout
+            // we throw so callers (e.g. EditorStateCache) do not advance their
+            // "last sent" bookkeeping based on a message that never went out.
+            if (!await _sendLock.WaitAsync(StatusLockTimeoutMs, token))
+            {
+                var msg =
+                    $"SendStatusAsync lock timed out after {StatusLockTimeoutMs}ms (status={status})";
+                BridgeLog.Warn(msg);
+                throw new TimeoutException(msg);
+            }
             try
             {
                 await Framing.WriteFrameAsync(_stream, statusMsg);
@@ -378,9 +395,20 @@ namespace UnityBridge
         private async Task HandlePingAsync(JObject msg, CancellationToken cancellationToken)
         {
             var pingTs = Messages.ParsePing(msg);
-
             var pongMsg = Messages.CreatePong(pingTs);
-            await _sendLock.WaitAsync(cancellationToken);
+
+            // PONG is the most latency-critical send. Bound the lock wait so a stuck
+            // sender cannot starve PONG indefinitely. On timeout we drop this PONG
+            // rather than racing another writer (which would corrupt the framed stream);
+            // if PONGs keep failing the relay will close the connection on its own and
+            // we will reconnect via BridgeReloadHandler.
+            if (!await _sendLock.WaitAsync(PongLockTimeoutMs, cancellationToken))
+            {
+                BridgeLog.Warn(
+                    $"PONG send lock timed out after {PongLockTimeoutMs}ms — dropping this PONG");
+                return;
+            }
+
             try
             {
                 await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken);
