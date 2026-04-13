@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -82,12 +81,7 @@ namespace UnityBridge
         }
 
         private static bool GetUpdateRegistered(BridgeManager manager)
-        {
-            var field = typeof(BridgeManager).GetField("_updateRegistered",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.That(field, Is.Not.Null, "_updateRegistered フィールドが存在すること。");
-            return (bool)field!.GetValue(manager);
-        }
+            => manager.IsUpdateRegistered;
 
         private sealed class StubCommandDispatcher : ICommandDispatcher
         {
