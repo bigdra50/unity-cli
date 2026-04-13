@@ -95,9 +95,10 @@ namespace UnityBridge
             Host = host;
             Port = port;
 
-            Client = _clientFactory(host, port);
-            Client.StatusChanged += OnClientStatusChanged;
-            Client.CommandReceived += OnCommandReceived;
+            var client = _clientFactory(host, port);
+            client.StatusChanged += OnClientStatusChanged;
+            client.CommandReceived += OnCommandReceived;
+            Client = client;
 
             // Register the EditorApplication.update handler on the main thread BEFORE
             // the receive loop can start firing CommandReceived from a background thread.
@@ -106,7 +107,29 @@ namespace UnityBridge
             // receive thread) does not work.
             EnsureUpdateRegistered();
 
-            await Client.ConnectAsync();
+            try
+            {
+                await client.ConnectAsync();
+            }
+            catch
+            {
+                // Roll back partial setup so a retry starts from a clean state.
+                client.StatusChanged -= OnClientStatusChanged;
+                client.CommandReceived -= OnCommandReceived;
+                UnregisterUpdate();
+                Client = null;
+
+                try
+                {
+                    await client.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception disposeEx)
+                {
+                    BridgeLog.Warn($"Dispose error during ConnectAsync rollback (ignored): {disposeEx.Message}");
+                }
+
+                throw;
+            }
 
             // Register for reload handling
             BridgeReloadHandler.RegisterClient(Client, host, port);
