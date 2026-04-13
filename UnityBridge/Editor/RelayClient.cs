@@ -66,6 +66,12 @@ namespace UnityBridge
         private readonly SemaphoreSlim _sendLock = new(1, 1);
         private bool _disposed;
 
+        // Upper bound on _sendLock waits for latency-sensitive sends. PONG must
+        // respond before the relay heartbeat window expires; STATUS is informational
+        // and can be dropped on timeout.
+        private const int PongLockTimeoutMs = 3000;
+        private const int StatusLockTimeoutMs = 5000;
+
         private readonly string _host;
         private readonly int _port;
         private int _heartbeatIntervalMs = ProtocolConstants.HeartbeatIntervalMs;
@@ -178,6 +184,11 @@ namespace UnityBridge
                     UnityVersion,
                     Capabilities);
 
+                // No ConfigureAwait(false) here: callers (BridgeManager.ConnectAsync,
+                // BridgeReloadHandler.ReconnectAsync) follow ConnectAsync with
+                // main-thread API calls (e.g. UnityEngine.Application.productName,
+                // BridgeLog -> EditorPrefs), so the continuation must stay on the
+                // Unity main thread.
                 await _sendLock.WaitAsync(cancellationToken);
                 try
                 {
@@ -245,10 +256,23 @@ namespace UnityBridge
                 return;
 
             var statusMsg = Messages.CreateStatus(InstanceId, status, detail);
-            await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
+            var token = _cts?.Token ?? CancellationToken.None;
+
+            // Bound the wait so a stuck send cannot block STATUS forever. On timeout
+            // we throw so callers (e.g. EditorStateCache) do not advance their
+            // "last sent" bookkeeping based on a message that never went out.
+            if (!await _sendLock.WaitAsync(StatusLockTimeoutMs, token).ConfigureAwait(false))
+            {
+                var msg =
+                    $"SendStatusAsync lock timed out after {StatusLockTimeoutMs}ms (status={status})";
+                BridgeLog.Warn(msg);
+                throw new TimeoutException(msg);
+            }
             try
             {
-                await Framing.WriteFrameAsync(_stream, statusMsg);
+                // Pass the token so a Disconnect cancels an in-flight write instead of
+                // letting NetworkStream.WriteAsync hang while holding _sendLock.
+                await Framing.WriteFrameAsync(_stream, statusMsg, token).ConfigureAwait(false);
             }
             finally
             {
@@ -306,10 +330,17 @@ namespace UnityBridge
 
             try
             {
-                await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
+                var token = _cts?.Token ?? CancellationToken.None;
+
+                // ConfigureAwait(false) keeps the lock-holding continuation off the
+                // Unity main thread so a non-focused editor cannot stall this send
+                // and starve PONG / STATUS waiting on _sendLock.
+                await _sendLock.WaitAsync(token).ConfigureAwait(false);
                 try
                 {
-                    await Framing.WriteFrameAsync(_stream, message);
+                    // Pass the token so a Disconnect cancels an in-flight write instead
+                    // of letting NetworkStream.WriteAsync hang while holding _sendLock.
+                    await Framing.WriteFrameAsync(_stream, message, token).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -335,8 +366,8 @@ namespace UnityBridge
             {
                 while (!cancellationToken.IsCancellationRequested && _client is { Connected: true })
                 {
-                    var msg = await Framing.ReadFrameAsync(_stream, cancellationToken);
-                    await HandleMessageAsync(msg, cancellationToken);
+                    var msg = await Framing.ReadFrameAsync(_stream, cancellationToken).ConfigureAwait(false);
+                    await HandleMessageAsync(msg, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -348,7 +379,7 @@ namespace UnityBridge
                 if (!cancellationToken.IsCancellationRequested)
                 {
                     BridgeLog.Error($"Receive loop error: {ex.Message}");
-                    await DisconnectInternalAsync();
+                    await DisconnectInternalAsync().ConfigureAwait(false);
                 }
             }
 
@@ -378,12 +409,23 @@ namespace UnityBridge
         private async Task HandlePingAsync(JObject msg, CancellationToken cancellationToken)
         {
             var pingTs = Messages.ParsePing(msg);
-
             var pongMsg = Messages.CreatePong(pingTs);
-            await _sendLock.WaitAsync(cancellationToken);
+
+            // PONG is the most latency-critical send. Bound the lock wait so a stuck
+            // sender cannot starve PONG indefinitely. On timeout we drop this PONG
+            // rather than racing another writer (which would corrupt the framed stream);
+            // if PONGs keep failing the relay will close the connection on its own and
+            // we will reconnect via BridgeReloadHandler.
+            if (!await _sendLock.WaitAsync(PongLockTimeoutMs, cancellationToken).ConfigureAwait(false))
+            {
+                BridgeLog.Warn(
+                    $"PONG send lock timed out after {PongLockTimeoutMs}ms — dropping this PONG");
+                return;
+            }
+
             try
             {
-                await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken);
+                await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken).ConfigureAwait(false);
             }
             finally
             {

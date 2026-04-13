@@ -21,6 +21,12 @@ namespace UnityBridge
         private bool _isProcessing;
 
         /// <summary>
+        /// Whether the EditorApplication.update handler that drains the command queue
+        /// is currently registered. Exposed for tests so they do not need reflection.
+        /// </summary>
+        internal bool IsUpdateRegistered => _updateRegistered;
+
+        /// <summary>
         /// Singleton instance
         /// </summary>
         public static BridgeManager Instance
@@ -95,11 +101,41 @@ namespace UnityBridge
             Host = host;
             Port = port;
 
-            Client = _clientFactory(host, port);
-            Client.StatusChanged += OnClientStatusChanged;
-            Client.CommandReceived += OnCommandReceived;
+            var client = _clientFactory(host, port);
+            client.StatusChanged += OnClientStatusChanged;
+            client.CommandReceived += OnCommandReceived;
+            Client = client;
 
-            await Client.ConnectAsync();
+            // Register the EditorApplication.update handler on the main thread BEFORE
+            // the receive loop can start firing CommandReceived from a background thread.
+            // EditorApplication.update is silently no-op when assigned from a background
+            // thread, so registering it inside OnCommandReceived (which runs on the
+            // receive thread) does not work.
+            EnsureUpdateRegistered();
+
+            try
+            {
+                await client.ConnectAsync();
+            }
+            catch
+            {
+                // Roll back partial setup so a retry starts from a clean state.
+                client.StatusChanged -= OnClientStatusChanged;
+                client.CommandReceived -= OnCommandReceived;
+                UnregisterUpdate();
+                Client = null;
+
+                try
+                {
+                    await client.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception disposeEx)
+                {
+                    BridgeLog.Warn($"Dispose error during ConnectAsync rollback (ignored): {disposeEx.Message}");
+                }
+
+                throw;
+            }
 
             // Register for reload handling
             BridgeReloadHandler.RegisterClient(Client, host, port);
@@ -146,15 +182,14 @@ namespace UnityBridge
         {
             BridgeLog.Verbose($"Queuing command for main thread: {e.Command} (id: {e.Id})");
 
-            // Queue command for main thread execution
+            // This handler runs on the RelayClient receive thread (background).
+            // ConcurrentQueue.Enqueue is thread-safe; the EditorApplication.update
+            // handler registered during ConnectAsync drains the queue on the main thread.
+            //
+            // Do NOT call EditorApplication.* APIs here — they are silently ignored
+            // when called from background threads, which previously caused commands to
+            // pile up unprocessed and time out on the relay side.
             _commandQueue.Enqueue(e);
-
-            // Ensure update handler is registered
-            EnsureUpdateRegistered();
-
-            // Force editor to tick even when unfocused, so the command is processed immediately.
-            // Without this, EditorApplication.update stops firing when Unity loses focus.
-            EditorApplication.QueuePlayerLoopUpdate();
         }
 
         private void EnsureUpdateRegistered()
