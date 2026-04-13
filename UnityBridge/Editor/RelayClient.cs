@@ -184,6 +184,11 @@ namespace UnityBridge
                     UnityVersion,
                     Capabilities);
 
+                // No ConfigureAwait(false) here: callers (BridgeManager.ConnectAsync,
+                // BridgeReloadHandler.ReconnectAsync) follow ConnectAsync with
+                // main-thread API calls (e.g. UnityEngine.Application.productName,
+                // BridgeLog -> EditorPrefs), so the continuation must stay on the
+                // Unity main thread.
                 await _sendLock.WaitAsync(cancellationToken);
                 try
                 {
@@ -256,7 +261,7 @@ namespace UnityBridge
             // Bound the wait so a stuck send cannot block STATUS forever. On timeout
             // we throw so callers (e.g. EditorStateCache) do not advance their
             // "last sent" bookkeeping based on a message that never went out.
-            if (!await _sendLock.WaitAsync(StatusLockTimeoutMs, token))
+            if (!await _sendLock.WaitAsync(StatusLockTimeoutMs, token).ConfigureAwait(false))
             {
                 var msg =
                     $"SendStatusAsync lock timed out after {StatusLockTimeoutMs}ms (status={status})";
@@ -265,7 +270,7 @@ namespace UnityBridge
             }
             try
             {
-                await Framing.WriteFrameAsync(_stream, statusMsg);
+                await Framing.WriteFrameAsync(_stream, statusMsg).ConfigureAwait(false);
             }
             finally
             {
@@ -323,10 +328,13 @@ namespace UnityBridge
 
             try
             {
-                await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None);
+                // ConfigureAwait(false) keeps the lock-holding continuation off the
+                // Unity main thread so a non-focused editor cannot stall this send
+                // and starve PONG / STATUS waiting on _sendLock.
+                await _sendLock.WaitAsync(_cts?.Token ?? CancellationToken.None).ConfigureAwait(false);
                 try
                 {
-                    await Framing.WriteFrameAsync(_stream, message);
+                    await Framing.WriteFrameAsync(_stream, message).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -352,8 +360,8 @@ namespace UnityBridge
             {
                 while (!cancellationToken.IsCancellationRequested && _client is { Connected: true })
                 {
-                    var msg = await Framing.ReadFrameAsync(_stream, cancellationToken);
-                    await HandleMessageAsync(msg, cancellationToken);
+                    var msg = await Framing.ReadFrameAsync(_stream, cancellationToken).ConfigureAwait(false);
+                    await HandleMessageAsync(msg, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -365,7 +373,7 @@ namespace UnityBridge
                 if (!cancellationToken.IsCancellationRequested)
                 {
                     BridgeLog.Error($"Receive loop error: {ex.Message}");
-                    await DisconnectInternalAsync();
+                    await DisconnectInternalAsync().ConfigureAwait(false);
                 }
             }
 
@@ -402,7 +410,7 @@ namespace UnityBridge
             // rather than racing another writer (which would corrupt the framed stream);
             // if PONGs keep failing the relay will close the connection on its own and
             // we will reconnect via BridgeReloadHandler.
-            if (!await _sendLock.WaitAsync(PongLockTimeoutMs, cancellationToken))
+            if (!await _sendLock.WaitAsync(PongLockTimeoutMs, cancellationToken).ConfigureAwait(false))
             {
                 BridgeLog.Warn(
                     $"PONG send lock timed out after {PongLockTimeoutMs}ms — dropping this PONG");
@@ -411,7 +419,7 @@ namespace UnityBridge
 
             try
             {
-                await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken);
+                await Framing.WriteFrameAsync(_stream, pongMsg, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
