@@ -65,6 +65,22 @@ namespace UnityBridge
             }
         }
 
+        [Test]
+        public void ConnectAsync_WhenClientConnectThrows_RollsBackState()
+        {
+            var stubClient = new StubRelayClient { ConnectThrows = true };
+            var manager = new BridgeManager(new StubCommandDispatcher(), (_, _) => stubClient);
+
+            Assert.ThrowsAsync<InvalidOperationException>(async () => await manager.ConnectAsync());
+
+            Assert.That(GetUpdateRegistered(manager), Is.False,
+                "ConnectAsync が失敗した場合、UnregisterUpdate でハンドラ登録が解除されていること。");
+            Assert.That(manager.Client, Is.Null,
+                "ConnectAsync が失敗した場合、Client プロパティは null に戻っていること。");
+            Assert.That(stubClient.DisposeCalled, Is.True,
+                "ConnectAsync が失敗した場合、Client.DisposeAsync が呼ばれていること。");
+        }
+
         private static bool GetUpdateRegistered(BridgeManager manager)
         {
             var field = typeof(BridgeManager).GetField("_updateRegistered",
@@ -90,11 +106,17 @@ namespace UnityBridge
             public string UnityVersion => "6000.0.0f1";
             public string[] Capabilities { get; set; } = Array.Empty<string>();
 
+            public bool ConnectThrows { get; set; }
+            public bool DisposeCalled { get; private set; }
+
             public event EventHandler<ConnectionStatusChangedEventArgs> StatusChanged;
             public event EventHandler<CommandReceivedEventArgs> CommandReceived;
 
             public Task ConnectAsync(CancellationToken cancellationToken = default)
             {
+                if (ConnectThrows)
+                    throw new InvalidOperationException("stub connect failure");
+
                 IsConnected = true;
                 StatusChanged?.Invoke(this,
                     new ConnectionStatusChangedEventArgs(ConnectionStatus.Disconnected, ConnectionStatus.Connected));
@@ -112,8 +134,8 @@ namespace UnityBridge
             public Task SendReadyStatusAsync() => Task.CompletedTask;
             public Task SendCommandResultAsync(string id, JObject data) => Task.CompletedTask;
             public Task SendCommandErrorAsync(string id, string code, string message) => Task.CompletedTask;
-            public void Dispose() { }
-            public ValueTask DisposeAsync() => default;
+            public void Dispose() { DisposeCalled = true; }
+            public ValueTask DisposeAsync() { DisposeCalled = true; return default; }
         }
     }
 }
