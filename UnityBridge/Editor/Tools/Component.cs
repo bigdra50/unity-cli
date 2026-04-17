@@ -348,11 +348,29 @@ namespace UnityBridge.Tools
                         var obj = EditorUtility.InstanceIDToObject(value.Value<int>());
                         sp.objectReferenceValue = obj;
                     }
+                    else if (value.Type == JTokenType.String)
+                    {
+                        var path = value.Value<string>();
+                        UnityEngine.Object obj = AssetDatabase.LoadMainAssetAtPath(path);
+                        if (obj == null)
+                        {
+                            throw new ProtocolException(
+                                ErrorCode.InvalidParams,
+                                $"Asset not found at path: {path}");
+                        }
+                        if (obj is Texture2D)
+                        {
+                            var sprite = AssetDatabase.LoadAllAssetsAtPath(path)
+                                .OfType<Sprite>().FirstOrDefault();
+                            if (sprite != null) obj = sprite;
+                        }
+                        sp.objectReferenceValue = obj;
+                    }
                     else
                     {
                         throw new ProtocolException(
                             ErrorCode.InvalidParams,
-                            "ObjectReference value must be null, empty string, or instanceID (integer)");
+                            "ObjectReference value must be null, empty string, instanceID (integer), or asset path (string)");
                     }
                     break;
                 default:

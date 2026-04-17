@@ -75,6 +75,14 @@ def gameobject_create(
             help="Primitive type: Cube, Sphere, Capsule, Cylinder, Plane, Quad (omit for empty GameObject)",
         ),
     ] = None,
+    parent: Annotated[
+        str | None,
+        typer.Option("--parent", help="Parent GameObject name"),
+    ] = None,
+    parent_id: Annotated[
+        int | None,
+        typer.Option("--parent-id", help="Parent GameObject instance ID"),
+    ] = None,
     position: Annotated[
         tuple[float, float, float] | None,
         typer.Option("--position", help="Position (X Y Z)"),
@@ -104,6 +112,8 @@ def gameobject_create(
     result = context.client.gameobject.create(
         name=name,
         primitive_type=primitive,
+        parent=parent,
+        parent_id=parent_id,
         position=list(position) if position else None,
         rotation=list(rotation) if rotation else None,
         scale=list(scale) if scale else None,

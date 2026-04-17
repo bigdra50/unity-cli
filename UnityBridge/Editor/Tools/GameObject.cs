@@ -111,6 +111,24 @@ namespace UnityBridge.Tools
 
             Undo.RegisterCreatedObjectUndo(newGo, $"Create GameObject '{name}'");
 
+            // Set parent if specified
+            var parentName = parameters["parent"]?.Value<string>();
+            var parentId = parameters["parentId"]?.Value<int>();
+            if (!string.IsNullOrEmpty(parentName) || parentId.HasValue)
+            {
+                var parentGo = GameObjectFinder.Find(parentName, parentId);
+                if (parentGo == null)
+                {
+                    // Clean up the created object before throwing
+                    Undo.DestroyObjectImmediate(newGo);
+                    var reference = !string.IsNullOrEmpty(parentName) ? parentName : parentId!.Value.ToString();
+                    throw new ProtocolException(
+                        ErrorCode.InvalidParams,
+                        $"Parent GameObject not found: '{reference}'");
+                }
+                newGo.transform.SetParent(parentGo.transform, worldPositionStays: false);
+            }
+
             // Apply transform
             ApplyTransform(newGo.transform, parameters);
 
