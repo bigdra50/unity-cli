@@ -19,7 +19,15 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
-profiler_app = typer.Typer(help="Profiler commands")
+profiler_app = typer.Typer(
+    help=(
+        "Drive Unity's Profiler and read frame metrics (FPS, CPU/GPU ms, draw calls,\n"
+        "GC allocs, etc.).\n\n"
+        "Typical flow: 'start' → exercise your app → 'frames -c 60' to summarize the\n"
+        "last N frames, or 'snapshot' for the current frame only. 'stop' pauses data\n"
+        "collection. Works in both EditMode and PlayMode."
+    )
+)
 
 
 @profiler_app.command("status")
@@ -30,7 +38,7 @@ def profiler_status(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Get profiler status."""
+    """Show whether profiling is currently enabled and the captured frame range."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.status()
@@ -47,7 +55,7 @@ def profiler_status(
 
 @profiler_app.command("start")
 def profiler_start(ctx: typer.Context) -> None:
-    """Start profiling."""
+    """Enable Unity's Profiler (starts recording frame data into Unity's ring buffer)."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.start()
@@ -61,7 +69,7 @@ def profiler_start(ctx: typer.Context) -> None:
 
 @profiler_app.command("stop")
 def profiler_stop(ctx: typer.Context) -> None:
-    """Stop profiling."""
+    """Pause the Profiler. Previously captured frames stay available for 'frames'/'snapshot'."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.stop()
@@ -78,7 +86,7 @@ def profiler_snapshot(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Get current frame profiler data."""
+    """Return metrics for the latest profiled frame (FPS, CPU/GPU ms, draw calls, GC allocs)."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.snapshot()
@@ -128,7 +136,11 @@ def profiler_frames(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Get recent N frames summary."""
+    """Return a table of the most recent N profiled frames with per-frame metrics.
+
+    Example:
+        u profiler frames -c 30
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.profiler.frames(count=count)

@@ -54,7 +54,24 @@ from unity_cli.config import UnityCLIConfig
 
 app = typer.Typer(
     name="unity-cli",
-    help="Unity CLI - Control Unity Editor via Relay Server",
+    help=(
+        "Unity CLI - Control a running Unity Editor from the shell or scripts.\n\n"
+        "Sends commands to the Unity Editor via a local Relay Server (TCP:6500).\n"
+        "Lets you: enter/exit play mode, refresh assets, read console logs, run tests,\n"
+        "create/modify GameObjects and Components, execute menu items (including custom\n"
+        "[MenuItem] entries), call arbitrary Unity static APIs, build players, inspect\n"
+        "scenes/UI Toolkit panels, capture screenshots, and more.\n\n"
+        "Quick start:\n"
+        "  u instances                            # List connected Unity Editors\n"
+        "  u -i <project> state                   # Show editor state for a specific project\n"
+        "  u refresh && u console get -l E        # Recompile then show errors+exceptions\n"
+        "  u console get -l W | head -50          # Tail warnings+ (pipe-friendly plain text)\n"
+        "  u console clear                        # Wipe the Console\n"
+        "  u menu exec 'Window/Package Manager'   # Run any menu item (built-in or custom)\n"
+        "  u api schema -t AssetDatabase          # Discover Unity static API methods\n"
+        "\n"
+        "All subcommands accept --help for detailed usage."
+    ),
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -126,7 +143,25 @@ def main(
         ),
     ] = False,
 ) -> None:
-    """Unity CLI - Control Unity Editor via Relay Server."""
+    """Unity CLI - Control a running Unity Editor from the shell or scripts.
+
+    Sends commands to the Unity Editor via a local Relay Server (TCP:6500).
+    Lets you: enter/exit play mode, refresh assets, read console logs, run tests,
+    create/modify GameObjects and Components, execute menu items (including custom
+    [MenuItem] entries), call arbitrary Unity static APIs, build players, inspect
+    scenes/UI Toolkit panels, capture screenshots, and more.
+
+    Quick start:
+      u instances                            # List connected Unity Editors
+      u -i <project> state                   # Show editor state for a specific project
+      u refresh && u console get -l E        # Recompile then show errors+exceptions
+      u console get -l W | head -50          # Tail warnings+ (pipe-friendly plain text)
+      u console clear                        # Wipe the Console
+      u menu exec 'Window/Package Manager'   # Run any menu item (built-in or custom)
+      u api schema -t AssetDatabase          # Discover Unity static API methods
+
+    All subcommands accept --help for detailed usage.
+    """
     from unity_cli.client import UnityClient
 
     # Resolve output mode and configure consoles

@@ -22,7 +22,12 @@ def register(app: typer.Typer) -> None:
             typer.Option("--json", help="Output as JSON"),
         ] = False,
     ) -> None:
-        """Get current editor selection."""
+        """Return the GameObject(s) currently selected in the Hierarchy/Scene view.
+
+        Reports count, the active selection's name/instance ID/tag/layer/scene path,
+        its Transform (position/rotation/scale), and the full list when multiple
+        objects are selected. Empty output means nothing is selected.
+        """
         context: CLIContext = ctx.obj
         try:
             result = context.client.selection.get()

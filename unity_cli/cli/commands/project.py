@@ -12,7 +12,15 @@ from unity_cli.cli.exit_codes import ExitCode
 from unity_cli.cli.helpers import _handle_error, _should_json
 from unity_cli.cli.output import _print_plain_table, get_console, is_no_color, print_error, print_json, print_line
 
-project_app = typer.Typer(help="Project information (file-based, no Relay required)")
+project_app = typer.Typer(
+    help=(
+        "Read project metadata directly from files on disk (no running Editor needed).\n\n"
+        "Parses ProjectSettings/*.asset, Packages/manifest.json, and .asmdef files to\n"
+        "surface Unity version, product info, build scenes, packages, tags/layers,\n"
+        "quality settings, and Assembly Definitions. Safe to run on closed projects\n"
+        "or in CI without a Unity license."
+    )
+)
 
 
 @project_app.command("info")

@@ -21,8 +21,24 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
-uitree_app = typer.Typer(help="UI Toolkit tree commands")
-snapshot_app = typer.Typer(help="UI tree snapshot commands")
+uitree_app = typer.Typer(
+    help=(
+        "Inspect and interact with runtime UI Toolkit (UIElements) panels.\n\n"
+        "Targets PanelSettings-backed runtime UI (UIDocument) and editor windows built\n"
+        "on UI Toolkit — not IMGUI. Supports listing panels, dumping the VisualElement\n"
+        "tree, querying by type/name/USS class, inspecting resolved styles, and driving\n"
+        "interactions (click, scroll, get text). Snapshot sub-commands let you diff\n"
+        "trees over time for regression testing, and 'monkey' fuzzes random actions."
+    )
+)
+snapshot_app = typer.Typer(
+    help=(
+        "Save, list, diff, and delete named UI-tree snapshots.\n\n"
+        "A snapshot freezes a panel's VisualElement tree to disk so you can later\n"
+        "compare the current state against it (added/removed/class-changed elements) —\n"
+        "handy for regression tests and visual-review automation."
+    )
+)
 uitree_app.add_typer(snapshot_app, name="snapshot")
 
 

@@ -10,7 +10,13 @@ from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _exit_usage, _should_json, handle_cli_errors
 from unity_cli.cli.output import print_hierarchy_table, print_json, print_key_value, print_success
 
-scene_app = typer.Typer(help="Scene management commands")
+scene_app = typer.Typer(
+    help=(
+        "Inspect and manage the open Unity scene(s).\n\n"
+        "Get the active scene, walk the GameObject hierarchy (paginated), load a scene\n"
+        "by path/name (single or additive), and save the current scene to an asset path."
+    )
+)
 
 
 @scene_app.command("active")
@@ -22,7 +28,7 @@ def scene_active(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Get active scene info."""
+    """Show the currently active scene (name, path, isDirty, build index)."""
     context: CLIContext = ctx.obj
     result = context.client.scene.get_active()
     if _should_json(context, json_flag):
@@ -43,7 +49,16 @@ def scene_hierarchy(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Get scene hierarchy."""
+    """Dump the active scene's GameObject hierarchy as a tree.
+
+    Results are paginated (--page-size + --cursor) so large scenes stay responsive.
+    Use --depth to limit how deep to recurse (1 = root objects only).
+
+    Examples:
+        u scene hierarchy                # Root GameObjects
+        u scene hierarchy -d 3           # Down to depth 3
+        u scene hierarchy --json         # Machine-readable output
+    """
     context: CLIContext = ctx.obj
     result = context.client.scene.get_hierarchy(
         depth=depth,
@@ -64,7 +79,17 @@ def scene_load(
     name: Annotated[str | None, typer.Option("--name", "-n", help="Scene name")] = None,
     additive: Annotated[bool, typer.Option("--additive", "-a", help="Load additively")] = False,
 ) -> None:
-    """Load a scene."""
+    """Open a scene in the editor (single or additive).
+
+    Identify the scene by asset path (--path) or by scene name (--name).
+    Paths resolve relative to the project (Assets/...). Unsaved changes in the
+    current scene are discarded unless --additive is set.
+
+    Examples:
+        u scene load -p Assets/Scenes/Main.unity
+        u scene load -n Main
+        u scene load -p Assets/Scenes/UI.unity --additive
+    """
     context: CLIContext = ctx.obj
 
     if not path and not name:
@@ -80,7 +105,15 @@ def scene_save(
     ctx: typer.Context,
     path: Annotated[str | None, typer.Option("--path", "-p", help="Save path")] = None,
 ) -> None:
-    """Save current scene."""
+    """Save the active scene.
+
+    Omit --path to overwrite the current file. Pass --path to save-as to a new
+    asset location (creates a new .unity file).
+
+    Examples:
+        u scene save                                 # Save in place
+        u scene save -p Assets/Scenes/Backup.unity   # Save as copy
+    """
     context: CLIContext = ctx.obj
     result = context.client.scene.save(path=path)
     print_success(result.get("message", "Scene saved"))

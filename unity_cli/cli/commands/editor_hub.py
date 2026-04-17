@@ -10,7 +10,14 @@ from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _handle_error, _should_json
 from unity_cli.cli.output import _print_plain_table, get_console, is_no_color, print_json, print_line, print_success
 
-editor_app = typer.Typer(help="Unity Editor management (via Hub)")
+editor_app = typer.Typer(
+    help=(
+        "Manage Unity Editor installations via Unity Hub CLI (no Relay required).\n\n"
+        "Lists locally installed editors (by scanning Hub's config + common install\n"
+        "paths) and invokes Hub's CLI to install new versions with optional modules.\n"
+        "Pairs with 'u open <project>' which auto-picks the right editor for a project."
+    )
+)
 
 
 @editor_app.command("list")
@@ -21,7 +28,10 @@ def editor_list(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List installed Unity editors."""
+    """List every Unity Editor installed on this machine (version + path).
+
+    Scans Unity Hub's config and standard install locations.
+    """
     context: CLIContext = ctx.obj
     from unity_cli.hub.paths import get_installed_editors
 
@@ -61,9 +71,16 @@ def editor_install(
         typer.Option("--changeset", "-c", help="Changeset for non-release versions"),
     ] = None,
 ) -> None:
-    """Install Unity Editor via Hub CLI.
+    """Install a Unity Editor version through Unity Hub's CLI.
 
-    Example: unity-cli editor install 2022.3.10f1 --modules android ios
+    VERSION accepts release tags like '2022.3.10f1', '6000.0.23f1', or beta/alpha
+    tags paired with --changeset. --modules takes Unity platform/module IDs
+    (android, ios, webgl, mac-il2cpp, linux-il2cpp, windows-il2cpp, ...).
+
+    Examples:
+        u editor install 2022.3.10f1
+        u editor install 2022.3.10f1 -m android -m ios
+        u editor install 6000.0.1a14 --changeset abcdef123456
     """
     from unity_cli.exceptions import HubError
     from unity_cli.hub.hub_cli import HubCLI

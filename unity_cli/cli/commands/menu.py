@@ -13,15 +13,37 @@ from unity_cli.cli.helpers import _handle_error, _should_json
 from unity_cli.cli.output import is_no_color, print_error, print_json, print_line, print_plain_item, print_success
 from unity_cli.exceptions import UnityCLIError
 
-menu_app = typer.Typer(help="Menu item commands")
+menu_app = typer.Typer(
+    help=(
+        "Invoke Unity menu items and [ContextMenu] methods.\n\n"
+        "Covers any MenuItem registered with Unity's menu bar — Unity's built-in menus\n"
+        "(Edit/Play, Assets/Refresh, Window/...) AND custom editor tools you or a\n"
+        'package register via [MenuItem("Tools/MyTool")]. This is the go-to way to\n'
+        "trigger editor workflows that have no dedicated CLI command."
+    )
+)
 
 
 @menu_app.command("exec")
 def menu_exec(
     ctx: typer.Context,
-    path: Annotated[str, typer.Argument(help="Menu item path (e.g., 'Edit/Play')")],
+    path: Annotated[str, typer.Argument(help="Menu item path (e.g., 'Edit/Play', 'Tools/MyCustomAction')")],
 ) -> None:
-    """Execute a Unity menu item."""
+    """Execute any Unity menu item by its menu-bar path.
+
+    Works with:
+      - Built-in menus: 'Edit/Play', 'File/Save', 'Assets/Refresh'
+      - Package menus:  'Window/Package Manager', 'Window/Analysis/Profiler'
+      - Custom tools:   any [MenuItem("Path/To/Action")] defined in your project
+
+    Use 'u menu list' (optionally with --filter) to discover available menu paths.
+
+    Examples:
+        u menu exec 'Edit/Play'
+        u menu exec 'Assets/Refresh'
+        u menu exec 'Window/Rendering/Lighting'
+        u menu exec 'Tools/RegenerateData'          # custom [MenuItem]
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.execute(path)
@@ -50,7 +72,15 @@ def menu_list(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List available menu items."""
+    """List Unity menu-bar entries (built-in + custom [MenuItem]).
+
+    Useful for discovering which paths 'u menu exec' can invoke.
+
+    Examples:
+        u menu list                        # All menu items
+        u menu list -f Tools               # Items containing 'Tools'
+        u menu list -f "Window/Analysis"   # Narrow to a submenu
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.list(filter_text=filter_text, limit=limit)
@@ -80,7 +110,17 @@ def menu_context(
         typer.Option("--target", "-t", help="Target object path (hierarchy or asset)"),
     ] = None,
 ) -> None:
-    """Execute a ContextMenu method on target object."""
+    """Invoke a [ContextMenu] method on a GameObject, Component, or Asset.
+
+    Targets methods decorated with [ContextMenu("MethodName")] in MonoBehaviours
+    or ScriptableObjects — equivalent to right-clicking the component header and
+    selecting the entry. If --target is omitted, the current Selection is used.
+
+    Examples:
+        u menu context Reset                                 # On current selection
+        u menu context Bake -t "Assets/Data/LightConfig.asset"
+        u menu context Regenerate -t "Player"                # Hierarchy name
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.menu.context(method=method, target=target)

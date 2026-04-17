@@ -20,7 +20,15 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
-recorder_app = typer.Typer(help="Frame recording commands")
+recorder_app = typer.Typer(
+    help=(
+        "Continuously capture frames from a Camera to disk (multi-frame recording).\n\n"
+        "Unlike 'u screenshot' (one-shot or fixed burst), this streams PNG/JPG frames\n"
+        "at a target FPS into an output directory until 'stop' is called. Useful for\n"
+        "gameplay capture, time-lapse, or automated visual regression runs.\n"
+        "Use 'u screenshot' for single captures or fixed-length bursts instead."
+    )
+)
 
 
 @recorder_app.command("start")
@@ -59,7 +67,17 @@ def recorder_start(
         typer.Option("--json", "-j", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Start recording frames from camera."""
+    """Begin streaming Camera frames to disk until 'u recorder stop' is called.
+
+    If --output is omitted, frames go to a timestamped folder under the project's
+    temp directory (shown in the success output). Use 'u recorder status' to check
+    progress, and 'u recorder stop' to finish and get the summary.
+
+    Examples:
+        u recorder start                                    # Main Camera, jpg, 30fps
+        u recorder start --fps 60 -f png -o ./capture
+        u recorder start -c "UI Camera" -W 1280 -H 720
+    """
     context: CLIContext = ctx.obj
 
     if format not in ("png", "jpg"):
@@ -98,7 +116,7 @@ def recorder_stop(
         typer.Option("--json", "-j", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Stop recording and get results."""
+    """End an active recording and report total frames, duration, FPS, and output dir."""
     context: CLIContext = ctx.obj
 
     try:
@@ -127,7 +145,7 @@ def recorder_status(
         typer.Option("--json", "-j", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Check recording status."""
+    """Show whether recording is active and the current frame count / elapsed time / pending writes."""
     context: CLIContext = ctx.obj
 
     try:

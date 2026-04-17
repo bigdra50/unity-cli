@@ -23,7 +23,14 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
-tests_app = typer.Typer(help="Test execution commands")
+tests_app = typer.Typer(
+    help=(
+        "Run Unity Test Runner suites (EditMode / PlayMode) from the CLI.\n\n"
+        "Wraps Unity's Test Framework: execute or list tests, filter by assembly,\n"
+        "category, fixture/name regex, and stream live progress. Exit code is non-zero\n"
+        "on test failure so it integrates cleanly with CI."
+    )
+)
 
 
 def _complete_test_mode(incomplete: str) -> list[tuple[str, str]]:
@@ -138,7 +145,19 @@ def tests_run(
         typer.Option("--no-wait", help="Return immediately without waiting for results"),
     ] = False,
 ) -> None:
-    """Run Unity tests."""
+    """Run EditMode or PlayMode tests and wait for results.
+
+    By default runs every test in the chosen mode and polls until completion,
+    printing a live progress summary. Filters are ANDed together.
+
+    Examples:
+        u tests run edit                                  # All EditMode tests
+        u tests run play                                  # All PlayMode tests
+        u tests run edit -a Game.Tests.Editor             # One assembly
+        u tests run edit -g "SceneTest"                   # Regex on test name
+        u tests run edit -n Ns.MyTests.MyCase             # Single test (full name)
+        u tests run edit --no-wait                        # Fire and forget (poll later via 'tests status')
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.tests.run(
@@ -178,7 +197,14 @@ def tests_list(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List available tests."""
+    """List every discoverable test name in the given mode.
+
+    Helpful for picking exact values for --test-names or --group-pattern.
+
+    Examples:
+        u tests list edit
+        u tests list play --json
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.tests.list(mode=mode)
@@ -207,7 +233,10 @@ def tests_status(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Check running test status."""
+    """Check whether a test run is in progress and its pass/fail counts.
+
+    Pairs with 'u tests run --no-wait' for asynchronous CI-style workflows.
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.tests.status()
