@@ -11,7 +11,15 @@ from unity_cli.cli.helpers import _handle_error, _should_json
 from unity_cli.cli.output import print_json, print_line, print_success, print_warning
 from unity_cli.exceptions import UnityCLIError
 
-console_app = typer.Typer(help="Console log commands")
+console_app = typer.Typer(
+    help=(
+        "Read and clear the Unity Editor Console log.\n\n"
+        "Mirrors entries produced by Debug.Log/LogWarning/LogError/LogException, plus\n"
+        "compiler errors. Use 'get' to retrieve logs with adb-logcat-style level\n"
+        "filtering (and pipe to head/grep for narrowing), and 'clear' to wipe them.\n"
+        "Tip: combine with 'u refresh' to surface compilation errors from the shell."
+    )
+)
 
 
 def _parse_level(level: str) -> list[str]:
@@ -151,7 +159,7 @@ def _print_console_entries(entries: list[dict[str, Any]], include_stacktrace: bo
 
 @console_app.command("clear")
 def console_clear(ctx: typer.Context) -> None:
-    """Clear console logs."""
+    """Wipe the Unity Console (same as clicking 'Clear' in the Console window)."""
     context: CLIContext = ctx.obj
     try:
         context.client.console.clear()

@@ -10,7 +10,15 @@ from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _exit_usage, _parse_cli_value, _should_json, handle_cli_errors
 from unity_cli.cli.output import print_components_table, print_json, print_key_value, print_success
 
-component_app = typer.Typer(help="Component commands")
+component_app = typer.Typer(
+    help=(
+        "List, inspect, add, modify, and remove Components on GameObjects.\n\n"
+        "The --type/-T option accepts a Component type name (short like 'Rigidbody',\n"
+        "'Camera', 'Transform', or fully-qualified like 'UnityEngine.Rigidbody').\n"
+        "User MonoBehaviour types work too if they are reachable by name. Targets\n"
+        "are chosen with --target <name> or --target-id <instance-id>."
+    )
+)
 
 
 @component_app.command("list")
@@ -24,7 +32,11 @@ def component_list(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List components on a GameObject."""
+    """Enumerate every Component attached to a GameObject.
+
+    Example:
+        u component list -t Player
+    """
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
@@ -49,7 +61,11 @@ def component_inspect(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Inspect component properties."""
+    """Dump all serialized property values of a Component on a GameObject.
+
+    Example:
+        u component inspect -t "Main Camera" -T Camera
+    """
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
@@ -74,7 +90,13 @@ def component_add(
     target: Annotated[str | None, typer.Option("--target", "-t", help="Target GameObject name")] = None,
     target_id: Annotated[int | None, typer.Option("--target-id", help="Target GameObject ID")] = None,
 ) -> None:
-    """Add a component to a GameObject."""
+    """Attach a new Component to a GameObject.
+
+    Examples:
+        u component add -t Player -T Rigidbody
+        u component add -t Enemy  -T UnityEngine.BoxCollider
+        u component add -t Enemy  -T MyNamespace.HealthController   # custom MonoBehaviour
+    """
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:
@@ -136,7 +158,11 @@ def component_remove(
     target: Annotated[str | None, typer.Option("--target", "-t", help="Target GameObject name")] = None,
     target_id: Annotated[int | None, typer.Option("--target-id", help="Target GameObject ID")] = None,
 ) -> None:
-    """Remove a component from a GameObject."""
+    """Detach/destroy a Component from a GameObject.
+
+    Example:
+        u component remove -t Enemy -T BoxCollider
+    """
     context: CLIContext = ctx.obj
 
     if not target and target_id is None:

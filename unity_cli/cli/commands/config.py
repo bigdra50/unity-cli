@@ -13,7 +13,14 @@ from unity_cli.cli.helpers import _should_json
 from unity_cli.cli.output import print_error, print_json, print_line, print_success
 from unity_cli.config import CONFIG_FILE_NAME, UnityCLIConfig
 
-config_app = typer.Typer(help="Configuration commands")
+config_app = typer.Typer(
+    help=(
+        "Inspect or generate the unity-cli config file (.unity-cli.toml).\n\n"
+        "Stores default relay host/port, timeout, and the preferred Unity instance\n"
+        "so you don't need to repeat --relay-* or -i on every invocation. Looked up\n"
+        "from the current directory upward, similar to .editorconfig."
+    )
+)
 
 
 @config_app.command("show")
@@ -24,7 +31,7 @@ def config_show(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Show current configuration."""
+    """Print the resolved config (from file + env vars + CLI flags) and its source path."""
     context: CLIContext = ctx.obj
     config_file = UnityCLIConfig._find_config_file()
 
@@ -59,7 +66,10 @@ def config_init(
         typer.Option("--force", "-f", help="Overwrite existing config"),
     ] = False,
 ) -> None:
-    """Generate default .unity-cli.toml configuration file."""
+    """Write a default .unity-cli.toml into the current directory (edit to taste).
+
+    Use --output to pick a different path, --force to overwrite an existing file.
+    """
     output_path = output or Path(CONFIG_FILE_NAME)
 
     if output_path.exists() and not force:

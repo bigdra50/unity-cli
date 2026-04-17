@@ -21,7 +21,13 @@ from unity_cli.cli.output import (
 )
 from unity_cli.exceptions import UnityCLIError
 
-build_app = typer.Typer(help="Build pipeline commands")
+build_app = typer.Typer(
+    help=(
+        "Drive Unity's BuildPipeline from the CLI (standalone, mobile, WebGL, ...).\n\n"
+        "Inspect the project's current Build Settings, list the scenes queued for\n"
+        "build, and kick off a player build for any BuildTarget the project supports."
+    )
+)
 
 
 @build_app.command("settings")
@@ -32,7 +38,7 @@ def build_settings(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Show current build settings."""
+    """Print the current Build Settings (target, product info, scripting backend, scenes)."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.build.settings()
@@ -90,7 +96,20 @@ def build_run(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """Run a build."""
+    """Execute a player build (BuildPipeline.BuildPlayer) and report results.
+
+    Defaults use the project's current Build Settings. Override --target for
+    a different platform or --scene to pick a one-off scene set. Exits non-zero
+    on build failure.
+
+    --target accepts Unity BuildTarget names, e.g.:
+      StandaloneWindows64, StandaloneOSX, StandaloneLinux64, Android, iOS, WebGL.
+
+    Examples:
+        u build run                                          # Use current settings
+        u build run -t StandaloneOSX -o Build/Mac/App.app
+        u build run -t Android -o Build/app.apk -s Assets/Scenes/Main.unity
+    """
     context: CLIContext = ctx.obj
     try:
         result = context.client.build.build(
@@ -138,7 +157,7 @@ def build_scenes(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List build scenes."""
+    """List the scenes registered in Build Settings (with enabled flag and GUID)."""
     context: CLIContext = ctx.obj
     try:
         result = context.client.build.scenes()

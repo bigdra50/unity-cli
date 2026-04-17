@@ -11,7 +11,15 @@ from unity_cli.cli.context import CLIContext
 from unity_cli.cli.helpers import _should_json, handle_cli_errors
 from unity_cli.cli.output import print_json, print_plain_table, print_success
 
-api_app = typer.Typer(help="Dynamic Unity API invocation")
+api_app = typer.Typer(
+    help=(
+        "Call any Unity static API method dynamically via reflection.\n\n"
+        "Bridges from the CLI to UnityEngine/UnityEditor static methods and properties\n"
+        "(e.g. AssetDatabase.Refresh, Application.unityVersion, EditorUtility.*).\n"
+        "Use 'api schema' to discover available methods and 'api call' to invoke them.\n"
+        "Instance methods are NOT supported — only public static members."
+    )
+)
 
 
 @api_app.command("call")
@@ -105,7 +113,17 @@ def api_schema(
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List available Unity static API methods."""
+    """List static API methods discoverable by 'api call'.
+
+    Returned entries include fully-qualified type, method name, return type,
+    and parameter signature. Combine filters to narrow the search.
+
+    Examples:
+        u api schema -t AssetDatabase               # All methods on one type
+        u api schema -n UnityEditor                  # Everything under a namespace
+        u api schema -m Refresh                      # Any method named Refresh
+        u api schema --offline --version 2022.3      # Browse cached schema offline
+    """
     context: CLIContext = ctx.obj
     result = context.client.dynamic_api.schema(
         namespace=namespace,

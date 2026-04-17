@@ -37,7 +37,12 @@ def register(app: typer.Typer) -> None:
             typer.Option("--json", help="Output as JSON"),
         ] = False,
     ) -> None:
-        """List connected Unity instances."""
+        """List Unity Editor instances currently registered with the Relay Server.
+
+        Each row shows the project path/name and its instance ID. Use the name
+        or path prefix with --instance/-i on any command to target a specific
+        editor when more than one is open.
+        """
         context: CLIContext = ctx.obj
         try:
             result = context.client.list_instances()
@@ -57,7 +62,10 @@ def register(app: typer.Typer) -> None:
             typer.Option("--json", help="Output as JSON"),
         ] = False,
     ) -> None:
-        """Get editor state."""
+        """Return current editor state: play mode, pause, compilation, active scene.
+
+        Useful as a readiness probe before scripting other commands.
+        """
         context: CLIContext = ctx.obj
         try:
             result = context.client.editor.get_state()
@@ -70,7 +78,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def play(ctx: typer.Context) -> None:
-        """Enter play mode."""
+        """Enter Play Mode (equivalent to pressing the Play button in the editor)."""
         context: CLIContext = ctx.obj
         try:
             context.client.editor.play()
@@ -80,7 +88,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def stop(ctx: typer.Context) -> None:
-        """Exit play mode."""
+        """Exit Play Mode and return to Edit Mode."""
         context: CLIContext = ctx.obj
         try:
             context.client.editor.stop()
@@ -90,7 +98,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def pause(ctx: typer.Context) -> None:
-        """Toggle pause."""
+        """Toggle Play Mode pause (has no effect when not in Play Mode)."""
         context: CLIContext = ctx.obj
         try:
             context.client.editor.pause()
@@ -100,7 +108,11 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def refresh(ctx: typer.Context) -> None:
-        """Refresh asset database (trigger recompilation)."""
+        """Run AssetDatabase.Refresh — reimport changed assets and recompile scripts.
+
+        Equivalent to 'Assets > Refresh' / Ctrl+R in the editor. Use after editing
+        C# files from outside Unity to force a compile.
+        """
         context: CLIContext = ctx.obj
         try:
             context.client.editor.refresh()
