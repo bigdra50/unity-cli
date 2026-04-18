@@ -39,6 +39,8 @@ class GameObjectAPI:
         self,
         name: str,
         primitive_type: str | None = None,
+        parent: str | None = None,
+        parent_id: int | None = None,
         position: list[float] | None = None,
         rotation: list[float] | None = None,
         scale: list[float] | None = None,
@@ -48,6 +50,8 @@ class GameObjectAPI:
         Args:
             name: Name for the new GameObject
             primitive_type: Primitive type (e.g., "Cube", "Sphere")
+            parent: Parent GameObject name
+            parent_id: Parent GameObject instance ID
             position: Initial position [x, y, z]
             rotation: Initial rotation [x, y, z]
             scale: Initial scale [x, y, z]
@@ -58,6 +62,10 @@ class GameObjectAPI:
         params: dict[str, Any] = {"action": "create", "name": name}
         if primitive_type:
             params["primitive"] = primitive_type
+        if parent:
+            params["parent"] = parent
+        if parent_id is not None:
+            params["parentId"] = parent_id
         if position:
             params["position"] = position
         if rotation:
