@@ -10,11 +10,6 @@ from unity_cli.api.gameobject import GameObjectAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> GameObjectAPI:
     return GameObjectAPI(mock_conn)
 

@@ -10,12 +10,6 @@ from unity_cli.api.selection import SelectionAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    """Create a mock relay connection."""
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> SelectionAPI:
     """Create a SelectionAPI instance with mock connection."""
     return SelectionAPI(mock_conn)

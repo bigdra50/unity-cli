@@ -10,12 +10,6 @@ from unity_cli.api.scene import SceneAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    """Create a mock relay connection."""
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> SceneAPI:
     """Create a SceneAPI instance with mock connection."""
     return SceneAPI(mock_conn)

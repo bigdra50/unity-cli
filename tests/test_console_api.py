@@ -10,12 +10,6 @@ from unity_cli.api.console import ConsoleAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    """Create a mock relay connection."""
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> ConsoleAPI:
     """Create a ConsoleAPI instance with mock connection."""
     return ConsoleAPI(mock_conn)

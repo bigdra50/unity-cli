@@ -10,11 +10,6 @@ from unity_cli.api.package import PackageAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> PackageAPI:
     return PackageAPI(mock_conn)
 

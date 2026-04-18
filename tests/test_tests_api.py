@@ -10,12 +10,6 @@ from unity_cli.api.tests import TestAPI
 
 
 @pytest.fixture
-def mock_conn() -> MagicMock:
-    """Create a mock relay connection."""
-    return MagicMock()
-
-
-@pytest.fixture
 def sut(mock_conn: MagicMock) -> TestAPI:
     """Create a TestAPI instance with mock connection."""
     return TestAPI(mock_conn)

@@ -34,6 +34,7 @@ interactive = ["InquirerPy>=0.3.4"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
     "mypy>=1.19.1",
     "ruff>=0.14.13",
     "pre-commit>=4.0",
@@ -46,6 +47,7 @@ dev = [
 asyncio_mode = "auto"
 markers = [
     "integration: requires running Relay Server and Unity Editor",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 
 [project.urls]
@@ -105,6 +107,20 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.coverage.run]
+source = ["relay", "unity_cli"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+]
+precision = 2
+show_missing = true
 
 [tool.importlinter]
 root_packages = ["relay", "unity_cli"]
