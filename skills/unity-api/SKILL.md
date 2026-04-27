@@ -1,10 +1,14 @@
 ---
 name: unity-api
-description: "Unity API の探索と実行。u api schema で検索、u api call で任意の public static メソッドを呼ぶ。"
-user-invocable: true
+description: |
+  Unity API の探索と実行。u api schema で検索、u api call で任意の public static メソッドを呼ぶ。
+  Use for: "Unity API 呼び出し", "u api call", "schema 検索", "CLI 非対応操作のフォールバック"
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
     cliHelp: "u api --help"
@@ -12,7 +16,7 @@ metadata:
 
 # unity-api
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 
 既存 `u` コマンドにない操作を Unity API から直接呼ぶ。
 

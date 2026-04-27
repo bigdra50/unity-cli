@@ -3,17 +3,19 @@ name: unity-build
 description: |
   ビルドワークフロー。検証 → 設定確認 → ビルド実行 → エラー対応。
   Use for: "ビルド", "ビルド実行", "プラットフォーム設定", "ビルドエラー"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---
 
 # unity-build
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 
 ## ワークフロー
 

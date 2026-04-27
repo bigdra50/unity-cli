@@ -493,7 +493,30 @@ u play --quiet 2>/dev/null; echo $?  # Suppress output, check exit code only
 
 ## AI Agent Skills
 
-Workflow skills for AI coding agents (Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, etc.). Installed via [Skills CLI](https://skills.sh/).
+Workflow skills for AI coding agents (Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, etc.). Conforms to the [agentskills.io](https://agentskills.io/specification) spec.
+
+### Option 1: GitHub CLI (recommended, gh 2.90.0+)
+
+```bash
+# Interactive: pick skills from a list
+gh skill install bigdra50/unity-cli
+
+# Install a single skill
+gh skill install bigdra50/unity-cli unity-verify
+
+# Install all skills at once (Claude Code, user scope)
+for s in unity-shared unity-verify unity-debug unity-build \
+         unity-scene unity-asset unity-perf unity-ui unity-api; do
+  gh skill install bigdra50/unity-cli "$s" --agent claude-code --scope user
+done
+
+# Pin to a specific release
+gh skill install bigdra50/unity-cli unity-verify --pin v3.11.0
+```
+
+Supports 40+ agents via `--agent` (claude-code, github-copilot, cursor, codex, gemini-cli, ...). Default scope is `project`; use `--scope user` for global install.
+
+### Option 2: Skills CLI (cross-agent, no gh required)
 
 ```bash
 # Install all skills (project-local)
@@ -505,6 +528,22 @@ npx skills add github:bigdra50/unity-cli -g
 # Install specific skills only
 npx skills add github:bigdra50/unity-cli -s unity-ui unity-api
 ```
+
+See [Skills CLI](https://skills.sh/) for details.
+
+### Option 3: Manual (git clone)
+
+```bash
+git clone https://github.com/bigdra50/unity-cli.git
+
+# Single skill
+cp -r unity-cli/skills/unity-verify ~/.claude/skills/
+
+# All skills
+cp -r unity-cli/skills/* ~/.claude/skills/
+```
+
+### Skills
 
 | Skill | Description |
 |-------|-------------|

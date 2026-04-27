@@ -3,17 +3,19 @@ name: unity-scene
 description: |
   シーン構築ワークフロー。オブジェクト配置、コンポーネント設定、Prefab化、シーン保存。
   Use for: "シーン構築", "オブジェクト配置", "Prefab化", "コンポーネント設定"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---
 
 # unity-scene
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 
 ## ワークフロー
 
