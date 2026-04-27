@@ -3,10 +3,12 @@ name: unity-asset
 description: |
   アセット管理ワークフロー。依存関係調査、参照整合性チェック、パッケージ管理。
   Use for: "アセット依存", "参照切れ", "パッケージ管理", "不要アセット"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---

@@ -3,10 +3,12 @@ name: unity-debug
 description: |
   ランタイムエラー・NullReference・コンソールログの調査ワークフロー。
   Use for: "エラー調査", "NullReference", "デバッグ", "コンソール確認", "ログ確認"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---

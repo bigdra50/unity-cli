@@ -1,10 +1,12 @@
 ---
 name: unity-shared
-description: "unity-cli 共通ルール。全スキルの前提条件。"
-user-invocable: false
+description: "unity-cli 共通ルール。全 unity-* スキルが自動ロードする前提条件。Use as prerequisite for any unity-* skill (verification sequence, fallback order, security policy)."
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: false
     requires:
       bins: ["u"]
     cliHelp: "u --help"

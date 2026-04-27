@@ -3,10 +3,12 @@ name: unity-perf
 description: |
   パフォーマンス計測ワークフロー。プロファイリング、GC 分析、最適化提案。
   Use for: "パフォーマンス", "プロファイル", "FPS", "GC", "最適化", "ボトルネック"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---

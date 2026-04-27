@@ -3,10 +3,12 @@ name: unity-ui
 description: |
   UI 開発・検査・自動テストワークフロー。uitree で構造把握→pytest E2E テスト生成→PlayMode テストに移植。
   Use for: "UI確認", "UI Toolkit", "uGUI", "E2Eテスト", "UI操作", "uitree", "スクリーンショット"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---

@@ -3,10 +3,12 @@ name: unity-verify
 description: |
   コード変更後の検証ワークフロー。refresh → コンパイル待ち → エラー確認 → 任意でテスト。
   Use for: "検証して", "コンパイル確認", "テスト実行", "verify", "preflight"
-user-invocable: true
+license: MIT
+compatibility: Requires `u` CLI (unity-cli) and active Unity Editor via Relay Server.
 metadata:
   openclaw:
     category: "game-development"
+    user-invocable: true
     requires:
       bins: ["u"]
 ---
