@@ -511,7 +511,7 @@ for s in unity-shared unity-verify unity-debug unity-build \
 done
 
 # 特定リリースに固定
-gh skill install bigdra50/unity-cli unity-verify --pin v3.11.1
+gh skill install bigdra50/unity-cli unity-verify --pin v3.11.0
 ```
 
 `--agent` で 40+ エージェントに対応 (claude-code, github-copilot, cursor, codex, gemini-cli, ...)。デフォルトは `--scope project`。グローバルは `--scope user`。
@@ -535,7 +535,12 @@ npx skills add github:bigdra50/unity-cli -s unity-ui unity-api
 
 ```bash
 git clone https://github.com/bigdra50/unity-cli.git
+
+# 単体
 cp -r unity-cli/skills/unity-verify ~/.claude/skills/
+
+# 全スキル
+cp -r unity-cli/skills/* ~/.claude/skills/
 ```
 
 ### スキル一覧

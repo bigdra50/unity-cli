@@ -15,7 +15,7 @@ metadata:
 
 # unity-scene
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 
 ## ワークフロー
 

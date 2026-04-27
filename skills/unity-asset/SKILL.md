@@ -15,7 +15,7 @@ metadata:
 
 # unity-asset
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 
 ## 調査フロー
 

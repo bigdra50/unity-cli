@@ -16,7 +16,7 @@ metadata:
 
 # unity-api
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 
 既存 `u` コマンドにない操作を Unity API から直接呼ぶ。
 

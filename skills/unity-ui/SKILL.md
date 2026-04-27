@@ -15,7 +15,7 @@ metadata:
 
 # unity-ui
 
-> **PREREQUISITE:** `../unity-shared/SKILL.md`
+> **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
 >
 > uitree コマンドは Play Mode 中のみ動作する。必ず `u play` してから実行すること。
 

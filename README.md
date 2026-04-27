@@ -511,7 +511,7 @@ for s in unity-shared unity-verify unity-debug unity-build \
 done
 
 # Pin to a specific release
-gh skill install bigdra50/unity-cli unity-verify --pin v3.11.1
+gh skill install bigdra50/unity-cli unity-verify --pin v3.11.0
 ```
 
 Supports 40+ agents via `--agent` (claude-code, github-copilot, cursor, codex, gemini-cli, ...). Default scope is `project`; use `--scope user` for global install.
@@ -535,7 +535,12 @@ See [Skills CLI](https://skills.sh/) for details.
 
 ```bash
 git clone https://github.com/bigdra50/unity-cli.git
+
+# Single skill
 cp -r unity-cli/skills/unity-verify ~/.claude/skills/
+
+# All skills
+cp -r unity-cli/skills/* ~/.claude/skills/
 ```
 
 ### Skills
