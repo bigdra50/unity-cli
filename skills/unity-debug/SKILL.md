@@ -16,13 +16,15 @@ metadata:
 # unity-debug
 
 > **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
+>
+> skill 経由のコマンドは必ず `-i <instance>` を付ける (unity-shared #インスタンス指定)。
 
 ## 調査フロー
 
 ```text
-1. エラー取得      u console get -l E,X --count 20
+1. エラー取得      u -i <instance> console get -l E,X | head -20
 2. エラー分類      → コンパイルエラー / ランタイムエラー / Missing 系
-3. コンテキスト収集  u scene hierarchy / u component inspect / u screenshot
+3. コンテキスト収集  u -i <instance> scene hierarchy / u -i <instance> component inspect / u -i <instance> screenshot
 4. 原因特定 → 修正 → /unity-verify で検証
 ```
 
@@ -31,25 +33,25 @@ metadata:
 | エラー種別 | 対応 |
 |-----------|------|
 | CS0XXX (コンパイルエラー) | コード修正 → /unity-verify |
-| NullReferenceException | `u scene hierarchy` + `u component inspect` で参照確認 |
-| MissingReferenceException | `u asset info` でアセット存在確認 |
-| MissingComponentException | `u component list` で確認 → `u component add` |
+| NullReferenceException | `u -i <instance> scene hierarchy` + `u -i <instance> component inspect` で参照確認 |
+| MissingReferenceException | `u -i <instance> asset info` でアセット存在確認 |
+| MissingComponentException | `u -i <instance> component list` で確認 → `u -i <instance> component add` |
 
 ## コンソール操作
 
 ```bash
-u console get                      # 全ログ
-u console get -l E --count 10      # Error のみ、先頭10件
-u console get -l E,W               # Error + Warning
-u console clear                    # ログクリア
+u -i <instance> console get                   # 全ログ
+u -i <instance> console get -l E | head -10   # Error のみ、先頭10件
+u -i <instance> console get -l E,W            # Error + Warning
+u -i <instance> console clear                 # ログクリア
 ```
 
 ## 状態確認
 
 ```bash
-u screenshot                       # エディタのスクリーンショット
-u scene hierarchy                  # 現在のシーン構造
-u state                            # Play/Pause/Compile 状態
+u -i <instance> screenshot          # エディタのスクリーンショット
+u -i <instance> scene hierarchy     # 現在のシーン構造
+u -i <instance> state               # Play/Pause/Compile 状態
 ```
 
 コンパイルエラーが解決しない場合は /unity-verify に切り替える。

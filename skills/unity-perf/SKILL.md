@@ -16,28 +16,30 @@ metadata:
 # unity-perf
 
 > **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
+>
+> skill 経由のコマンドは必ず `-i <instance>` を付ける (unity-shared #インスタンス指定)。
 
 ## プロファイリングフロー
 
 ```text
-1. /unity-verify Quick Verify      コンパイルエラーがないことを確認
-2. u play                          Play Mode 開始
-3. u profiler start                プロファイリング開始
+1. /unity-verify Quick Verify             コンパイルエラーがないことを確認
+2. u -i <instance> play                   Play Mode 開始
+3. u -i <instance> profiler start         プロファイリング開始
 4. 計測 (数秒〜数十秒)
-5. u profiler snapshot             スナップショット取得
-   u profiler frames --count 10   フレームデータ取得
-6. u profiler stop                 停止
-7. u stop                          Play Mode 終了
+5. u -i <instance> profiler snapshot      スナップショット取得
+   u -i <instance> profiler frames --count 10   フレームデータ取得
+6. u -i <instance> profiler stop          停止
+7. u -i <instance> stop                   Play Mode 終了
 8. 分析 → 最適化提案
 ```
 
 ## コマンド
 
 ```bash
-u profiler start                  # 開始
-u profiler stop                   # 停止
-u profiler snapshot               # 現在のスナップショット
-u profiler frames --count 10      # 直近Nフレーム
+u -i <instance> profiler start                  # 開始
+u -i <instance> profiler stop                   # 停止
+u -i <instance> profiler snapshot               # 現在のスナップショット
+u -i <instance> profiler frames --count 10      # 直近Nフレーム
 ```
 
 ## 分析パターン

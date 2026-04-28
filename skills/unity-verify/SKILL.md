@@ -19,13 +19,39 @@ metadata:
 
 ## Quick Verify
 
-コード変更するたびに実行。unity-shared の Quick Verify そのもの。
+コード変更するたびに実行。unity-shared の Quick Verify (#quick-verify) を参照。skill 経由のコマンドは必ず `-i <instance>` を付ける (unity-shared #インスタンス指定)。
 
 ```text
-u refresh → isCompiling ポーリング → u console clear → u console get -l E,W
-→ Error あり: 修正して再実行 (最大3回)
-→ クリーン: 完了
+u -i <instance> console clear
+→ u -i <instance> refresh
+→ isCompiling ポーリング (2s 間隔, 最大 30s)
+→ u -i <instance> console get -l E,W | head -50
 ```
+
+### 結果判定
+
+`u console get` の出力に対して以下のテーブルで判定。出力ゼロ行 = エラー無しとして扱う (空 = OK)。
+
+| 出力内容 | 判定 | 次のアクション |
+|----------|------|---------------|
+| 空 (0 行) | **クリーン** | 完了。次工程 (Full Verify 等) に進める |
+| `[ERROR]` 行のみ無し ＋ `[WARN]` 行あり | **クリーン (Warning 許容)** | Warning を 1〜3 行に要約してユーザー報告、続行 |
+| `[ERROR]` 行あり | **エラー** | 下記「修正ループ」へ |
+
+`-l E,W` は Error + Warning 両方を取得する。Warning だけなら続行可、Error が 1 件でもあれば停止して修正ループに入る。
+
+### 修正ループ (Error 検出時)
+
+最大 3 回までの「修正 → Quick Verify 再実行」サイクル。
+
+1. **修正前にユーザー確認 (default)**: 以下のいずれかに該当する場合は自動修正せずユーザーに修正方針を確認する
+   - ファイル名 prefix が `_` (例: `_Broken*.cs`) または "Test" "Fixture" 等を含む
+   - エラーファイル内コメントに `intentional`, `TODO`, `FIXME`, `tuning` 等の意図的破壊を示唆する語がある
+   - 1 回の修正で 3 ファイル以上に変更が及ぶ場合
+   - 既存ロジックの大幅変更が必要な場合 (型変更、API 置換、import 追加以外の構造変更)
+2. **自動修正可**: 単純なタイプミス (セミコロン抜け、スペル間違い、import 不足) で 1 ファイル限定の場合は試行 OK
+3. **ループ運用**: 修正 → Quick Verify を最大 3 回繰り返す。3 回で解消しない場合はユーザーに状況を報告し判断を仰ぐ
+4. **副作用回避**: 1 回の修正は 1 ファイル単位。無関係な変更 (フォーマット整形、リファクタ) を混ぜない
 
 ## Full Verify
 
@@ -33,8 +59,8 @@ u refresh → isCompiling ポーリング → u console clear → u console get 
 
 ```text
 Quick Verify 実行
-→ クリーンなら u tests run edit → 結果確認
-→ Fail あり: 報告、修正して Quick Verify から再実行
+→ クリーン (Error 0、Warning は許容) なら u -i <instance> tests run edit → 結果確認
+→ Fail あり: 報告、修正して Quick Verify から再実行 (修正ループの規定に従う)
 ```
 
 ## Runtime Check
@@ -42,7 +68,12 @@ Quick Verify 実行
 要求された場合のみ。Play Mode でランタイムエラーを検出。
 
 ```text
-u console clear → u play → isPlaying ポーリング → 3秒待機 → u console get -l +E+X → u stop
+u -i <instance> console clear
+→ u -i <instance> play
+→ isPlaying ポーリング
+→ 3秒待機
+→ u -i <instance> console get -l +E+X
+→ u -i <instance> stop
 ```
 
 報告のみ。自動修正せずユーザーに判断を委ねる。

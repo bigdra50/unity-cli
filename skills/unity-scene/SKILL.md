@@ -16,15 +16,17 @@ metadata:
 # unity-scene
 
 > **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
+>
+> skill 経由のコマンドは必ず `-i <instance>` を付ける (unity-shared #インスタンス指定)。
 
 ## ワークフロー
 
 ```text
-1. 現状把握     u scene active / u scene hierarchy
-2. オブジェクト  u gameobject create / find / modify / delete
-3. コンポーネント u component add / modify / inspect / list
-4. Prefab化     u asset prefab <path> --target <name>
-5. シーン保存   u scene save
+1. 現状把握     u -i <instance> scene active / u -i <instance> scene hierarchy
+2. オブジェクト  u -i <instance> gameobject create / find / modify / delete
+3. コンポーネント u -i <instance> component add / modify / inspect / list
+4. Prefab化     u -i <instance> asset prefab <path> --target <name>
+5. シーン保存   u -i <instance> scene save
 ```
 
 ## コマンドリファレンス
@@ -32,42 +34,42 @@ metadata:
 ### Scene
 
 ```bash
-u scene active                    # アクティブシーン情報
-u scene hierarchy --depth 2       # 階層表示
-u scene load --path "Assets/..."  # シーン読み込み
-u scene save                      # 保存
+u -i <instance> scene active                    # アクティブシーン情報
+u -i <instance> scene hierarchy --depth 2       # 階層表示
+u -i <instance> scene load --path "Assets/..."  # シーン読み込み
+u -i <instance> scene save                      # 保存
 ```
 
 ### GameObject
 
 ```bash
-u gameobject create "Player"                          # 空オブジェクト
-u gameobject create "Cube" --primitive Cube            # プリミティブ
-u gameobject find --name "Player"                      # 検索
-u gameobject modify -n "Player" --position 0,1,0       # Transform変更
-u gameobject delete -n "Player"                        # 削除
+u -i <instance> gameobject create "Player"                          # 空オブジェクト
+u -i <instance> gameobject create "Cube" --primitive Cube           # プリミティブ
+u -i <instance> gameobject find --name "Player"                     # 検索
+u -i <instance> gameobject modify -n "Player" --position 0,1,0      # Transform変更
+u -i <instance> gameobject delete -n "Player"                       # 削除
 ```
 
 ### Component
 
 ```bash
-u component list -t "Player"                                      # 一覧
-u component inspect -t "Player" -T Rigidbody                      # 詳細
-u component add -t "Player" -T Rigidbody                          # 追加
-u component modify -t "Player" -T Rigidbody --prop mass --value 2 # 変更
-u component remove -t "Player" -T Rigidbody                       # 削除
+u -i <instance> component list -t "Player"                                      # 一覧
+u -i <instance> component inspect -t "Player" -T Rigidbody                      # 詳細
+u -i <instance> component add -t "Player" -T Rigidbody                          # 追加
+u -i <instance> component modify -t "Player" -T Rigidbody --prop mass --value 2 # 変更
+u -i <instance> component remove -t "Player" -T Rigidbody                       # 削除
 ```
 
 ### Asset
 
 ```bash
-u asset prefab "Assets/Prefabs/Player.prefab" --target "Player"  # Prefab化
-u asset info "Assets/Prefabs/Player.prefab"                       # 情報
+u -i <instance> asset prefab "Assets/Prefabs/Player.prefab" --target "Player"  # Prefab化
+u -i <instance> asset info "Assets/Prefabs/Player.prefab"                       # 情報
 ```
 
 ## CLI 非対応操作
 
 unity-shared のフォールバック順に従う:
-1. `u api schema --type <Type>` で対応メソッドを検索
-2. `u api call` で実行
+1. `u -i <instance> api schema --type <Type>` で対応メソッドを検索
+2. `u -i <instance> api call` で実行
 3. .meta インポート設定等は YAML 直接編集

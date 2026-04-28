@@ -17,36 +17,36 @@ metadata:
 # unity-api
 
 > **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
-
-既存 `u` コマンドにない操作を Unity API から直接呼ぶ。
+>
+> skill 経由のコマンドは必ず `-i <instance>` を付ける (unity-shared #インスタンス指定)。`--offline` オプションのみ Relay 不要 = `-i` 不要。
 
 ## メソッド検索
 
 ```bash
-u api schema --type AssetDatabase          # 型名でフィルタ
-u api schema --namespace UnityEditor       # 名前空間でフィルタ
-u api schema --method Refresh              # メソッド名で検索
-u api schema --offline --type PlayerSettings  # キャッシュから (Relay 不要)
+u -i <instance> api schema --type AssetDatabase          # 型名でフィルタ
+u -i <instance> api schema --namespace UnityEditor       # 名前空間でフィルタ
+u -i <instance> api schema --method Refresh              # メソッド名で検索
+u api schema --offline --type PlayerSettings              # キャッシュから (Relay 不要なので -i 不要)
 ```
 
 ## メソッド呼び出し
 
 ```bash
-u api call UnityEngine.Application get_unityVersion
-u api call UnityEditor.AssetDatabase Refresh
-u api call UnityEditor.AssetDatabase ImportAsset --params '["Assets/Prefabs/Player.prefab", 0]'
-u api call UnityEditor.EditorApplication ExecuteMenuItem --params '["Window/General/Console"]'
+u -i <instance> api call UnityEngine.Application get_unityVersion
+u -i <instance> api call UnityEditor.AssetDatabase Refresh
+u -i <instance> api call UnityEditor.AssetDatabase ImportAsset --params '["Assets/Prefabs/Player.prefab", 0]'
+u -i <instance> api call UnityEditor.EditorApplication ExecuteMenuItem --params '["Window/General/Console"]'
 ```
 
 ## よく使うパターン
 
 | 用途 | コマンド |
 |------|---------|
-| プロジェクト設定 | `u api call UnityEditor.PlayerSettings get_productName` |
-| コンパイル状態 | `u api call UnityEditor.EditorApplication get_isCompiling` |
-| アセット存在確認 | `u api call UnityEditor.AssetDatabase AssetPathExists --params '["Assets/..."]'` |
-| フォルダ作成 | `u api call UnityEditor.AssetDatabase CreateFolder --params '["Assets", "New"]'` |
-| メニュー実行 | `u api call UnityEditor.EditorApplication ExecuteMenuItem --params '["Tools/..."]'` |
+| プロジェクト設定 | `u -i <instance> api call UnityEditor.PlayerSettings get_productName` |
+| コンパイル状態 | `u -i <instance> api call UnityEditor.EditorApplication get_isCompiling` |
+| アセット存在確認 | `u -i <instance> api call UnityEditor.AssetDatabase AssetPathExists --params '["Assets/..."]'` |
+| フォルダ作成 | `u -i <instance> api call UnityEditor.AssetDatabase CreateFolder --params '["Assets", "New"]'` |
+| メニュー実行 | `u -i <instance> api call UnityEditor.EditorApplication ExecuteMenuItem --params '["Tools/..."]'` |
 
 ## 制約
 

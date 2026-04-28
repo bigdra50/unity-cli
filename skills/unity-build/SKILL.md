@@ -16,23 +16,25 @@ metadata:
 # unity-build
 
 > **PREREQUISITE:** `../unity-shared/SKILL.md`（Relay Server 経由で Unity Editor が起動/アクティブであること）
+>
+> skill 経由のコマンドは必ず `-i <instance>` を付ける (unity-shared #インスタンス指定)。
 
 ## ワークフロー
 
 ```text
 1. /unity-verify Quick Verify   コンパイルエラーがないことを確認
-2. ビルド設定確認              u build settings --json
-3. ビルドシーン確認            u build scenes --json
-4. ビルド実行                  u build run --target <platform> --output <path>
+2. ビルド設定確認              u -i <instance> build settings --json
+3. ビルドシーン確認            u -i <instance> build scenes --json
+4. ビルド実行                  u -i <instance> build run --target <platform> --output <path>
 5. 結果確認                    成功/失敗を報告
 ```
 
 ## コマンド
 
 ```bash
-u build settings --json                                      # 現在の設定
-u build scenes --json                                        # ビルドシーン一覧
-u build run --target StandaloneWindows64 --output ./Build     # ビルド実行
+u -i <instance> build settings --json                                # 現在の設定
+u -i <instance> build scenes --json                                  # ビルドシーン一覧
+u -i <instance> build run --target StandaloneWindows64 --output ./Build   # ビルド実行
 ```
 
 ## プラットフォーム
@@ -50,5 +52,5 @@ u build run --target StandaloneWindows64 --output ./Build     # ビルド実行
 | エラー | 対応 |
 |--------|------|
 | コンパイルエラー | /unity-verify で修正ループ |
-| Missing Scene | `u build scenes` で確認、シーンパス修正 |
-| プラットフォーム未対応 | `u api call UnityEditor.EditorApplication ExecuteMenuItem --params '["File/Build Settings"]'` |
+| Missing Scene | `u -i <instance> build scenes` で確認、シーンパス修正 |
+| プラットフォーム未対応 | `u -i <instance> api call UnityEditor.EditorApplication ExecuteMenuItem --params '["File/Build Settings"]'` |
