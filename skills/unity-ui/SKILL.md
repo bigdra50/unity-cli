@@ -316,7 +316,7 @@ pytest E2E のまま残す基準:
 1. Phase 2 の pytest テストから安定したシナリオを選ぶ
 2. 以下のテンプレートに従い、`Assets/Tests/PlayMode/` に C# テストを生成する
 3. asmdef に UI コントローラの参照を追加する（必要に応じて）
-4. `u tests run play` で実行して確認する
+4. `u -i <instance> tests run play` で実行して確認する
 
 テンプレート:
 
@@ -417,7 +417,7 @@ asmdef の注意:
 
 Phase 2 の pytest テストの各テストメソッドを1対1で C# に移植する。
 
-移植後は `u tests run play` で実行。
+移植後は `u -i <instance> tests run play` で実行。
 
 ## CLI 非対応操作
 

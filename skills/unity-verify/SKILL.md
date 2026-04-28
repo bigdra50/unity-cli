@@ -59,7 +59,7 @@ u -i <instance> console clear
 
 ```text
 Quick Verify 実行
-→ クリーン (Error 0、Warning は許容) なら u tests run edit → 結果確認
+→ クリーン (Error 0、Warning は許容) なら u -i <instance> tests run edit → 結果確認
 → Fail あり: 報告、修正して Quick Verify から再実行 (修正ループの規定に従う)
 ```
 
