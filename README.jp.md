@@ -97,10 +97,9 @@ uv tool install git+https://github.com/bigdra50/unity-cli
 # インタラクティブUI付き（エディタ選択プロンプト）
 uv tool install "git+https://github.com/bigdra50/unity-cli[interactive]"
 
-# CLIコマンド（すべてのエイリアスが同じ動作）
+# CLIコマンド（どちらのエイリアスも同じ動作）
 unity-cli state    # フルネーム
-unity state        # 短縮形
-u state            # 最短形
+u state            # 短縮形
 
 u play
 u console get -l E | head -10  # 最新10件のエラー以上

@@ -97,10 +97,9 @@ uv tool install git+https://github.com/bigdra50/unity-cli
 # With interactive UI (editor selection prompt)
 uv tool install "git+https://github.com/bigdra50/unity-cli[interactive]"
 
-# CLI commands (all aliases work the same)
+# CLI commands (both aliases work the same)
 unity-cli state    # Full name
-unity state        # Short alias
-u state            # Shortest alias
+u state            # Short alias
 
 u play
 u console get -l E | head -10  # Last 10 error+ logs
